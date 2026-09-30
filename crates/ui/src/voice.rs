@@ -4043,6 +4043,8 @@ mod tests {
 				_ => {}
 			}
 		}
+		// Labels are matched in English; the default language follows the host locale.
+		crate::i18n::set_current(crate::i18n::Language::English);
 		let ctx = egui::Context::default();
 		let frame = |view: &mut MessagingUi, events: Vec<egui::Event>| {
 			let mut output = ctx.run_ui(
