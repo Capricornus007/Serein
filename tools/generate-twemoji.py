@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import io
 import sys
+import struct
 from pathlib import Path
 import shutil
 import subprocess
@@ -44,13 +45,26 @@ def main():
         assert len({text for text, _ in entries}) == COUNT
         atlas = Image.new("RGBA", (COLUMNS * CELL, ((COUNT + COLUMNS - 1) // COLUMNS) * CELL))
         index = []
+        sprites = bytearray()
+        offsets = [0]
         for cell, (text, member) in enumerate(entries):
-            with Image.open(archive.extractfile(member)) as original:
+            png = archive.extractfile(member).read()
+            with Image.open(io.BytesIO(png)) as original:
                 assert original.size == (72, 72)
+                padded = Image.new("RGBA", (76, 76))
+                padded.paste(original.convert("RGBA"), (2, 2))
+                encoded = io.BytesIO()
+                padded.save(encoded, format="PNG", optimize=True)
+                sprites.extend(encoded.getvalue())
+                offsets.append(len(sprites))
                 glyph = original.convert("RGBA").resize((CELL - 2, CELL - 2), Image.Resampling.LANCZOS)
                 atlas.paste(glyph, ((cell % COLUMNS) * CELL + 1, (cell // COLUMNS) * CELL + 1))
             index.append((text.replace("\ufe0f", ""), cell))
         assert len({text for text, _ in index}) == COUNT
+        assert len(sprites) <= 16 * 1024 * 1024
+        (destination / "sprites.bin").write_bytes(
+            struct.pack(f"<{COUNT + 1}I", *offsets) + sprites
+        )
         atlas.save(destination / "atlas.png", optimize=True)
         # Lossless; ~13% smaller than Pillow's best zlib output. Install with `cargo install oxipng`.
         if shutil.which("oxipng"):

@@ -1769,6 +1769,16 @@ impl Formatted {
 					text: cluster.to_owned(),
 					custom: custom.map(|(id, _)| id),
 					image: cell.and_then(|cell| {
+						if !demo
+							&& size * ui.ctx().pixels_per_point() > 30.0
+							&& let Some(image) = images.unicode_image(cell, size)
+						{
+							// Match the atlas's 30/32 glyph ratio: 72px artwork in a 76.8px slot.
+							return Some(image.alt_text(cluster).uv(egui::Rect::from_min_max(
+								egui::pos2(-0.4 / 76.0, -0.4 / 76.0),
+								egui::pos2(76.4 / 76.0, 76.4 / 76.0),
+							)));
+						}
 						atlas
 							.get_or_insert_with(|| crate::emoji::atlas(ui.ctx()))
 							.map(|atlas| crate::emoji::image_cell(atlas, cluster, cell, size))

@@ -1,10 +1,24 @@
-//! Bundled Twemoji. One fixed atlas, no runtime requests or per-message image cache.
+//! Bundled Twemoji: a small inline atlas and on-demand larger artwork.
 use egui::{Context, Image, TextureHandle};
 use image::ImageDecoder;
 use std::sync::OnceLock;
 
 const ATLAS: &[u8] = include_bytes!("../../../assets/twemoji/atlas.png");
 const INDEX: &str = include_str!("../../../assets/twemoji/index.tsv");
+const SPRITES: &[u8] = include_bytes!("../../../assets/twemoji/sprites.bin");
+
+/// Padded original 72px artwork for the shared off-thread image worker; never fetched or persisted.
+pub fn bundled_png(key: &str) -> Option<&'static [u8]> {
+	let cell: usize = key.strip_prefix("emoji-unicode-")?.parse().ok()?;
+	if cell >= 4009 {
+		return None;
+	}
+	let offsets = SPRITES.get(cell * 4..cell * 4 + 8)?;
+	let start = u32::from_le_bytes(offsets[..4].try_into().ok()?) as usize;
+	let end = u32::from_le_bytes(offsets[4..].try_into().ok()?) as usize;
+	SPRITES.get(4010 * 4..)?.get(start..end)
+}
+
 static ENTRIES: OnceLock<Vec<(&'static str, usize)>> = OnceLock::new();
 
 fn entries() -> &'static [(&'static str, usize)] {

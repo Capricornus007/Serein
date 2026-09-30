@@ -380,13 +380,24 @@ impl Avatars {
 			self.attempts.insert(key.clone(), (Instant::now(), false));
 			self.accept(_ctx, key.clone(), Some(image));
 		}
+		self.emoji_image(key, size, !demo)
+	}
+	pub(crate) fn unicode_image(&mut self, cell: usize, size: f32) -> Option<egui::Image<'static>> {
+		self.emoji_image(format!("emoji-unicode-{cell}"), size, true)
+	}
+	fn emoji_image(
+		&mut self,
+		key: String,
+		size: f32,
+		request: bool,
+	) -> Option<egui::Image<'static>> {
 		if let Some(entry) = self.emoji_textures.get_mut(&key) {
 			self.clock += 1;
 			entry.0 = self.clock;
 			let image = egui::Image::new(&entry.1).fit_to_exact_size(egui::Vec2::splat(size));
 			Some(image)
 		} else {
-			if !demo {
+			if request {
 				self.request(key);
 			}
 			None

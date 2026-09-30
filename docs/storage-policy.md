@@ -666,8 +666,12 @@ decodes one 2,048×2,016 RGBA atlas (15.75 MiB); the GPU texture has the same pi
 payload, with driver overhead additional. The decoder writes directly into the final
 CPU pixel buffer and premultiplies alpha in place; decoder scratch and upload staging
 can add temporary storage. The context retains the single atlas until exit,
-including across logout; there are no emoji downloads, disk writes, or growing texture
-queues. Unknown sequences and explicit text-presentation selectors remain font text.
+including across logout. Larger chat emoji use bundled original 72px artwork with
+a transparent two-pixel gutter, decoded off-thread through the existing bounded image
+worker. The fixed sprite bundle has 4,009 PNGs and a 16 MiB encoded-payload cap; decoded
+textures share the 1,024-item / 16 MiB emoji LRU below. They use no network or disk cache.
+The inline atlas remains the loading fallback; synthetic demo mode retains the atlas.
+Unknown sequences and explicit text-presentation selectors remain font text.
 
 GIF search and trending results retain at most eight session-memory pages / 768 KiB for ten
 minutes. Reopening a fresh query reuses its page without a REST request; least-recently-used

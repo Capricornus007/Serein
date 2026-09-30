@@ -14,6 +14,11 @@ of padding on each edge of every 32×32 cell, then losslessly recompressed with
 
 - `atlas.png`: RGBA, 2,048×2,016 pixels, 64 columns, 63 rows; row-major cells.
   Compressed: 5,225,108 bytes; decoded: 16,515,072 bytes (15.75 MiB).
+- `sprites.bin`: original 72?72 artwork with a transparent two-pixel gutter (76?76 PNGs),
+  decoded on demand off-thread for chat emoji larger than the inline atlas. The first
+  4,010 little-endian u32 values are offsets into the concatenated PNG payload, in
+  atlas-cell order. The payload is capped at 16 MiB; decoded images share the bounded
+  emoji texture cache. No network or disk cache is used for these bundled sprites.
 - `index.tsv`: UTF-8 Unicode sequence, tab, zero-based cell index; one entry per
   line, sorted by Unicode sequence after removing emoji presentation selectors
   (U+FE0F). Cell indices retain the original upstream sequence order. The renderer

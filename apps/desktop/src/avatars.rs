@@ -331,7 +331,8 @@ impl AvatarWorker {
 		})
 	}
 	pub fn request(&self, key: String) -> bool {
-		cdn_url(&key).is_some() && self.requests.try_send(key).is_ok()
+		(ui::emoji::bundled_png(&key).is_some() || cdn_url(&key).is_some())
+			&& self.requests.try_send(key).is_ok()
 	}
 	pub fn poll(&mut self) -> Option<AvatarResult> {
 		let result = self.results.try_recv().ok()?;
@@ -866,6 +867,21 @@ async fn run(
 			&& !*cancelled.borrow()
 			&& let Some(key) = viewer.pop_front().or_else(|| inline.pop_front())
 		{
+			if let Some(png) = ui::emoji::bundled_png(&key) {
+				jobs.spawn(async move {
+					let (image, frames, _) =
+						decode_blocking(&key, png.to_vec(), false, Budget::legacy(76), None).await;
+					Loaded {
+						key,
+						image,
+						frames,
+						fetched: None,
+						error: None,
+						until: cooldown,
+					}
+				});
+				continue;
+			}
 			let Some(MediaUrls { primary, fallback }) = job_urls(&key) else {
 				continue;
 			};
