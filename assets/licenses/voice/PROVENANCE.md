@@ -139,10 +139,13 @@ from DeepFilterNet commit `d375b2d8309e0935d165700c91da9de862a99c31`
 Tract 0.22.4 / ndarray 0.16.1 adaptation and runtime/reset changes.
 Hendrik Schröter and DeepFilterNet contributors retain their original copyrights.
 
-The embedded `models/DeepFilterNet3_onnx.tar.gz` is unchanged: 7,983,136 bytes,
+The source `models/DeepFilterNet3_onnx.tar.gz` is unchanged: 7,983,136 bytes,
 SHA-256 `c94d91f70911001c946e0fabb4aa9adc37045f45a03b56008cb0c8244cb63616`.
 These bytes also match release v0.5.6 at
-`978576aa8400552a4ce9730838c635aa30db5e61`. No model is downloaded at runtime.
+`978576aa8400552a4ce9730838c635aa30db5e61`. Serein embeds its deterministic
+Tract NNEF conversion, `models/DeepFilterNet3_nnef.tar.gz` (7,978,996 bytes,
+SHA-256 `1998816336f7351e143725bafe43b9948243e5681b5adb418638dad5652abb25`);
+the weights are unchanged. No model is downloaded at runtime.
 The upstream root license offers MIT or Apache-2.0, while its README describes
 the licensed scope as “all code”. The model archive carries no separate license
 entry. Explicit model-redistribution questions in upstream
@@ -161,4 +164,4 @@ and archive hashes in `assets/licenses/dependencies/PROVENANCE.md`.
 | `deep-filter-LICENSE` | [pinned upstream](https://github.com/Rikorose/DeepFilterNet/blob/d375b2d8309e0935d165700c91da9de862a99c31/LICENSE) | `f7ef673bf046d823dcd775bdd0768432bd8855f81d0e5e1290a0a48c42e2dca3` |
 | `deep-filter-LICENSE-MIT` | [pinned upstream](https://github.com/Rikorose/DeepFilterNet/blob/d375b2d8309e0935d165700c91da9de862a99c31/LICENSE-MIT) | `24e6bb09c928af8d8e56268082f87413247ce36b39dd5d33add2f9893968065e` |
 | `deep-filter-LICENSE-APACHE` | [pinned upstream](https://github.com/Rikorose/DeepFilterNet/blob/d375b2d8309e0935d165700c91da9de862a99c31/LICENSE-APACHE) | `1eaee808c5fb6b4e895ba30425285a5cdc5dd25bba2cd230f264c2200c331aec` |
-| `deep-filter-SEREIN-PATCH.md` | `vendor/deep-filter/SEREIN-PATCH.md` (local modification/provenance record) | `52d31cad159d8c83ba398d5b38589788434049c91efed253c89dfb45326ac6b5` |
+| `deep-filter-SEREIN-PATCH.md` | `vendor/deep-filter/SEREIN-PATCH.md` (local modification/provenance record) | `6f9541dbf9bea314014dd6324b128529b955482699cb270411135fbdea569297` |

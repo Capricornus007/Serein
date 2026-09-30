@@ -11,9 +11,11 @@ The upstream repository offers **MIT OR Apache-2.0**; its original license files
 and Serein's modification/provenance record are bundled under
 `assets/licenses/voice/deep-filter-*`.
 
-The unchanged **DeepFilterNet3_onnx.tar.gz** weights are embedded locally
-(7,983,136 bytes; SHA-256
-`c94d91f70911001c946e0fabb4aa9adc37045f45a03b56008cb0c8244cb63616`).
+The unchanged **DeepFilterNet3_onnx.tar.gz** weights (7,983,136 bytes; SHA-256
+`c94d91f70911001c946e0fabb4aa9adc37045f45a03b56008cb0c8244cb63616`) are embedded
+locally as their deterministic Tract NNEF conversion,
+`DeepFilterNet3_nnef.tar.gz` (SHA-256
+`1998816336f7351e143725bafe43b9948243e5681b5adb418638dad5652abb25`).
 No remote model service or runtime download is used. The repository README
 expressly describes the license scope as “all code”; the model archive has no
 separate license entry. Upstream pretrained-weight redistribution questions
@@ -22,9 +24,9 @@ separate license entry. Upstream pretrained-weight redistribution questions
 when checked on September 29, 2026. Model-specific license-scope clarification
 remains outstanding; copied repository license texts do not resolve it.
 
-Inference uses **tract-core, tract-data, tract-hir, tract-linalg, tract-nnef,
-tract-onnx, tract-onnx-opl, tract-pulse and tract-pulse-opl 0.22.4** and
-**ndarray 0.16.1** (MIT OR Apache-2.0). Exact versions, archive checksums and
+Inference uses **tract-core, tract-data, tract-linalg, tract-nnef and
+tract-pulse-opl 0.22.4** and **ndarray 0.16.1** (MIT OR Apache-2.0); the offline
+converter additionally uses tract-hir, tract-onnx, tract-onnx-opl and tract-pulse. Exact versions, archive checksums and
 unmodified license/copyright texts for all 52 newly locked registry components,
 including build-time helpers, are recorded in
 `assets/licenses/dependencies/PROVENANCE.md` and bundled by existing packaging.

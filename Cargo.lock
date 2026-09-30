@@ -1448,6 +1448,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "deep-filter-model"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "flate2",
+ "rust-ini",
+ "tar",
+ "tract-nnef",
+ "tract-onnx",
+ "tract-onnx-opl",
+ "tract-pulse",
+ "tract-pulse-opl",
+]
+
+[[package]]
 name = "deep_filter"
 version = "0.5.7-serein.1"
 dependencies = [
@@ -1462,9 +1477,8 @@ dependencies = [
  "rustfft",
  "tar",
  "tract-core",
- "tract-hir",
- "tract-onnx",
- "tract-pulse",
+ "tract-nnef",
+ "tract-pulse-opl",
 ]
 
 [[package]]

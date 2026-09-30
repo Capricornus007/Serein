@@ -3,7 +3,11 @@
 - Upstream: https://github.com/Rikorose/DeepFilterNet
 - Revision: `d375b2d8309e0935d165700c91da9de862a99c31` (`0.5.7-pre`).
 - Copied source: `libDF/src/lib.rs`, `libDF/src/tract.rs`.
-- Copied model: `models/DeepFilterNet3_onnx.tar.gz`, 7,983,136 bytes.
+- Embedded model: `models/DeepFilterNet3_nnef.tar.gz`, 7,978,996 bytes, SHA-256
+  `1998816336f7351e143725bafe43b9948243e5681b5adb418638dad5652abb25`, a deterministic
+  Tract NNEF conversion of the copied ONNX model below by `tools/deep-filter-model`.
+- Copied model: `models/DeepFilterNet3_onnx.tar.gz`, 7,983,136 bytes (conversion source,
+  not embedded).
 - Model SHA-256: `c94d91f70911001c946e0fabb4aa9adc37045f45a03b56008cb0c8244cb63616`.
   These bytes also match upstream release `v0.5.6`, revision
   `978576aa8400552a4ce9730838c635aa30db5e61`.
@@ -51,6 +55,15 @@ Local changes:
 8. Add a deterministic reset regression: process speech-like audio and silence,
    reset repeatedly, require outputs to match a fresh stream exactly and require
    spectral history lengths to stay fixed. No recorded or live audio is used.
+
+9. Load pre-pulsed NNEF graphs instead of ONNX. `tools/deep-filter-model` performs
+   upstream's ONNX parsing, input facts, declutter and pulsification offline, adds the
+   `tract_pulse_delay` serializer Tract 0.22.4 lacks, and writes a deterministic
+   archive; its test requires the committed bytes to equal a fresh conversion.
+   Runtime only optimizes for the host CPU, so `tract-onnx`, `tract-onnx-opl`,
+   `tract-hir` and `tract-pulse` are not linked. The mono-only runtime drops
+   `ReduceMask`, whose single-channel reduction is an identity. Output over 400
+   synthetic frames is byte-identical to the ONNX loader.
 
 No model weights were changed or retrained. Synthetic tests establish resource
 and state behavior, not perceptual quality or live-call compatibility.

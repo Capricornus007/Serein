@@ -4,7 +4,8 @@ This is a narrowly vendored Rust inference runtime from
 [Rikorose/DeepFilterNet](https://github.com/Rikorose/DeepFilterNet), maintained for Serein.
 See [SEREIN-PATCH.md](SEREIN-PATCH.md) for the exact source and local changes.
 
-The embedded standard DeepFilterNet3 model accepts normalized mono 48 kHz audio,
+The embedded standard DeepFilterNet3 model, pre-converted from upstream's ONNX release
+to Tract NNEF by `tools/deep-filter-model`, accepts normalized mono 48 kHz audio,
 480 samples per call (10 ms). Its 960-sample STFT and two-frame model lookahead
 add 30 ms of algorithmic delay. This is speech noise suppression, not an input
 activity gate. No Python, GPU, network download, or external model file is needed.

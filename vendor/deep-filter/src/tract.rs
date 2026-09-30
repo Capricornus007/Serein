@@ -9,10 +9,8 @@ use ndarray::{prelude::*, Axis};
 use tar::Archive;
 use tract_core::internal::tract_itertools::izip;
 use tract_core::internal::tract_smallvec::alloc::collections::VecDeque;
-use tract_core::ops;
 use tract_core::prelude::*;
-use tract_onnx::{prelude::*, tract_hir::shapefactoid};
-use tract_pulse::{internal::ToDim, model::*};
+use tract_pulse_opl::WithPulse;
 
 use crate::*;
 
@@ -26,8 +24,11 @@ pub struct DfParams {
 
 impl DfParams {
 	/// Load the one trusted, embedded model; no arbitrary model files are accepted.
+	///
+	/// The archive holds the upstream ONNX graphs already pulsed and decluttered into
+	/// Tract NNEF by `tools/deep-filter-model`, so runtime needs no ONNX parser or pulsifier.
 	pub fn embedded() -> Result<Self> {
-		Self::from_targz(include_bytes!("../models/DeepFilterNet3_onnx.tar.gz").as_slice())
+		Self::from_targz(include_bytes!("../models/DeepFilterNet3_nnef.tar.gz").as_slice())
 	}
 	fn from_targz<R: Read>(f: R) -> Result<Self> {
 		let tar = GzDecoder::new(f);
@@ -42,11 +43,11 @@ impl DfParams {
 		{
 			let mut file = e.context("Could not open model tar entry.")?;
 			let path = file.path().unwrap();
-			if path.ends_with("enc.onnx") {
+			if path.ends_with("enc.nnef.tar") {
 				file.read_to_end(&mut enc)?;
-			} else if path.ends_with("erb_dec.onnx") {
+			} else if path.ends_with("erb_dec.nnef.tar") {
 				file.read_to_end(&mut erb_dec)?;
-			} else if path.ends_with("df_dec.onnx") {
+			} else if path.ends_with("df_dec.nnef.tar") {
 				file.read_to_end(&mut df_dec)?;
 			} else if path.ends_with("config.ini") {
 				config =
@@ -74,29 +75,6 @@ impl Default for DfParams {
 	}
 }
 
-#[derive(Clone)]
-pub enum ReduceMask {
-	NONE = 0,
-	MAX = 1,
-	MEAN = 2,
-}
-impl Default for ReduceMask {
-	fn default() -> Self {
-		ReduceMask::NONE
-	}
-}
-impl TryFrom<i32> for ReduceMask {
-	type Error = ();
-
-	fn try_from(v: i32) -> Result<Self, Self::Error> {
-		match v {
-			x if x == ReduceMask::NONE as i32 => Ok(ReduceMask::NONE),
-			x if x == ReduceMask::MAX as i32 => Ok(ReduceMask::MAX),
-			x if x == ReduceMask::MEAN as i32 => Ok(ReduceMask::MEAN),
-			_ => Err(()),
-		}
-	}
-}
 pub struct RuntimeParams {
 	pub n_ch: usize,
 	pub post_filter: bool,
@@ -105,7 +83,6 @@ pub struct RuntimeParams {
 	pub min_db_thresh: f32,
 	pub max_db_erb_thresh: f32,
 	pub max_db_df_thresh: f32,
-	pub reduce_mask: ReduceMask,
 }
 impl RuntimeParams {
 	pub fn new(
@@ -115,7 +92,6 @@ impl RuntimeParams {
 		min_db_thresh: f32,
 		max_db_erb_thresh: f32,
 		max_db_df_thresh: f32,
-		reduce_mask: ReduceMask,
 	) -> Self {
 		let post_filter = post_filter_beta > 0.;
 		Self {
@@ -126,7 +102,6 @@ impl RuntimeParams {
 			min_db_thresh,
 			max_db_erb_thresh,
 			max_db_df_thresh,
-			reduce_mask,
 		}
 	}
 	pub fn with_post_filter(mut self, beta: f32) -> Self {
@@ -152,10 +127,6 @@ impl RuntimeParams {
 		self.max_db_df_thresh = max_db_df_thresh;
 		self
 	}
-	pub fn with_mask_reduce(mut self, red: ReduceMask) -> Self {
-		self.reduce_mask = red;
-		self
-	}
 	pub fn default_with_ch(channels: usize) -> Self {
 		RuntimeParams {
 			n_ch: channels,
@@ -165,7 +136,6 @@ impl RuntimeParams {
 			min_db_thresh: -10.,
 			max_db_erb_thresh: 30.,
 			max_db_df_thresh: 20.,
-			reduce_mask: ReduceMask::MEAN,
 		}
 	}
 }
@@ -201,7 +171,6 @@ pub struct DfTract {
 	pub min_db_thresh: f32,
 	pub max_db_erb_thresh: f32,
 	pub max_db_df_thresh: f32,
-	pub reduce_mask: ReduceMask,
 	pub atten_lim: Option<f32>,
 	pub df_states: Vec<DFState>,
 	pub spec_buf: Tensor, // Real-valued spectrogram buffer of shape [n_ch, 1, 1, n_freqs, 2]
@@ -237,7 +206,6 @@ pub struct FrozenDfTract {
 	pub min_db_thresh: f32,
 	pub max_db_erb_thresh: f32,
 	pub max_db_df_thresh: f32,
-	pub reduce_mask: ReduceMask,
 	pub atten_lim: Option<f32>,
 	pub df_states: Vec<DFState>,
 	pub spec_buf: Tensor, // Real-valued spectrogram buffer of shape [n_ch, 1, 1, n_freqs, 2]
@@ -274,7 +242,6 @@ impl FrozenDfTract {
 			min_db_thresh: self.min_db_thresh,
 			max_db_erb_thresh: self.max_db_erb_thresh,
 			max_db_df_thresh: self.max_db_df_thresh,
-			reduce_mask: self.reduce_mask,
 			atten_lim: self.atten_lim,
 			df_states: self.df_states,
 			spec_buf: self.spec_buf,
@@ -321,7 +288,6 @@ impl DfTract {
 			min_db_thresh: self.min_db_thresh,
 			max_db_erb_thresh: self.max_db_erb_thresh,
 			max_db_df_thresh: self.max_db_df_thresh,
-			reduce_mask: self.reduce_mask,
 			atten_lim: self.atten_lim,
 			df_states: self.df_states,
 			spec_buf: self.spec_buf,
@@ -343,19 +309,16 @@ impl DfTract {
 		let ch = rp.n_ch;
 		ensure!(ch == 1, "Serein DeepFilterNet accepts mono audio only");
 
-		let enc = init_encoder_from_read(&mut Cursor::new(dfp.enc), df_cfg, ch)?;
-		let erb_dec = init_erb_decoder_from_read(
-			&mut Cursor::new(dfp.erb_dec),
-			model_cfg,
-			df_cfg,
-			ch,
-			Some(rp.reduce_mask.clone()),
-		)?;
-		let df_dec =
-			init_df_decoder_from_read(&mut Cursor::new(dfp.df_dec), model_cfg, df_cfg, ch)?;
-		let enc = SimpleState::new(Arc::new(enc.into_runnable()?))?;
-		let erb_dec = SimpleState::new(Arc::new(erb_dec.into_runnable()?))?;
-		let df_dec = SimpleState::new(Arc::new(df_dec.into_runnable()?))?;
+		let nnef = tract_nnef::nnef().with_tract_core().with_pulse();
+		let load = |graph: &[u8]| -> Result<TractModel> {
+			let model = nnef.model_for_read(&mut Cursor::new(graph))?;
+			Ok(SimpleState::new(Arc::new(
+				model.into_optimized()?.into_runnable()?,
+			))?)
+		};
+		let enc = load(&dfp.enc)?;
+		let erb_dec = load(&dfp.erb_dec)?;
+		let df_dec = load(&dfp.df_dec)?;
 		#[cfg(feature = "timings")]
 		let t1 = Instant::now();
 
@@ -438,7 +401,6 @@ impl DfTract {
 			min_db_thresh: rp.min_db_thresh,
 			max_db_erb_thresh: rp.max_db_erb_thresh,
 			max_db_df_thresh: rp.max_db_df_thresh,
-			reduce_mask: rp.reduce_mask.clone(),
 			atten_lim,
 			spec_buf,
 			erb_buf,
@@ -901,208 +863,6 @@ fn df(
 		}
 	}
 	Ok(())
-}
-
-fn init_encoder_impl(
-	mut m: InferenceModel,
-	df_cfg: &ini::Properties,
-	n_ch: usize,
-) -> Result<TypedModel> {
-	log::debug!("Start init encoder.");
-	let s = m.symbols.sym("S");
-
-	let nb_erb = df_cfg.get("nb_erb").unwrap().parse::<usize>()?;
-	let nb_df = df_cfg.get("nb_df").unwrap().parse::<usize>()?;
-	let feat_erb = InferenceFact::dt_shape(f32::datum_type(), shapefactoid!(n_ch, 1, s, nb_erb));
-	let feat_spec = InferenceFact::dt_shape(f32::datum_type(), shapefactoid!(n_ch, 2, s, nb_df));
-
-	log::debug!(
-		"Encoder input: \n feat_erb  [{:?}]\n feat_spec [{:?}]",
-		feat_erb.shape,
-		feat_spec.shape,
-	);
-	m = m
-		.with_input_fact(0, feat_erb)?
-		.with_input_fact(1, feat_spec)?
-		.with_input_names(["feat_erb", "feat_spec"])?
-		.with_output_names(["e0", "e1", "e2", "e3", "emb", "c0", "lsnr"])?;
-
-	m.analyse(true)?;
-	let mut m = m.into_typed()?;
-
-	m.declutter()?;
-	let pulsed = PulsedModel::new(&m, s, &1.to_dim())?;
-	log::info!("Init encoder");
-	let m = pulsed.into_typed()?.into_optimized()?;
-	Ok(m)
-}
-fn init_encoder_from_read(
-	m: &mut dyn Read,
-	df_cfg: &ini::Properties,
-	n_ch: usize,
-) -> Result<TypedModel> {
-	let m = tract_onnx::onnx()
-		.with_ignore_output_shapes(true)
-		.model_for_read(m)?;
-	init_encoder_impl(m, df_cfg, n_ch)
-}
-
-fn init_erb_decoder_impl(
-	mut m: InferenceModel,
-	net_cfg: &ini::Properties,
-	df_cfg: &ini::Properties,
-	n_ch: usize,
-	mask_reduction: Option<ReduceMask>,
-) -> Result<TypedModel> {
-	log::debug!("Start init ERB decoder.");
-	let s = m.symbols.sym("S");
-
-	let nb_erb = df_cfg.get("nb_erb").unwrap().parse::<usize>()?;
-	let layer_width = net_cfg.get("conv_ch").unwrap().parse::<usize>()?;
-	let n_hidden = layer_width * nb_erb / 4;
-
-	let emb = InferenceFact::dt_shape(f32::datum_type(), shapefactoid!(n_ch, s, n_hidden));
-	let e3f = nb_erb / 4;
-	let e3 = InferenceFact::dt_shape(f32::datum_type(), shapefactoid!(n_ch, layer_width, s, e3f));
-	let e2 = InferenceFact::dt_shape(f32::datum_type(), shapefactoid!(n_ch, layer_width, s, e3f));
-	let e1f = nb_erb / 2;
-	let e1 = InferenceFact::dt_shape(f32::datum_type(), shapefactoid!(n_ch, layer_width, s, e1f));
-	let e0 = InferenceFact::dt_shape(
-		f32::datum_type(),
-		shapefactoid!(n_ch, layer_width, s, nb_erb),
-	);
-	log::debug!(
-		"ERB decoder input: \n emb [{:?}]\n e3  [{:?}]\n e2  [{:?}]\n e1  [{:?}]\n e0  [{:?}]",
-		emb.shape,
-		e3.shape,
-		e2.shape,
-		e1.shape,
-		e0.shape
-	);
-	let mut output_name = "m".to_string();
-
-	m = m
-		.with_input_fact(0, emb)?
-		.with_input_fact(1, e3)?
-		.with_input_fact(2, e2)?
-		.with_input_fact(3, e1)?
-		.with_input_fact(4, e0)?
-		.with_input_names(["emb", "e3", "e2", "e1", "e0"])?;
-	// .with_output_names([output_name])?;
-
-	m.analyse(true)?;
-
-	let mut m = m.into_typed()?;
-
-	m.declutter()?;
-	let pulsed = PulsedModel::new(&m, s, &1.to_dim())?;
-	let mut m = pulsed.into_typed()?;
-	log::info!("Init ERB decoder");
-
-	if let Some(r) = mask_reduction {
-		let outlets = m.output_outlets()?;
-		let mask_outlet = outlets[0];
-		let ch_axis = 0;
-		match r {
-			ReduceMask::MAX => {
-				output_name = "reduce_mask_max".to_string();
-				m.wire_node(
-					"reduce_mask_max",
-					ops::nn::Reduce::new(tvec!(ch_axis), ops::nn::Reducer::Max),
-					&[mask_outlet],
-				)?;
-			}
-			ReduceMask::MEAN => {
-				let sum = m.wire_node(
-					"reduce_mask_sum".to_string(),
-					ops::nn::Reduce::new(tvec!(ch_axis), ops::nn::Reducer::Sum),
-					&[mask_outlet],
-				)?[0];
-				let ch_i = m
-					.add_const(
-						"ch".to_string(),
-						Tensor::from_shape(&[1, 1, 1, 1], &[1. / n_ch as f32])?,
-					)
-					.unwrap();
-				output_name = "reduce_mask_div_ch".to_string();
-				m.wire_node(
-					"reduce_mask_div_ch",
-					tract_core::ops::math::mul(),
-					&[sum, ch_i],
-				)?;
-			}
-			_ => (),
-		}
-	}
-	m = m.with_output_names(&[output_name])?;
-
-	let m = m.into_optimized()?;
-
-	Ok(m)
-}
-fn init_erb_decoder_from_read(
-	m: &mut dyn Read,
-	net_cfg: &ini::Properties,
-	df_cfg: &ini::Properties,
-	n_ch: usize,
-	mask_reduction: Option<ReduceMask>,
-) -> Result<TypedModel> {
-	let m = tract_onnx::onnx()
-		.with_ignore_output_shapes(true)
-		.model_for_read(m)?;
-	init_erb_decoder_impl(m, net_cfg, df_cfg, n_ch, mask_reduction)
-}
-
-fn init_df_decoder_impl(
-	mut m: InferenceModel,
-	net_cfg: &ini::Properties,
-	df_cfg: &ini::Properties,
-	n_ch: usize,
-) -> Result<TypedModel> {
-	log::debug!("Start init DF decoder.");
-	let s = m.symbols.sym("S");
-
-	let nb_erb = df_cfg.get("nb_erb").unwrap().parse::<usize>()?;
-	let nb_df = df_cfg.get("nb_df").unwrap().parse::<usize>()?;
-	let layer_width = net_cfg.get("conv_ch").unwrap().parse::<usize>()?;
-	let n_hidden = layer_width * nb_erb / 4;
-
-	let emb = InferenceFact::dt_shape(f32::datum_type(), shapefactoid!(n_ch, s, n_hidden));
-	let c0 = InferenceFact::dt_shape(
-		f32::datum_type(),
-		shapefactoid!(n_ch, layer_width, s, nb_df),
-	);
-
-	log::debug!(
-		"ERB decoder input: \n emb [{:?}]\n c0  [{:?}]",
-		emb.shape,
-		c0.shape,
-	);
-	m = m
-		.with_input_fact(0, emb)?
-		.with_input_fact(1, c0)?
-		.with_input_names(["emb", "c0"])?
-		.with_output_names(["coefs"])?;
-
-	m.analyse(true)?;
-	let mut m = m.into_typed()?;
-
-	m.declutter()?;
-	let pulsed = PulsedModel::new(&m, s, &1.to_dim())?;
-	log::info!("Init DF decoder");
-	let m = pulsed.into_typed()?.into_optimized()?;
-	Ok(m)
-}
-fn init_df_decoder_from_read(
-	m: &mut dyn Read,
-	net_cfg: &ini::Properties,
-	df_cfg: &ini::Properties,
-	n_ch: usize,
-) -> Result<TypedModel> {
-	let m = tract_onnx::onnx()
-		.with_ignore_output_shapes(true)
-		.model_for_read(m)?;
-	init_df_decoder_impl(m, net_cfg, df_cfg, n_ch)
 }
 
 fn calc_norm_alpha(sr: usize, hop_size: usize, tau: f32) -> f32 {

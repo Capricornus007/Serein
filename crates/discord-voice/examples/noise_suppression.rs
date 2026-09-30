@@ -31,7 +31,7 @@ fn main() {
 	] {
 		let init = Instant::now();
 		let mut dsp = echo::Echo::new();
-		dsp.configure(Processing {
+		let settings = Processing {
 			suppression: mode,
 			suppression_level: if matches!(
 				mode,
@@ -42,37 +42,22 @@ fn main() {
 				0
 			},
 			..Processing::studio()
-		})
-		.unwrap();
-		while dsp.suppression_status() == 3 {
+		};
+		dsp.configure(settings).unwrap();
+		while dsp.suppression_status() == echo::Status::Loading {
 			assert!(init.elapsed().as_secs() < 30, "model preparation timed out");
 			std::thread::sleep(std::time::Duration::from_millis(5));
-			dsp.configure(Processing {
-				suppression: mode,
-				suppression_level: if matches!(
-					mode,
-					NoiseSuppression::Auto | NoiseSuppression::DeepFilterNet
-				) {
-					2
-				} else {
-					0
-				},
-				..Processing::studio()
-			})
-			.unwrap();
+			dsp.configure(settings).unwrap();
 		}
 		if mode == NoiseSuppression::DeepFilterNet {
 			assert_eq!(
 				dsp.suppression_status(),
-				4,
+				echo::Status::DeepFilter,
 				"DeepFilterNet must actually run"
 			);
 		}
 		let init_us = init.elapsed().as_micros();
-		println!(
-			"{mode:?} selected={}",
-			echo::Echo::suppression_label(dsp.suppression_status())
-		);
+		println!("{mode:?} selected={}", dsp.suppression_status().label());
 		for run in 0..6 {
 			let mut times = Vec::with_capacity(frames.len());
 			for input in &frames {

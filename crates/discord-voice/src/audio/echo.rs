@@ -2,6 +2,7 @@
 #[path = "echo/deep_filter.rs"]
 mod deep_filter;
 use deep_filter::DeepFilter;
+pub use deep_filter::Status;
 use model::voice_settings::{NoiseSuppression, Processing, VoiceProcessing};
 use nnnoiseless::DenoiseState;
 use sonora::{
@@ -105,11 +106,8 @@ impl Echo {
 		Ok(())
 	}
 
-	pub fn suppression_status(&self) -> u16 {
-		self.deep_filter.status() as u16
-	}
-	pub fn suppression_label(status: u16) -> &'static str {
-		deep_filter::Status::label(status)
+	pub fn suppression_status(&self) -> Status {
+		self.deep_filter.status()
 	}
 
 	pub fn reset(&mut self) {
@@ -215,7 +213,7 @@ mod deepfilter_tests {
 		let deadline = Instant::now();
 		loop {
 			dsp.configure(settings).unwrap();
-			if dsp.suppression_status() != 3 {
+			if dsp.suppression_status() != Status::Loading {
 				break;
 			}
 			assert!(deadline.elapsed() < Duration::from_secs(30));
@@ -223,7 +221,7 @@ mod deepfilter_tests {
 		}
 		assert_eq!(
 			dsp.suppression_status(),
-			4,
+			Status::DeepFilter,
 			"exercise the actual model, not fallback"
 		);
 		dsp

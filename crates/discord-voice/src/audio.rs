@@ -172,7 +172,7 @@ impl Audio {
 		Self::start_inner(settings, capture, playback, emit, true)
 	}
 	pub fn suppression_status(&self) -> &'static str {
-		echo::Echo::suppression_label(self.gate.suppression_status.load(Ordering::Relaxed))
+		echo::Status::from_repr(self.gate.suppression_status.load(Ordering::Relaxed)).label()
 	}
 	pub fn preview_level_db(&self) -> f32 {
 		if !self.gate.capture() {
@@ -423,7 +423,7 @@ impl Audio {
 							drops += u64::from(active.output.push(frame).is_err());
 						}
 					}
-					let status = echo.suppression_status();
+					let status = echo.suppression_status() as u16;
 					if worker_gate
 						.suppression_status
 						.swap(status, Ordering::Relaxed)

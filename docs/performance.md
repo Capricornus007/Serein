@@ -2966,3 +2966,23 @@ removing or upgrading existing package versions. The embedded model is 7,983,136
 bytes. Upstream repository licenses and exact provenance are preserved; explicit
 model-weight redistribution clarification is still unanswered upstream. Dedicated
 license CI is separate from packaging; no local license-coverage gate was run.
+
+### Pre-converted NNEF model (2026-09-30)
+
+The runtime now embeds a deterministic Tract NNEF conversion of the unchanged
+weights instead of parsing ONNX at load, so `tract-onnx`, `tract-onnx-opl`,
+`tract-hir` and `tract-pulse` are no longer linked. Same host and release profile;
+`noise_suppression` component example built from the rebased ONNX revision and
+from this change, one run each under `/usr/bin/time -l`. The equivalent
+DeepFilterNet output over 400 synthetic frames at 24 dB is byte-identical.
+
+| Component metric | ONNX loader | NNEF loader | Delta |
+| --- | ---: | ---: | ---: |
+| Example executable, bytes | 21,255,696 | 20,693,408 | -562,288 / -2.6% |
+| Forced DeepFilterNet preparation + probe | 243 ms | 202 ms | -41 ms |
+| Auto preparation + probe | 225 ms | 182 ms | -43 ms |
+| Five-mode workload peak RSS, bytes | 60,145,664 | 49,643,520 | -10,502,144 / -17.5% |
+| Peak memory footprint, bytes | 45,089,200 | 35,684,784 | -9,404,416 / -20.9% |
+
+Steady-state inference is unchanged (per-frame timings within run-to-run noise).
+The full application package was not rebuilt for this follow-up.

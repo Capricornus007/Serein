@@ -15,9 +15,9 @@ const FRAME_BUDGET: Duration = Duration::from_millis(3);
 const PROBE_LIMIT: Duration = Duration::from_millis(500);
 const PROBE_FRAMES: usize = 48;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
-pub(super) enum Status {
+pub enum Status {
 	Off,
 	RnNoise,
 	WebRtc,
@@ -27,15 +27,31 @@ pub(super) enum Status {
 	Unavailable,
 }
 impl Status {
-	pub fn label(value: u16) -> &'static str {
-		match value {
-			1 => "voice-suppression-rnnoise",
-			2 => "voice-suppression-webrtc",
-			3 => "voice-suppression-loading",
-			4 => "voice-suppression-deepfilter",
-			5 => "voice-suppression-limited",
-			6 => "voice-suppression-unavailable",
-			_ => "voice-suppression-off",
+	const ALL: [Self; 7] = [
+		Self::Off,
+		Self::RnNoise,
+		Self::WebRtc,
+		Self::Loading,
+		Self::DeepFilter,
+		Self::Limited,
+		Self::Unavailable,
+	];
+	/// Inverse of `status as u16`, for the worker's lock-free status atomic.
+	pub fn from_repr(value: u16) -> Self {
+		Self::ALL
+			.into_iter()
+			.find(|status| *status as u16 == value)
+			.unwrap_or(Self::Off)
+	}
+	pub fn label(self) -> &'static str {
+		match self {
+			Self::Off => "voice-suppression-off",
+			Self::RnNoise => "voice-suppression-rnnoise",
+			Self::WebRtc => "voice-suppression-webrtc",
+			Self::Loading => "voice-suppression-loading",
+			Self::DeepFilter => "voice-suppression-deepfilter",
+			Self::Limited => "voice-suppression-limited",
+			Self::Unavailable => "voice-suppression-unavailable",
 		}
 	}
 }
