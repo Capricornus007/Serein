@@ -2574,9 +2574,12 @@ impl Desktop {
 		if self.tray_window.hidden && !self.tray_available() {
 			self.tray_window.show(ctx);
 		}
-		self.messaging.tray_status = self
-			.tray_error
-			.unwrap_or_else(|| self.tray_setting.status());
+		self.messaging.tray_status = if self.tray_setting.enabled {
+			self.tray_error
+				.unwrap_or_else(|| self.tray_setting.status())
+		} else {
+			self.tray_setting.status()
+		};
 		if previous_status != self.messaging.tray_status {
 			ctx.request_repaint();
 		}
