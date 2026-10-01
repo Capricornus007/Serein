@@ -2569,7 +2569,9 @@ impl Desktop {
 			self.tray_setting.failed = !accepted && !self.fixture_only && !self.state.demo;
 			self.cache_pending += usize::from(accepted);
 		}
-		if self.tray.is_none() && self.tray_error.is_none() {
+		if self.tray_error.is_some() {
+			self.tray = None;
+		} else if self.tray.is_none() {
 			let wake = ctx.clone();
 			#[cfg(target_os = "linux")]
 			let tray = {
@@ -5623,6 +5625,9 @@ impl Desktop {
 			self.connection = None;
 			self.pending_save = None;
 			self.pending_account_save = None;
+			self.voice.stop();
+			self.messaging.camera_test_requested = false;
+			self.messaging.camera_test_texture = None;
 			self.state.apply(Envelope {
 				generation: self.state.generation,
 				event: Event::Failure(failure),
@@ -5935,6 +5940,7 @@ impl eframe::App for Desktop {
 					}
 				}
 				platform::tray::Event::Unavailable => {
+					self.tray = None;
 					self.tray_error = Some(if cfg!(target_os = "linux") {
 						"Tray unavailable. Start a StatusNotifier host, then toggle the tray off/on."
 					} else {
@@ -6019,6 +6025,8 @@ impl eframe::App for Desktop {
 			&& (self.messaging.push_to_talk_down(ctx) || self.hotkeys.push_to_talk_down());
 		if self.state.auth == AuthState::Authenticated || self.state.demo {
 			self.poll_voice(ctx);
+		} else {
+			self.voice.stop();
 		}
 		self.sync_tray(ctx);
 		if self.state.voice.active.is_some() {
