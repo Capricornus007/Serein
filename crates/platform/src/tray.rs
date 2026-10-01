@@ -255,12 +255,7 @@ mod native {
 					},
 					..Default::default()
 				};
-				let tip = match state {
-					super::VoiceState::Unmuted => "Serein",
-					super::VoiceState::Speaking => "Serein (Speaking)",
-					super::VoiceState::Muted => "Serein (Muted)",
-					super::VoiceState::Deafened => "Serein (Deafened)",
-				};
+				let tip = voice_state_tip(state);
 				for (slot, unit) in data.szTip.iter_mut().zip(tip.encode_utf16()) {
 					*slot = unit;
 				}
@@ -271,11 +266,29 @@ mod native {
 		}
 	}
 
+	fn voice_state_tip(state: super::VoiceState) -> &'static str {
+		match state {
+			super::VoiceState::Unmuted => "Serein",
+			super::VoiceState::Speaking => "Serein (Speaking)",
+			super::VoiceState::Muted => "Serein (Muted)",
+			super::VoiceState::Deafened => "Serein (Deafened)",
+		}
+	}
+
 	impl State {
 		fn add_icon(&self) -> bool {
 			let mut icon_data = self.icon;
-			if let Some(hicon) = self.voice_icons[self.current_voice_state.get() as usize] {
+			let state = self.current_voice_state.get();
+			if let Some(hicon) = self.voice_icons[state as usize] {
 				icon_data.hIcon = hicon;
+			}
+			icon_data.szTip = [0; 128];
+			for (slot, unit) in icon_data
+				.szTip
+				.iter_mut()
+				.zip(voice_state_tip(state).encode_utf16())
+			{
+				*slot = unit;
 			}
 			// SAFETY: this initialized descriptor contains only live borrowed handles and fixed text.
 			unsafe {
