@@ -1539,6 +1539,12 @@ replacement behind the existing audio retirement fence. It keeps the original
 30-second deadline and zeroizes that set on confirmation, cancellation or failure
 teardown. Failed candidates do not spawn retries until credentials actually change.
 
+Local voice-confirmation admission failures carry one channel ID, attempt and
+candidate revision plus a fixed static diagnostic through the existing bounded
+event queue. They retain no credentials, allocate no payload buffers and add no
+pending/retry slot. The desktop consumes only the matching current unconfirmed
+candidate; existing bounded local abandonment handles release after failure.
+
 ## Connected guild soundboard metadata (October 2, 2026)
 
 Soundboard catalogs are session-only, attached to one generation, guild, channel
