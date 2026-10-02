@@ -3814,3 +3814,38 @@ Catalogs are session-only. Incoming effect playback, external-guild catalogs,
 creation and local preview downloads are outside this slice. No live account,
 Discord message/call/effect, microphone, camera or upload was used. GPU frame
 latency, real-account interoperability and audible playback remain unmeasured.
+
+
+### Current Soundboard confirmation-watch integration (October 2, 2026)
+
+The separately tested and packaged source `2ed16b090fd344d31d858290a7f9fd124e44e27f`
+includes the fixed-size confirmation-failure watch from #537. Metadata merge
+`472f70272b8e5db2b3eda04d60d8ec55ed7ee3bc` adds only corrected parent documentation
+and bounded offline logs; complete application, manifest, asset, vendor and
+packaging inputs remain byte-identical to 2ed. Earlier df0a native and reducer
+measurements above keep their original source identities.
+
+Current source passes eleven Soundboard and nine confirmation-focused tests,
+the full workspace check (176 desktop / 370 UI), formatting, strict Clippy and
+policy checks. Its standard voice-enabled package compiled all twelve runtime
+workspace crates fresh after inspected workspace-name cache invalidation across
+worktree IDs, finished in 11m02s, and passed deep/strict local ad-hoc signing.
+Both standard packages use repository FAT-LTO and the xtask command that omits
+development data while retaining voice. Exact main71 is the comparison baseline.
+
+| Current aggregate shipping metric | Exact main71 | Source 2ed | Delta |
+| --- | ---: | ---: | ---: |
+| Executable | 62,269,488 B | 62,368,144 B | +98,656 B / +0.1584% |
+| Installed package | 68,279,917 B | 68,378,573 B | +98,656 B / +0.1445% |
+| Distribution ZIP | 43,363,423 B | 43,397,986 B | +34,563 B / +0.0797% |
+
+Both packages contain 206 regular files with 203 unchanged hashes; existing
+license and notice payloads are unchanged. These are aggregate Soundboard plus
+inherited confirmation-pressure correction deltas, not isolated feature cost.
+The actual full-queue byte/item-pressure, unread-publisher-shutdown, preceding
+replacement signaling and dormant live-transport retirement regressions verify
+the changed admission path without a service request or physical audio device.
+No fresh GPU, queue-latency, active sound-effect or native/reducer performance
+measurement is claimed for the corrected source. Current hashes, baseline
+provenance, package inventory and source scope are recorded separately in
+[`soundboard/measurements.json`](pr-evidence/soundboard/measurements.json).
