@@ -16,7 +16,7 @@
     "ui_tests_passed": 361,
     "ui_tests_ignored": 5,
     "live_account": false,
-    "release_package_and_performance": "pending; no improvement claim",
+    "release_package_and_performance": "Final df0a standard/FAT/reducer builds passed; matched native voice CPU/RSS and synthetic reducer measured. measurements.json preserves raw samples, hashes and aggregate-source scope; no general performance improvement claim.",
     "confirmation_filtered_tests": 8,
     "translated_soundboard_catalogs": 11
   },
@@ -39,5 +39,5 @@
     }
   },
   "integration_note": "Normal integration with main 66cc09d2 and the validated voice-confirmation queue fix 9cdad91c. Both actual native wide and narrow frames were refreshed and visually inspected. Temporary hooks were removed exactly; the full check passed with 361 UI tests and 5 ignored tests, plus 11 Soundboard-focused and 8 confirmation-filtered tests.",
-  "after_note": "The actual screenshots were captured on source5391e4ec before the subsequent nine-language translation correction. All rendering and English/Czech catalogs remain byte-identical; target-language lookup and channel formatting, and a fresh full check, pass after that correction."
+  "after_note": "The actual screenshots were captured on source 5391e4ec before the subsequent nine-language translation correction. All rendering and English/Czech catalogs remain byte-identical; target-language lookup and channel formatting, and a fresh full check, pass after that correction."
 }

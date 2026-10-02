@@ -3576,3 +3576,63 @@ variation. New motion (rail pill, icon morph, badges, switches, sidebar rows,
 page fade) uses egui's `animate_*` helpers, which request repaints only while a
 value is moving, so the idle result is the expected one. Active-animation frame
 time, p95 latency and the standard package size were not measured.
+
+
+## Guild Soundboard selection and explicit send — October 2, 2026
+
+Source `df0a7930da67c3d8b99e4366a03c8b860f2e387d` includes main 66 and the independently checked
+voice-confirmation queue fix #537. It is compared with main `1107d9045fb9d98980d6d8e9987c96a362b4f9ab`;
+this is an aggregate change, not isolated Soundboard cost. The actual native
+before/after preview images compare parent 3f with 5391; later nine-language
+translations keep rendering and English/Czech catalogs unchanged. Raw samples,
+commands, source identities, binary hashes and limits are in
+[`soundboard/measurements.json`](pr-evidence/soundboard/measurements.json).
+
+Environment: macOS 27.0 (26A428), Apple M1 MacBookAir10,1 / 16 GiB,
+Rust 1.98.1, locked dependencies, two build jobs.
+
+| Metric / method | Main 110 baseline | Aggregate df0a | Delta |
+| --- | ---: | ---: | ---: |
+| Standard executable, bytes | 62,154,064 | 62,367,808 | +213,744 / +0.3439% |
+| Installed package, bytes | 68,164,493 | 68,378,237 | +213,744 / +0.3136% |
+| Distribution ZIP, bytes | 43,322,199 | 43,390,880 | +68,681 / +0.1585% |
+| Native idle CPU, ten-sample median | 0.0% | 0.0% | 0 percentage points |
+| Sampled peak RSS, KiB | 122,720 | 123,184 | +464 / +0.3781% |
+| Settled RSS, KiB | 122,656 | 123,168 | +512 / +0.4174% |
+| Synthetic reducer, five-run median, ms | 53.931958 | 53.510000 | -0.421958 / -0.7824% |
+
+Both standard packages include voice and use the default FAT release profile.
+The xtask internally uses `--no-default-features` to omit development data.
+Both have 206 regular files and unchanged license/notice payloads. Installed
+size sums regular files; ZIP uses identical `ditto -c -k --sequesterRsrc`
+over complete contents without an enclosing directory. Deep/strict local
+ad-hoc signature verification passed. Owned workspace artifacts across all
+worktree IDs were inspected and cleared; all twelve runtime crates compiled
+fresh from df0a. The same unchanged worktree then built default-plus-demo FAT
+and the reducer; no other release worktree intervened.
+
+The native pair runs identical `--demo --demo-voice` at 1120×760 logical pixels,
+2× display scale, Metal. A five-second warmup precedes ten one-second process
+`ps` samples; settled RSS is the last-five median. All team compilers, tests,
+replays, heavy IO and other apps were held. Both apps stopped after sampling.
+The +512 KiB settled difference is small idle variation, not an improvement
+or a sound playback latency measurement. No sound was played or downloaded.
+
+Reducer source 3f is reused only after proving all 96 tracked files across the
+workspace manifest, lockfile, toolchain/config and relevant model/core/cache/
+fixture/replay crates byte-identical to main 110. No application/media identity
+is inferred. Each reducer has one warmup and five alternating measured pairs
+of 100,000 synthetic events. Baseline range is 53.584292–55.589208 ms;
+after is 53.306667–53.529875 ms. This short cached run does
+not establish a general speed improvement. Both retain 331,992–332,477 estimated
+timeline bytes / 500 records; this is not process RSS, UI or voice timing.
+
+Soundboard admits 128 combined catalog items / 64 KiB retained, 64 KiB per HTTP
+response, 2–32 Unicode scalars / 128 UTF-8 bytes per name, finite volume 0–1,
+nonzero IDs and bounded emoji. Retention counts actual capacities. One pending
+session-scoped operation, one-second explicit-play interval, current guild/
+channel/call/generation and authorization guards prevent stale results/sends.
+Catalogs are session-only. Incoming effect playback, external-guild catalogs,
+creation and local preview downloads are outside this slice. No live account,
+Discord message/call/effect, microphone, camera or upload was used. GPU frame
+latency, real-account interoperability and audible playback remain unmeasured.
