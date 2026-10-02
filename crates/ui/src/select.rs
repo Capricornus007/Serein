@@ -530,6 +530,7 @@ pub fn install(ctx: &egui::Context) {
 }
 
 pub(crate) fn clear(ctx: &egui::Context) {
+	Popup::close_id(ctx, Id::unique("chat-selection-copy"));
 	if let Some(plugin) = ctx.plugin_opt::<mapped::Selection>() {
 		*plugin.lock() = Default::default();
 	}
@@ -1060,6 +1061,31 @@ mod tests {
 				.drop_without_applying_deltas();
 		}
 		assert_eq!(menu_copy(&ctx, &mut render, from, || {}), Some(text.into()));
+		Popup::open_id(&ctx, Id::unique("chat-selection-copy"));
+		clear(&ctx);
+		assert!(
+			!Popup::is_any_open(&ctx),
+			"a conversation/account reset closes the old selection menu"
+		);
+		let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+		assert!(!has_selection(&ctx) && !Popup::is_any_open(&ctx));
+		assert!(
+			!output
+				.platform_output
+				.commands
+				.iter()
+				.any(|command| matches!(command, egui::OutputCommand::CopyText(_))),
+			"the reset cannot emit retained native or mapped text"
+		);
+		output.drop_without_applying_deltas();
+		let unrelated = Id::unique("unrelated-popup");
+		Popup::open_id(&ctx, unrelated);
+		clear(&ctx);
+		assert!(
+			Popup::is_id_open(&ctx, unrelated),
+			"only selection popup memory is reset"
+		);
+		Popup::close_all(&ctx);
 	}
 
 	/// Drag from `from` to `to` and return what a copy would yield.
