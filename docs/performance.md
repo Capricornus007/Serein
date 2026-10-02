@@ -3715,3 +3715,52 @@ unmeasured. No audio device, account, microphone or live media request was used.
 Reproduce after packaging either revision, with the same `CARGO_TARGET_DIR` used
 for that build: `python3 docs/pr-evidence/voice-attachment-playback/benchmark.py`.
 The script also accepts a baseline-worktree path as its first argument.
+
+## Native camera format selection: integrated host validation — October 2, 2026
+
+The backend-only camera fix in #529 prefers native formats near 640 × 480 at
+15 fps, with a 720p ceiling where supported. The existing bounded DirectShow
+1080-only fallback remains. Camera hardware behavior is still unverified.
+
+[Source identities and validation records](pr-evidence/camera-native-formats/validation.json)
+record nine identical Git objects across the feature source, merged main
+`71ebbc1c`, and recovery integration `d6bf2c8c`: camera implementation, the offline
+format example, the voice manifest and lockfile. This proves that these host
+checks contain the same camera slice; it does not prove whole-application
+equivalence or isolate the camera change's cost.
+
+The camera-focused macOS tests passed **3 tests**, including synthetic ranking,
+invalid mode/device bounds and bounded encoded frames. The offline
+`camera_format` example passed without opening a device. The fresh integrated
+`d6bf2c8c` full check passed workspace tests (**168 desktop / 368 UI**), strict
+Clippy, formatting and policy checks. The exact `71ebbc1c` standard package
+freshly compiled all 12 runtime workspace crates, included voice and notices,
+and passed deep/strict local ad-hoc signature verification; it is not notarized.
+
+The same nine camera objects are present at the final runtime PR head `ad7aa532`
+and evidence integration `2d0f6482` (#541). That integration passed all ten
+checks, including native compile/tests on
+[macOS](https://github.com/ViceVerse-cz/Serein/actions/runs/37014428404/job/110861696337),
+[Windows x64](https://github.com/ViceVerse-cz/Serein/actions/runs/37014428404/job/110861696455),
+[Windows ARM](https://github.com/ViceVerse-cz/Serein/actions/runs/37014428404/job/110861696613)
+and [Ubuntu](https://github.com/ViceVerse-cz/Serein/actions/runs/37014428404/job/110861696676).
+These checks validate the integrated code, not physical camera compatibility.
+
+| Aggregate host metric | Integrated main71 result | Method / scope |
+| --- | ---: | --- |
+| Standard executable | 62,269,488 B | Normal FAT-LTO `cargo xtask package`, voice included |
+| Installed package | 68,279,917 B / 206 files | Sum of all regular files |
+| Compressed distribution | 43,363,423 B | `ditto -c -k --sequesterRsrc` |
+
+These are aggregate package measurements containing other merged features,
+not an isolated before/after camera delta. Idle native CPU/RSS is not used as
+a camera-selection measurement. Physical Windows/Linux/macOS camera FPS,
+capture latency and format compatibility are unmeasured because no camera
+was enabled; native CI compilation is not hardware validation. There is no
+visible UI change, so screenshots are not applicable. The final runtime PR
+was merged by another actor while its last native workflow was cancelled;
+its earlier passing checks are not presented as final-head all-green proof.
+
+This follow-up changes development documentation only; no runtime or build
+dependency changes, new application build or new performance comparison are
+needed for the documentation itself.

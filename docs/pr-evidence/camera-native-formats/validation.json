@@ -1,0 +1,304 @@
+{
+  "issue": 239,
+  "runtime_pull_request": 529,
+  "runtime_merge": "3fcc38eaca4fa9fc1881f46c8fdf29fca5ca5956",
+  "feature_source": "c355e970f26ab973000109b47f0b96f6de96fa09",
+  "packaging_followup_source": "96c6b8acfc5ec68b05d0c9d39ef9eec8c684887b",
+  "scope": "Source-object-verified aggregate host validation of the merged camera slice; no isolated camera package-cost comparison or hardware performance claim",
+  "environment": {
+    "os": "macOS 27.0 (26A428)",
+    "cpu": "Apple M1",
+    "ram_gib": 16,
+    "rust": "1.98.1",
+    "cargo_build_jobs": 2
+  },
+  "focused_checks": {
+    "camera_tests": {
+      "command": "cargo test --locked -p discord-voice --lib camera",
+      "passed": 3,
+      "hardware_access": false
+    },
+    "offline_camera_format_example": {
+      "command": "cargo run --locked -p discord-voice --example camera_format",
+      "result": "passed; synthetic native mode ranking and rejection, no camera opened"
+    }
+  },
+  "aggregate_full_check": {
+    "source": "d6bf2c8cb6077fd5c45b1348ab0cfcf46508f8c8",
+    "command": "cargo xtask check",
+    "result": "passed; workspace tests, strict Clippy, format and policy",
+    "desktop_tests_passed": 168,
+    "ui_tests_passed": 368,
+    "scope": "Whole recovery integration that contains an identical camera slice; not an isolated camera full check"
+  },
+  "aggregate_standard_package": {
+    "commit": "71ebbc1c0393a0ba4f4e6c93ae9b7b0bd3e06d35",
+    "command": "cargo xtask package",
+    "features": "standard xtask package; voice included; xtask internally uses --no-default-features",
+    "executable": 62269488,
+    "installed": 68279917,
+    "compressed": 43363423,
+    "files": 206,
+    "executable_sha256": "c6b3b2ac3f9d801cdd81f91ba36a68200e96f072d7fd18e3bb3707a919e50988",
+    "zip_method": "ditto -c -k --sequesterRsrc full standard-dist contents, without enclosing directory"
+  },
+  "build_provenance": {
+    "source": "71ebbc1c0393a0ba4f4e6c93ae9b7b0bd3e06d35",
+    "source_clean": true,
+    "capture_hooks": false,
+    "all_runtime_crates_fresh": {
+      "model": true,
+      "session-cache": true,
+      "client-core": true,
+      "discord-protocol": true,
+      "discord-api": true,
+      "discord-gateway": true,
+      "discord-voice": true,
+      "extensions": true,
+      "local-store": true,
+      "platform": true,
+      "ui": true,
+      "serein": true
+    },
+    "standard_log_sha256": "9b7bcc132d6e6c19587409b14e6f993da47c8488f5abd380298677898454c1ab",
+    "workspace_cache_prune_sha256": "c376c77f990a1e96ed553b23e34b512e31b6a8313e4205a196b45963ecbeadee",
+    "strict_deep_signature_verification": "passed; local ad-hoc, not notarized",
+    "profile": "Repository default FAT standard package, voice included, xtask internal --no-default-features",
+    "elapsed": [
+      "Finished `release` profile [optimized + debuginfo] target(s) in 12m 32s"
+    ]
+  },
+  "source_object_proof": {
+    "feature_source": "96c6b8acfc5ec68b05d0c9d39ef9eec8c684887b",
+    "scope": "Camera implementation and format example, voice manifest and lockfile only; no whole-application equivalence",
+    "comparisons": [
+      {
+        "target": "71ebbc1c0393a0ba4f4e6c93ae9b7b0bd3e06d35",
+        "files": [
+          {
+            "path": "Cargo.lock",
+            "feature_blob": "b745be611e03fd3d5e1490503cbd749a0d2aae63",
+            "aggregate_blob": "b745be611e03fd3d5e1490503cbd749a0d2aae63",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/Cargo.toml",
+            "feature_blob": "d4cca54cb719c2bc0edff62ef75278cfb374313f",
+            "aggregate_blob": "d4cca54cb719c2bc0edff62ef75278cfb374313f",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/examples/camera_format.rs",
+            "feature_blob": "bdfd294fee2ed7e3b9832e38fb93424ab13dcbd6",
+            "aggregate_blob": "bdfd294fee2ed7e3b9832e38fb93424ab13dcbd6",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera.rs",
+            "feature_blob": "e1c6162be4909d13e663674ab80563620862a1ab",
+            "aggregate_blob": "e1c6162be4909d13e663674ab80563620862a1ab",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera/encode_linux.rs",
+            "feature_blob": "48f550292eff4d6db583859acb718f8de4d975e7",
+            "aggregate_blob": "48f550292eff4d6db583859acb718f8de4d975e7",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera/format.rs",
+            "feature_blob": "a1f16f3fb802ba4d344a5a04dd42bcc48a0e222a",
+            "aggregate_blob": "a1f16f3fb802ba4d344a5a04dd42bcc48a0e222a",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera/linux.rs",
+            "feature_blob": "c3c1a78d9fe010fc31453aced644cd50e0732523",
+            "aggregate_blob": "c3c1a78d9fe010fc31453aced644cd50e0732523",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera/windows.rs",
+            "feature_blob": "529fc23d4b73c84a7ceea18b07c46f7a86bb0198",
+            "aggregate_blob": "529fc23d4b73c84a7ceea18b07c46f7a86bb0198",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera/windows/directshow.rs",
+            "feature_blob": "050b0759abfc67bac7532cef032de6442667d741",
+            "aggregate_blob": "050b0759abfc67bac7532cef032de6442667d741",
+            "equal": true
+          }
+        ],
+        "all_equal": true
+      },
+      {
+        "target": "d6bf2c8cb6077fd5c45b1348ab0cfcf46508f8c8",
+        "files": [
+          {
+            "path": "Cargo.lock",
+            "feature_blob": "b745be611e03fd3d5e1490503cbd749a0d2aae63",
+            "aggregate_blob": "b745be611e03fd3d5e1490503cbd749a0d2aae63",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/Cargo.toml",
+            "feature_blob": "d4cca54cb719c2bc0edff62ef75278cfb374313f",
+            "aggregate_blob": "d4cca54cb719c2bc0edff62ef75278cfb374313f",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/examples/camera_format.rs",
+            "feature_blob": "bdfd294fee2ed7e3b9832e38fb93424ab13dcbd6",
+            "aggregate_blob": "bdfd294fee2ed7e3b9832e38fb93424ab13dcbd6",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera.rs",
+            "feature_blob": "e1c6162be4909d13e663674ab80563620862a1ab",
+            "aggregate_blob": "e1c6162be4909d13e663674ab80563620862a1ab",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera/encode_linux.rs",
+            "feature_blob": "48f550292eff4d6db583859acb718f8de4d975e7",
+            "aggregate_blob": "48f550292eff4d6db583859acb718f8de4d975e7",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera/format.rs",
+            "feature_blob": "a1f16f3fb802ba4d344a5a04dd42bcc48a0e222a",
+            "aggregate_blob": "a1f16f3fb802ba4d344a5a04dd42bcc48a0e222a",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera/linux.rs",
+            "feature_blob": "c3c1a78d9fe010fc31453aced644cd50e0732523",
+            "aggregate_blob": "c3c1a78d9fe010fc31453aced644cd50e0732523",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera/windows.rs",
+            "feature_blob": "529fc23d4b73c84a7ceea18b07c46f7a86bb0198",
+            "aggregate_blob": "529fc23d4b73c84a7ceea18b07c46f7a86bb0198",
+            "equal": true
+          },
+          {
+            "path": "crates/discord-voice/src/camera/windows/directshow.rs",
+            "feature_blob": "050b0759abfc67bac7532cef032de6442667d741",
+            "aggregate_blob": "050b0759abfc67bac7532cef032de6442667d741",
+            "equal": true
+          }
+        ],
+        "all_equal": true
+      }
+    ]
+  },
+  "private_verification_log_sha256": {
+    "/tmp/serein-camera-final-focus.log": "4c895e98d979ea4e6c74624f02f862b80fab31fced161b66ab3af879822f42cc",
+    "/tmp/serein-camera-final-example.log": "c70048a83ef6a04d62cd465c5bf77ac3c6213502823c6cb8e17c11d8d12cbe50",
+    "/tmp/serein-resume-send-current-full-check.log": "9d8063b8345e3997e9a9c66e4e276a75e305ecd4c41f41b4abaad141c1bdb552"
+  },
+  "screenshots": "Not applicable \u2014 native camera format negotiation has no visible UI change",
+  "performance": {
+    "hardware_camera_fps": "Unmeasured; no physical camera enabled",
+    "capture_latency": "Unmeasured; no Windows/Linux camera hardware available or opened",
+    "isolated_package_delta": "Unavailable; aggregate package includes other independently merged features",
+    "native_idle_cpu_rss": "Not used; idle demo does not exercise camera mode selection",
+    "component_limits": "Nearest native mode to 640 \u00d7 480 at 15 fps with a 720p ceiling where supported; the existing DirectShow 1080-only bounded fallback remains. Candidate enumeration and frame buffers remain bounded."
+  },
+  "remote_ci_limitation": "Runtime PR529 was merged by another actor; its final ad7aa532 native workflow was cancelled at merge. Earlier c355 native compilation passed, but that is not proof of final-head all-green CI or actual hardware capture.",
+  "documentation_base": "bd958db2cbe049496076f98fafe76b536839b389",
+  "documentation_only": true,
+  "documentation_base_camera_blobs_equal": true,
+  "final_runtime_head_proof": {
+    "source": "ad7aa532371aec732d8c7bcfccf66355e446c71c",
+    "method": "GitHub git trees API",
+    "files": [
+      {
+        "path": "Cargo.lock",
+        "feature_blob": "b745be611e03fd3d5e1490503cbd749a0d2aae63",
+        "final_runtime_blob": "b745be611e03fd3d5e1490503cbd749a0d2aae63",
+        "equal": true
+      },
+      {
+        "path": "crates/discord-voice/Cargo.toml",
+        "feature_blob": "d4cca54cb719c2bc0edff62ef75278cfb374313f",
+        "final_runtime_blob": "d4cca54cb719c2bc0edff62ef75278cfb374313f",
+        "equal": true
+      },
+      {
+        "path": "crates/discord-voice/examples/camera_format.rs",
+        "feature_blob": "bdfd294fee2ed7e3b9832e38fb93424ab13dcbd6",
+        "final_runtime_blob": "bdfd294fee2ed7e3b9832e38fb93424ab13dcbd6",
+        "equal": true
+      },
+      {
+        "path": "crates/discord-voice/src/camera.rs",
+        "feature_blob": "e1c6162be4909d13e663674ab80563620862a1ab",
+        "final_runtime_blob": "e1c6162be4909d13e663674ab80563620862a1ab",
+        "equal": true
+      },
+      {
+        "path": "crates/discord-voice/src/camera/encode_linux.rs",
+        "feature_blob": "48f550292eff4d6db583859acb718f8de4d975e7",
+        "final_runtime_blob": "48f550292eff4d6db583859acb718f8de4d975e7",
+        "equal": true
+      },
+      {
+        "path": "crates/discord-voice/src/camera/format.rs",
+        "feature_blob": "a1f16f3fb802ba4d344a5a04dd42bcc48a0e222a",
+        "final_runtime_blob": "a1f16f3fb802ba4d344a5a04dd42bcc48a0e222a",
+        "equal": true
+      },
+      {
+        "path": "crates/discord-voice/src/camera/linux.rs",
+        "feature_blob": "c3c1a78d9fe010fc31453aced644cd50e0732523",
+        "final_runtime_blob": "c3c1a78d9fe010fc31453aced644cd50e0732523",
+        "equal": true
+      },
+      {
+        "path": "crates/discord-voice/src/camera/windows.rs",
+        "feature_blob": "529fc23d4b73c84a7ceea18b07c46f7a86bb0198",
+        "final_runtime_blob": "529fc23d4b73c84a7ceea18b07c46f7a86bb0198",
+        "equal": true
+      },
+      {
+        "path": "crates/discord-voice/src/camera/windows/directshow.rs",
+        "feature_blob": "050b0759abfc67bac7532cef032de6442667d741",
+        "final_runtime_blob": "050b0759abfc67bac7532cef032de6442667d741",
+        "equal": true
+      }
+    ],
+    "all_equal": true
+  },
+  "integrated_multiplatform_ci": {
+    "source": "2d0f64821eb7623a5fe3858ff4643275e19b9834",
+    "pull_request": 541,
+    "source_camera_blobs_equal": true,
+    "all_ten_checks": "SUCCESS; merged bd958db2 after exact-head verification",
+    "scope": "Native compile/workspace tests of an integrated tree with identical camera implementation; not device capture",
+    "native_jobs": [
+      {
+        "name": "macos-latest",
+        "conclusion": "SUCCESS",
+        "url": "https://github.com/ViceVerse-cz/Serein/actions/runs/37014428404/job/110861696337"
+      },
+      {
+        "name": "windows-latest",
+        "conclusion": "SUCCESS",
+        "url": "https://github.com/ViceVerse-cz/Serein/actions/runs/37014428404/job/110861696455"
+      },
+      {
+        "name": "windows-11-arm",
+        "conclusion": "SUCCESS",
+        "url": "https://github.com/ViceVerse-cz/Serein/actions/runs/37014428404/job/110861696613"
+      },
+      {
+        "name": "ubuntu-latest",
+        "conclusion": "SUCCESS",
+        "url": "https://github.com/ViceVerse-cz/Serein/actions/runs/37014428404/job/110861696676"
+      }
+    ]
+  }
+}
