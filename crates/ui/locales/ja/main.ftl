@@ -4341,4 +4341,4 @@ lib-composer-onboarding-incomplete = 参加を完了すると、さらにチャ�
 # Context: composer
 lib-composer-onboarding-complete = オンボーディングを完了
 
-voice-call-moved-to-another-client = 通話が別のクライアントに移動しました
+voice-call-moved-to-another-client = このデバイスの通話セッションが置き換えられました

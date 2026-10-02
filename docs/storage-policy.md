@@ -1520,3 +1520,14 @@ Queued commands recheck this invalidation before dispatch; the worker also waits
 for it alongside HTTP so a takeover cancels the pending operation before the UI
 reduces it.
 Watch metadata is additional; no invalidation history or growing queue is retained.
+
+Negotiation confirmation retains one bounded Gateway server record (a redacted,
+zeroizing token of at most 2,048 bytes and an optional endpoint of at most 512 bytes)
+to deduplicate credential changes. One `u64` candidate revision covers the current
+session/token/endpoint and crosses only the existing bounded command/event queues;
+it is not a Discord session ID and has no persistence. Until scoped transport
+confirmation is acknowledged, the desktop keeps one extra pending credential set
+(session and token at most 2,048 bytes each, endpoint at most 512 bytes) for local
+replacement behind the existing audio retirement fence. It keeps the original
+30-second deadline and zeroizes that set on confirmation, cancellation or failure
+teardown. Failed candidates do not spawn retries until credentials actually change.

@@ -4341,4 +4341,4 @@ lib-composer-onboarding-incomplete = Daha fazla kanalın kilidini açmak için s
 # Context: composer
 lib-composer-onboarding-complete = Tanıtımı tamamla
 
-voice-call-moved-to-another-client = Arama başka bir istemciye taşındı
+voice-call-moved-to-another-client = Bu cihazın arama oturumu değiştirildi

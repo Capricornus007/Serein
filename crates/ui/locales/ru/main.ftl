@@ -4356,4 +4356,4 @@ lib-composer-onboarding-incomplete = Завершите вступление, ч
 # Context: composer
 lib-composer-onboarding-complete = Завершить знакомство
 
-voice-call-moved-to-another-client = Звонок перенесён в другой клиент
+voice-call-moved-to-another-client = Сеанс звонка на этом устройстве был заменён

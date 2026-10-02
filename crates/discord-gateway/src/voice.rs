@@ -39,8 +39,12 @@ pub(super) struct Calls {
 	pub(super) allowed: BTreeMap<Id, Option<Id>>,
 	pub(super) active: Option<(Id, u64)>,
 	active_guild: Option<Id>,
-	// One validated, redacted/zeroizing identity for the explicitly joined device session.
+	// One validated, redacted/zeroizing candidate; ownership requires transport confirmation.
 	active_session: Option<Secret>,
+	// A candidate is replaceable until this device authenticates its voice transport.
+	session_confirmed: bool,
+	negotiation_revision: u64,
+	negotiation_server: Option<(Secret, Option<String>)>,
 	muted: bool,
 	deafened: bool,
 	camera: bool,
@@ -68,6 +72,8 @@ impl Calls {
 		self.active = None;
 		self.active_guild = None;
 		self.active_session = None;
+		self.negotiation_server = None;
+		self.session_confirmed = false;
 		self.muted = false;
 		self.deafened = false;
 		self.camera = false;
@@ -84,6 +90,8 @@ impl Calls {
 			self.active = None;
 			self.active_guild = None;
 			self.active_session = None;
+			self.negotiation_server = None;
+			self.session_confirmed = false;
 			self.stream = None;
 			self.watch = None;
 			self.camera = false;
@@ -244,6 +252,30 @@ impl Calls {
 		}
 		Ok(())
 	}
+	pub(super) fn confirm_session(
+		&mut self,
+		channel: Id,
+		request: u64,
+		revision: u64,
+	) -> Option<Event> {
+		if self.active != Some((channel, request))
+			|| self.allowed.get(&channel) != Some(&self.active_guild)
+			|| self.active_session.is_none()
+			|| self
+				.negotiation_server
+				.as_ref()
+				.is_none_or(|(_, endpoint)| endpoint.is_none())
+			|| self.negotiation_revision != revision
+		{
+			return None;
+		}
+		self.session_confirmed = true;
+		Some(Event::Voice(voice::Event::SessionConfirmed {
+			channel,
+			request,
+			revision,
+		}))
+	}
 	pub(super) fn packet(&mut self, command: Command) -> Result<Option<Frame>, Failure> {
 		let (channel, guild) = match command {
 			Command::Sync { channel } => {
@@ -271,17 +303,37 @@ impl Calls {
 				self.active = Some((channel, request));
 				self.active_guild = guild;
 				self.active_session = None;
+				self.negotiation_server = None;
+				self.session_confirmed = false;
 				self.muted = mute || deaf;
 				self.deafened = deaf;
 				self.camera = false;
 				(Some(channel), guild)
+			}
+			Command::AbandonSession { channel, request } => {
+				if self.active == Some((channel, request)) {
+					self.active = None;
+					self.active_guild = None;
+					self.active_session = None;
+					self.negotiation_server = None;
+					self.session_confirmed = false;
+					self.stream = None;
+					self.watch = None;
+					self.camera = false;
+				}
+				return Ok(None);
 			}
 			Command::Leave { channel, request } => {
 				if self.active != Some((channel, request)) {
 					return Ok(None);
 				}
 				self.departing = self.active.take();
-				self.departing_session = self.active_session.take();
+				self.departing_session = self
+					.active_session
+					.take()
+					.filter(|_| self.session_confirmed);
+				self.session_confirmed = false;
+				self.negotiation_server = None;
 				self.departing_guild = self.active_guild;
 				self.departure_deadline = Some(Instant::now() + Duration::from_secs(10));
 				self.stream = None;
@@ -321,7 +373,8 @@ impl Calls {
 				self.camera = enabled;
 				(Some(channel), self.active_guild)
 			}
-			Command::StartStream { .. }
+			Command::ConfirmSession { .. }
+			| Command::StartStream { .. }
 			| Command::StopStream { .. }
 			| Command::WatchStream { .. }
 			| Command::StopWatching { .. }
@@ -766,7 +819,7 @@ impl Calls {
 			&& state.channel_id.is_some()
 			&& self.active.is_some()
 			&& !matches_active
-			&& self.active_session.is_none()
+			&& !self.session_confirmed
 		{
 			// A previous-channel update cannot invalidate a newly submitted, unconfirmed Join.
 			return Ok(());
@@ -776,8 +829,9 @@ impl Calls {
 		} else {
 			None
 		};
-		let moved = self.active_session.is_some() && state.channel_id.is_some() && !matches_active;
-		let changed_session = matches_active
+		let moved = self.session_confirmed && state.channel_id.is_some() && !matches_active;
+		let changed_session = self.session_confirmed
+			&& matches_active
 			&& secret.as_ref().is_some_and(|session| {
 				self.active_session
 					.as_ref()
@@ -788,13 +842,19 @@ impl Calls {
 			let (channel, request) = self.active.take().expect("confirmed active call");
 			self.active_guild = None;
 			self.active_session = None;
+			self.negotiation_server = None;
+			self.session_confirmed = false;
 			self.stream = None;
 			self.watch = None;
 			self.camera = false;
 			emit(Event::Voice(voice::Event::TakenOver { channel, request }))?;
 		} else if let Some(session) = &secret
-			&& self.active_session.is_none()
+			&& self
+				.active_session
+				.as_ref()
+				.is_none_or(|old| old.expose() != session.expose())
 		{
+			self.negotiation_revision = self.negotiation_revision.wrapping_add(1);
 			self.active_session = Some(Secret::new(session.expose().to_owned())?);
 		}
 		let request = self.active.and_then(|(_, request)| {
@@ -807,6 +867,7 @@ impl Calls {
 			guild: state.guild_id,
 			channel: state.channel_id.filter(|_| allowed),
 			user: state.user_id,
+			negotiation_revision: secret.as_ref().map(|_| self.negotiation_revision),
 			session: secret,
 			member: state
 				.member
@@ -824,6 +885,8 @@ impl Calls {
 			self.active = None;
 			self.active_guild = None;
 			self.active_session = None;
+			self.negotiation_server = None;
+			self.session_confirmed = false;
 			self.stream = None;
 			self.watch = None;
 			self.camera = false;
@@ -863,6 +926,8 @@ impl Calls {
 						self.active = None;
 						self.active_guild = None;
 						self.active_session = None;
+						self.negotiation_server = None;
+						self.session_confirmed = false;
 						self.stream = None;
 						self.watch = None;
 						self.camera = false;
@@ -939,10 +1004,24 @@ impl Calls {
 				if server.endpoint.as_ref().is_some_and(|s| s.len() > 512) {
 					return Err(Failure::Capacity);
 				}
+				let token = Secret::new(token.to_string())?;
+				if self
+					.negotiation_server
+					.as_ref()
+					.is_none_or(|(old, endpoint)| {
+						old.expose() != token.expose() || *endpoint != server.endpoint
+					}) {
+					self.negotiation_revision = self.negotiation_revision.wrapping_add(1);
+					self.negotiation_server = Some((
+						Secret::new(token.expose().to_owned())?,
+						server.endpoint.clone(),
+					));
+				}
 				emit(Event::Voice(voice::Event::Server {
 					request,
 					channel,
-					token: Some(Secret::new(token.to_string())?),
+					negotiation_revision: Some(self.negotiation_revision),
+					token: Some(token),
 					endpoint: server.endpoint,
 				}))?;
 			}
@@ -1354,6 +1433,244 @@ mod tests {
 		);
 		assert!(!calls.camera);
 	}
+	fn confirm_transport(calls: &mut Calls, emit: &impl Fn(Event) -> Result<(), Failure>) {
+		let (channel, request) = calls.active.unwrap();
+		let server = serde_json::to_vec(&json!({ "guild_id":calls.active_guild, "channel_id":channel, "token":"synthetic-token", "endpoint":"synthetic.discord.media" })).unwrap();
+		calls
+			.dispatch("VOICE_SERVER_UPDATE", &server, Some(Id(1)), emit)
+			.unwrap();
+		assert!(
+			calls
+				.confirm_session(channel, request, calls.negotiation_revision)
+				.is_some()
+		);
+	}
+	#[test]
+	fn join_candidates_remain_replaceable_until_the_exact_local_transport_is_confirmed() {
+		for guild in [None, Some(Id(10))] {
+			for server_first in [false, true] {
+				let mut calls = Calls::default();
+				calls.allowed.insert(Id(20), guild);
+				let events = Mutex::new(Vec::new());
+				let emit = |event| {
+					events.lock().unwrap().push(event);
+					Ok(())
+				};
+				calls
+					.packet(Command::Join {
+						channel: Id(20),
+						request: 5,
+						ring: true,
+						mute: false,
+						deaf: false,
+					})
+					.unwrap();
+				assert!(calls.confirm_session(Id(20), 5, 0).is_none());
+				let state = |session| {
+					serde_json::to_vec(
+						&json!({ "guild_id":guild, "channel_id":Id(20), "user_id":Id(1), "session_id":session }),
+					)
+					.unwrap()
+				};
+				let server = serde_json::to_vec(&json!({ "guild_id":guild, "channel_id":Id(20), "token":"synthetic-token", "endpoint":"synthetic.discord.media" })).unwrap();
+				if server_first {
+					calls
+						.dispatch("VOICE_SERVER_UPDATE", &server, Some(Id(1)), &emit)
+						.unwrap();
+				}
+				// The other client's existing state can arrive before this device's Join acknowledgement.
+				calls
+					.dispatch(
+						"VOICE_STATE_UPDATE",
+						&state("existing-client"),
+						Some(Id(1)),
+						&emit,
+					)
+					.unwrap();
+				let old_revision = calls.negotiation_revision;
+				if !server_first {
+					calls
+						.dispatch("VOICE_SERVER_UPDATE", &server, Some(Id(1)), &emit)
+						.unwrap();
+				}
+				calls
+					.dispatch(
+						"VOICE_STATE_UPDATE",
+						&state("this-local-candidate"),
+						Some(Id(1)),
+						&emit,
+					)
+					.unwrap();
+				let revision = calls.negotiation_revision;
+				assert_ne!(old_revision, revision);
+				assert_eq!(calls.active, Some((Id(20), 5))); // Never mistake Join acknowledgement for takeover.
+				assert!(!calls.session_confirmed);
+				assert!(
+					!events
+						.lock()
+						.unwrap()
+						.iter()
+						.any(|event| matches!(event, Event::Voice(voice::Event::TakenOver { .. })))
+				);
+				// Late TransportReady/confirmation from the superseded candidate cannot establish ownership.
+				assert!(calls.confirm_session(Id(20), 5, old_revision).is_none());
+				assert!(calls.confirm_session(Id(20), 4, revision).is_none());
+				assert!(calls.confirm_session(Id(21), 5, revision).is_none());
+				assert!(!calls.session_confirmed);
+				assert!(
+					matches!(calls.confirm_session(Id(20), 5, revision), Some(Event::Voice(voice::Event::SessionConfirmed { channel:Id(20), request:5, revision: confirmed })) if confirmed == revision)
+				);
+				assert!(calls.session_confirmed);
+				calls
+					.dispatch(
+						"VOICE_STATE_UPDATE",
+						&state("this-local-candidate"),
+						Some(Id(1)),
+						&emit,
+					)
+					.unwrap();
+				assert_eq!(calls.negotiation_revision, revision); // Duplicate state does not invalidate the handshake.
+				events.lock().unwrap().clear();
+				calls
+					.dispatch(
+						"VOICE_STATE_UPDATE",
+						&state("replacement-client"),
+						Some(Id(1)),
+						&emit,
+					)
+					.unwrap();
+				assert!(matches!(
+					events.lock().unwrap()[0],
+					Event::Voice(voice::Event::TakenOver {
+						channel: Id(20),
+						request: 5
+					})
+				));
+				assert!(calls.confirm_session(Id(20), 5, revision).is_none());
+				assert!(
+					calls
+						.packet(Command::Leave {
+							channel: Id(20),
+							request: 5
+						})
+						.unwrap()
+						.is_none()
+				);
+				assert!(calls.departing.is_none());
+			}
+		}
+	}
+	#[test]
+	fn current_server_credentials_are_part_of_confirmation_and_abandon_sends_no_hangup() {
+		let mut calls = Calls::default();
+		calls.allowed.insert(Id(20), None);
+		let events = Mutex::new(Vec::new());
+		let emit = |event| {
+			events.lock().unwrap().push(event);
+			Ok(())
+		};
+		let join = |request| Command::Join {
+			channel: Id(20),
+			request,
+			ring: false,
+			mute: false,
+			deaf: false,
+		};
+		calls.packet(join(5)).unwrap();
+		calls
+			.dispatch(
+				"VOICE_STATE_UPDATE",
+				br#"{"channel_id":"20","user_id":"1","session_id":"synthetic-session"}"#,
+				Some(Id(1)),
+				&emit,
+			)
+			.unwrap();
+		assert!(
+			calls
+				.confirm_session(Id(20), 5, calls.negotiation_revision)
+				.is_none()
+		);
+		let server = |token, endpoint| {
+			serde_json::to_vec(&json!({ "channel_id":Id(20), "token":token, "endpoint":endpoint }))
+				.unwrap()
+		};
+		let mut previous = calls.negotiation_revision;
+		for (token, endpoint) in [
+			("token-1", Some("a.discord.media")),
+			("token-2", Some("a.discord.media")),
+			("token-2", Some("b.discord.media")),
+			("token-2", None),
+		] {
+			calls
+				.dispatch(
+					"VOICE_SERVER_UPDATE",
+					&server(token, endpoint),
+					Some(Id(1)),
+					&emit,
+				)
+				.unwrap();
+			let current = calls.negotiation_revision;
+			assert_ne!(previous, current);
+			assert!(calls.confirm_session(Id(20), 5, previous).is_none());
+			calls
+				.dispatch(
+					"VOICE_SERVER_UPDATE",
+					&server(token, endpoint),
+					Some(Id(1)),
+					&emit,
+				)
+				.unwrap();
+			assert_eq!(calls.negotiation_revision, current); // Identical credentials are deduplicated.
+			if endpoint.is_none() {
+				assert!(calls.confirm_session(Id(20), 5, current).is_none());
+			}
+			previous = current;
+		}
+		assert!(
+			calls
+				.packet(Command::AbandonSession {
+					channel: Id(20),
+					request: 4
+				})
+				.unwrap()
+				.is_none()
+		);
+		assert_eq!(calls.active, Some((Id(20), 5))); // Stale local cancellation cannot clear a newer attempt.
+		assert!(
+			calls
+				.packet(Command::AbandonSession {
+					channel: Id(20),
+					request: 5
+				})
+				.unwrap()
+				.is_none()
+		);
+		assert!(
+			!calls.has_call()
+				&& calls.active_session.is_none()
+				&& calls.negotiation_server.is_none()
+		);
+		assert!(calls.departing.is_none() && calls.departure_deadline.is_none());
+		events.lock().unwrap().clear();
+		calls
+			.dispatch(
+				"VOICE_STATE_UPDATE",
+				br#"{"channel_id":"20","user_id":"1","session_id":"late-session"}"#,
+				Some(Id(1)),
+				&emit,
+			)
+			.unwrap();
+		assert!(matches!(
+			events.lock().unwrap()[0],
+			Event::Voice(voice::Event::State {
+				request: None,
+				session: None,
+				..
+			})
+		));
+		assert!(calls.confirm_session(Id(20), 5, previous).is_none());
+		assert!(calls.packet(join(6)).unwrap().is_some());
+	}
 	#[test]
 	fn another_client_takes_over_without_a_hangup_or_stale_departure_barrier() {
 		for guild in [None, Some(Id(10))] {
@@ -1394,6 +1711,7 @@ mod tests {
 					.unwrap();
 				assert_eq!(calls.active, Some((Id(20), 5)));
 			}
+			confirm_transport(&mut calls, &emit);
 			assert_eq!(
 				format!("{:?}", calls.active_session.as_ref().unwrap()),
 				"VoiceSecret([REDACTED])"
@@ -1503,6 +1821,7 @@ mod tests {
 					&emit,
 				)
 				.unwrap();
+			confirm_transport(&mut calls, &emit);
 			calls
 				.packet(Command::Leave {
 					channel: Id(20),
@@ -1590,6 +1909,7 @@ mod tests {
 					&emit,
 				)
 				.unwrap();
+			confirm_transport(&mut calls, &emit);
 			events.lock().unwrap().clear();
 			calls
 				.dispatch(

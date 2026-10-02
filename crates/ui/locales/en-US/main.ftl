@@ -4403,4 +4403,4 @@ public-upload-error-conversation = Return to the original conversation and revie
 public-upload-error-selection = Selection changed; review the file again before uploading publicly
 public-upload-error-missing = Select the file again before uploading publicly
 
-voice-call-moved-to-another-client = Call moved to another client
+voice-call-moved-to-another-client = This device's call session was replaced

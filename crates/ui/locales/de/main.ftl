@@ -4352,4 +4352,4 @@ lib-composer-onboarding-incomplete = Schließe den Beitritt ab, um weitere Kanä
 # Context: composer
 lib-composer-onboarding-complete = Einführung abschließen
 
-voice-call-moved-to-another-client = Anruf wurde auf einen anderen Client übertragen
+voice-call-moved-to-another-client = Die Anrufsitzung dieses Geräts wurde ersetzt

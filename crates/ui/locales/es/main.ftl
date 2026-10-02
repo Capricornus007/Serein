@@ -4352,4 +4352,4 @@ lib-composer-onboarding-incomplete = Termina de unirte a este servidor para desb
 # Context: composer
 lib-composer-onboarding-complete = Completar bienvenida
 
-voice-call-moved-to-another-client = La llamada se trasladó a otro cliente
+voice-call-moved-to-another-client = Se reemplazó la sesión de llamada de este dispositivo

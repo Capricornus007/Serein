@@ -141,6 +141,7 @@ impl Connection {
                 let gateway_channels=dm_channels.clone();
                 let (voice_online,mut voice_availability)=watch::channel(false);
                 let (takeover_send,mut takeover_receive)=watch::channel(None);
+                let gateway_takeover=takeover_send.clone();
                 let gateway_api=api.clone();let gateway_emit=emit.clone();let terminal_send=finished.clone();
                 let gateway_wake=wake.clone();
                 let activity_wake=wake.clone();
@@ -166,7 +167,7 @@ impl Connection {
 
                         if event.ready_navigation().is_some() || matches!(&event,Event::Resumed) {let _=voice_online.send(true);}
                         if matches!(&event,Event::Disconnected|Event::Resync) {let _=voice_online.send(false);}
-                        if let Event::Voice(client_core::voice::Event::TakenOver{channel,request})=&event {let _=takeover_send.send_replace(Some((*channel,*request)));}
+                        if let Event::Voice(client_core::voice::Event::TakenOver{channel,request})=&event {let _=gateway_takeover.send_replace(Some((*channel,*request)));}
                         gateway_emit(event)
                     }).await.err().unwrap_or(Failure::Network).protocol_at("Gateway connection: unsupported handshake or event");
                     gateway_api.stop();let _=terminal_send.send(Some(error));gateway_wake.request_repaint();
@@ -350,12 +351,21 @@ impl Connection {
 							}
 							if let Command::Voice(control)=command {
                                 use client_core::voice::{Command as V,Event as E};
-                                let (channel,request)=match control {V::Join{channel,request,..}|V::Ring{channel,request}|V::Leave{channel,request}|V::SetMute{channel,request,..}|V::SetCamera{channel,request,..}=>(channel,request),V::Decline{channel}=>(channel,0),V::Sync{..}|V::StartStream{..}|V::StopStream{..}|V::WatchStream{..}|V::StopWatching{..}=>unreachable!("sync and stream actions routed above")};
+                                let (channel,request)=match control {V::AbandonSession{channel,request}|V::ConfirmSession{channel,request,..}|V::Join{channel,request,..}|V::Ring{channel,request}|V::Leave{channel,request}|V::SetMute{channel,request,..}|V::SetCamera{channel,request,..}=>(channel,request),V::Decline{channel}=>(channel,0),V::Sync{..}|V::StartStream{..}|V::StopStream{..}|V::WatchStream{..}|V::StopWatching{..}=>unreachable!("sync and stream actions routed above")};
+                                if let V::AbandonSession{channel,request}=control {
+                                    if voice_request.is_some_and(|(id,r,_)|id==channel && r==request) {
+                                        let _=takeover_send.send_replace(Some((channel,request)));
+                                        let _=release_taken_over(&mut voice_request,Some((channel,request)));
+                                        drop(ringing.take());
+                                    }
+                                    voice_send.try_send(control).map_err(|_|Failure::Capacity)?;
+                                    continue;
+                                }
                                 if !*voice_availability.borrow() {
                                     emit(Event::Voice(E::Failed{channel,request,message:"Voice is disconnected; no call was started"}))?;continue;
                                 }
                                 if join_taken_over(control,*takeover_receive.borrow()) {
-                                    emit(Event::Voice(E::Failed{channel,request,message:"Call moved to another client; join again to start a new attempt"}))?;continue;
+                                    emit(Event::Voice(E::Failed{channel,request,message:"Call attempt ended; join again to start a new attempt"}))?;continue;
                                 }
                                 if matches!(control,V::Join{..}) {drop(ringing.take());}
                                 if let V::Leave{channel,request}=control && voice_request.is_some_and(|(id,r,_)|id==channel && r==request) {drop(ringing.take());}
@@ -859,6 +869,12 @@ fn ring_action(
 	dm: bool,
 ) -> Result<Option<(Option<model::Id>, bool)>, ()> {
 	use client_core::voice::Command as V;
+	if let V::AbandonSession { channel, request } = control {
+		if active.is_some_and(|(id, r, _)| id == channel && r == request) {
+			*active = None;
+		}
+		return Ok(None);
+	}
 	if let V::Leave { channel, request } = control {
 		if active.is_some_and(|(id, r, _)| id == channel && r == request) {
 			*active = None;
@@ -878,7 +894,9 @@ fn ring_action(
 				*active = Some((channel, request, true));
 				Ok(None)
 			}
-			V::Sync { .. }
+			V::AbandonSession { .. }
+			| V::ConfirmSession { .. }
+			| V::Sync { .. }
 			| V::Leave { .. }
 			| V::SetMute { .. }
 			| V::SetCamera { .. }
@@ -909,7 +927,9 @@ fn ring_action(
 			Ok(Some((None, false)))
 		}
 		V::Decline { .. } => Ok(Some((Some(owner), true))),
-		V::Sync { .. }
+		V::AbandonSession { .. }
+		| V::ConfirmSession { .. }
+		| V::Sync { .. }
 		| V::Leave { .. }
 		| V::SetMute { .. }
 		| V::SetCamera { .. }
@@ -1124,6 +1144,49 @@ mod tests {
 		}
 	}
 
+	#[test]
+	fn abandoning_an_unconfirmed_attempt_clears_dispatch_without_an_http_hangup() {
+		use client_core::voice::Command as V;
+		let mut active = Some((model::Id(20), 5, false));
+		assert_eq!(
+			ring_action(
+				V::AbandonSession {
+					channel: model::Id(20),
+					request: 4
+				},
+				model::Id(1),
+				&mut active,
+				true
+			),
+			Ok(None)
+		);
+		assert_eq!(active, Some((model::Id(20), 5, false)));
+		assert_eq!(
+			ring_action(
+				V::AbandonSession {
+					channel: model::Id(20),
+					request: 5
+				},
+				model::Id(1),
+				&mut active,
+				true
+			),
+			Ok(None)
+		);
+		assert!(active.is_none());
+		assert_eq!(
+			ring_action(
+				V::Ring {
+					channel: model::Id(20),
+					request: 5
+				},
+				model::Id(1),
+				&mut active,
+				true
+			),
+			Err(())
+		);
+	}
 	#[tokio::test]
 	async fn activity_privacy_waits_for_opt_in_and_propagates_expired_session() {
 		let api = Arc::new(

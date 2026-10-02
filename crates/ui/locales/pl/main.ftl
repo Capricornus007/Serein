@@ -4355,4 +4355,4 @@ lib-composer-onboarding-incomplete = Dokończ dołączanie do serwera, aby odblo
 # Context: composer
 lib-composer-onboarding-complete = Dokończ wprowadzenie
 
-voice-call-moved-to-another-client = Połączenie przeniesiono do innego klienta
+voice-call-moved-to-another-client = Sesja połączenia na tym urządzeniu została zastąpiona
