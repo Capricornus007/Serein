@@ -1,4 +1,4 @@
-//! Opt-out native tray icon. Minimizing keeps its normal window behavior; the application
+//! Persistent native tray icon. Minimizing keeps its normal window behavior; the application
 //! decides what closing does: hide when supported, otherwise ask the compositor to minimize.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -122,6 +122,7 @@ mod native {
 		wake: Box<dyn Fn()>,
 		voice_icons: [Option<HICON>; 4],
 		current_voice_state: Cell<super::VoiceState>,
+		applied_voice_state: Cell<Option<super::VoiceState>>,
 	}
 
 	impl Tray {
@@ -158,7 +159,6 @@ mod native {
 			if notification == 0 || restart == 0 {
 				return Err(UNAVAILABLE);
 			}
-			let voice_icons = create_voice_icons();
 			// SAFETY: request a borrowed window icon; the fallback is a shared system icon.
 			let fallback_icon = unsafe {
 				let handle = HICON(
@@ -171,16 +171,17 @@ mod native {
 					handle
 				}
 			};
-			let icon = voice_icons[super::VoiceState::Unmuted as usize].unwrap_or(fallback_icon);
 			// SAFETY: creates a menu owned by State, released on every success/error path.
 			let menu = unsafe { CreatePopupMenu() }.map_err(|_| UNAVAILABLE)?;
+			// No fallible initialization remains before State takes ownership of these icons.
+			let voice_icons = create_voice_icons();
 			let mut data = NOTIFYICONDATAW {
 				cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
 				hWnd: hwnd,
 				uID: ID as u32,
 				uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP,
 				uCallbackMessage: notification,
-				hIcon: icon,
+				hIcon: fallback_icon,
 				Anonymous: NOTIFYICONDATAW_0 {
 					uVersion: NOTIFYICON_VERSION_4,
 				},
@@ -202,6 +203,7 @@ mod native {
 					wake: Box::new(wake),
 					voice_icons,
 					current_voice_state: Cell::new(super::VoiceState::Unmuted),
+					applied_voice_state: Cell::new(None),
 				}),
 				_window: window,
 			};
@@ -238,30 +240,20 @@ mod native {
 			self.state.events.take()
 		}
 
+		/// Retain the desired state, retrying until the shell accepts its icon and tooltip.
 		pub fn set_voice_state(&self, state: super::VoiceState) {
-			if self.state.current_voice_state.get() == state {
+			self.state.current_voice_state.set(state);
+			if !self.state.present.get() || self.state.applied_voice_state.get() == Some(state) {
 				return;
 			}
-			self.state.current_voice_state.set(state);
-			if let Some(hicon) = self.state.voice_icons[state as usize] {
-				let mut data = NOTIFYICONDATAW {
-					cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
-					hWnd: self.state.icon.hWnd,
-					uID: self.state.icon.uID,
-					uFlags: NIF_ICON | NIF_TIP | NIF_SHOWTIP,
-					hIcon: hicon,
-					Anonymous: NOTIFYICONDATAW_0 {
-						uVersion: NOTIFYICON_VERSION_4,
-					},
-					..Default::default()
-				};
-				let tip = voice_state_tip(state);
-				for (slot, unit) in data.szTip.iter_mut().zip(tip.encode_utf16()) {
-					*slot = unit;
-				}
-				unsafe {
-					let _ = Shell_NotifyIconW(NIM_MODIFY, &data);
-				}
+			let mut data = self.state.voice_descriptor();
+			data.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
+			// SAFETY: the descriptor contains live UI-thread handles and fixed tooltip text.
+			if unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) }.as_bool() {
+				self.state.applied_voice_state.set(Some(state));
+			} else {
+				// The shell's presentation is unconfirmed, even if intent changes back later.
+				self.state.applied_voice_state.set(None);
 			}
 		}
 	}
@@ -276,7 +268,8 @@ mod native {
 	}
 
 	impl State {
-		fn add_icon(&self) -> bool {
+		/// Use a neutral borrowed icon if generation failed, with the current state tooltip.
+		fn voice_descriptor(&self) -> NOTIFYICONDATAW {
 			let mut icon_data = self.icon;
 			let state = self.current_voice_state.get();
 			if let Some(hicon) = self.voice_icons[state as usize] {
@@ -290,6 +283,11 @@ mod native {
 			{
 				*slot = unit;
 			}
+			icon_data
+		}
+		/// Restore both the desired icon and tooltip after registration or Explorer restart.
+		fn add_icon(&self) -> bool {
+			let icon_data = self.voice_descriptor();
 			// SAFETY: this initialized descriptor contains only live borrowed handles and fixed text.
 			unsafe {
 				if !Shell_NotifyIconW(NIM_ADD, &icon_data).as_bool() {
@@ -300,6 +298,8 @@ mod native {
 					return false;
 				}
 			}
+			self.applied_voice_state
+				.set(Some(self.current_voice_state.get()));
 			self.present.set(true);
 			true
 		}
@@ -383,10 +383,9 @@ mod native {
 		fn drop(&mut self) {
 			// SAFETY: this state owns the menu; callback Rc copies keep it alive during nested menus.
 			let _ = unsafe { DestroyMenu(self.menu) };
-			for icon in self.voice_icons {
-				if let Some(hicon) = icon {
-					let _ = unsafe { DestroyIcon(hicon) };
-				}
+			for hicon in self.voice_icons.into_iter().flatten() {
+				// SAFETY: only generated icons are owned; the fallback icon is borrowed.
+				let _ = unsafe { DestroyIcon(hicon) };
 			}
 		}
 	}
@@ -480,7 +479,7 @@ mod native {
 		};
 		use windows::Win32::UI::WindowsAndMessaging::{CreateIconIndirect, ICONINFO};
 
-		let mask_stride = ((width + 31) / 32) * 4;
+		let mask_stride = width.div_ceil(32) * 4;
 		let mask_bytes = vec![0u8; (mask_stride * height) as usize];
 		// SAFETY: mask_bytes has valid stride and length for width * height monochrome bitmap.
 		let mask = unsafe {

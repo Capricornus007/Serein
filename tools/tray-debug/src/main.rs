@@ -101,6 +101,15 @@ mod linux {
 		while !tray.is_available() {
 			wake.notified().await;
 		}
+		for state in [
+			tray::VoiceState::Unmuted,
+			tray::VoiceState::Speaking,
+			tray::VoiceState::Muted,
+			tray::VoiceState::Deafened,
+		] {
+			tray.set_voice_state(state);
+			assert!(tray.is_available());
+		}
 		println!("PASS: registration");
 		let service = registration.borrow_and_update().clone();
 		let item = zbus::Proxy::new(

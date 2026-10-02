@@ -2622,12 +2622,9 @@ impl Desktop {
 		if self.tray_window.hidden && !self.tray_available() {
 			self.tray_window.show(ctx);
 		}
-		self.messaging.tray_status = if self.tray_setting.enabled {
-			self.tray_error
-				.unwrap_or_else(|| self.tray_setting.status())
-		} else {
-			self.tray_setting.status()
-		};
+		self.messaging.tray_status = self
+			.tray_error
+			.unwrap_or_else(|| self.tray_setting.status());
 		if previous_status != self.messaging.tray_status {
 			ctx.request_repaint();
 		}
@@ -5945,7 +5942,7 @@ impl eframe::App for Desktop {
 				platform::tray::Event::Unavailable => {
 					self.tray = None;
 					self.tray_error = Some(if cfg!(target_os = "linux") {
-						"Tray unavailable. Start a StatusNotifier host, then toggle the tray off/on."
+						"Tray icon unavailable; Close exits normally. Start a StatusNotifier host, then toggle minimize-to-tray to retry."
 					} else {
 						"Tray unavailable. The window will stay visible."
 					});
@@ -6733,7 +6730,6 @@ impl eframe::App for Desktop {
 			for command in commands {
 				self.command(command);
 			}
-			self.poll_voice(&ctx);
 			if self.messaging.logout_requested {
 				self.messaging.logout_requested = false;
 				self.request_session_end(&ctx, SessionEnd::Logout);
@@ -6786,7 +6782,6 @@ impl eframe::App for Desktop {
 			&mut self.messaging,
 			self.fixture_only || self.state.demo,
 		);
-		self.sync_tray(&ctx);
 		if appearance != self.appearance {
 			self.appearance = appearance;
 			self.appearance_changed = true;

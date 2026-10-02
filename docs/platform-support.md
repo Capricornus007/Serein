@@ -133,10 +133,10 @@ provider rejection and missing native webview runtimes fail visibly. macOS/Linux
 live CAPTCHA acceptance remains unverified. Widget
 loading and synthetic checks do not establish live Discord challenge acceptance.
 
-## Opt-out tray icon (September 13, 2026)
+## Persistent tray icon (October 2, 2026)
 
-Windows General settings offer Show Serein in System Tray, on by default; turning it off
-falls back to ordinary window minimize/close. Minimizing
+General settings control close-to-tray behavior, on by default; turning it off
+restores ordinary window close behavior while the tray icon remains registered. Minimizing
 keeps the window in the taskbar, including taskbar clicks and automatic startup. The icon supports
 keyboard/mouse restore and a Show Serein / Quit menu. Quit uses the normal unsaved
 work/download exit checks; while the icon is live, the window Close button hides the
@@ -144,8 +144,13 @@ window instead of exiting, and Serein keeps running with its logic ticking so
 notifications and calls continue. Show restores the window. Disabling the setting,
 or a tray that reports itself unavailable, restores a hidden window immediately, so
 Close can never strand the application without a way back.
-The adapter uses existing user32/Shell APIs and dependencies, with no background
-polling. A synthetic native Windows test verifies registration,
+The Windows adapter uses existing user32/Shell APIs and dependencies. Its icon and
+tooltip reflect speaking, mute and deafen state; unavailable generated icons fall back
+to the neutral window icon with the current tooltip. Shell updates are retried until
+accepted, and Explorer restart restores the desired icon and tooltip together.
+Voice polling and tray synchronization run once per logic tick, including while hidden;
+active calls request a tick every 50 ms. Native Windows failure/recovery behavior
+remains unverified in the Linux review-fix pass. A synthetic native Windows test verifies registration,
 minimize/restore, own-window taskbar recovery, Quit event and cleanup. macOS uses a native menu bar icon with Show Serein / Quit actions; it draws Serein's own
 mark (`assets/brand/serein-tray.png`, rendered from the brand SVG) as an 18-point template
 image, so the system tints it for light, dark and highlighted menu bars. Minimized windows
@@ -155,7 +160,9 @@ Linux now uses ksni's StatusNotifierItem on the session bus with Show Serein,
 Minimize Serein and Quit actions. Enable a StatusNotifier host (for example a panel's
 tray module). Until registration succeeds, or after host loss, Close retains normal
 exit behavior. Start/restart the host and toggle the tray off/on to retry registration.
-The existing on-by-default tray preference is reused; demo changes are session-only.
+Registration errors remain visible even when close-to-tray is off; failed registrations
+are discarded before a user-triggered retry. The existing on-by-default close-to-tray
+preference is reused; demo changes are session-only.
 
 **Hyprland / native Wayland:** winit cannot hide, unhide, focus or unminimize a native
 Wayland window. On Hyprland, Close and tray Minimize instead park Serein on
