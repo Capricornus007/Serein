@@ -4405,3 +4405,13 @@ public-upload-error-busy = Wait for the current attachment operation to finish
 public-upload-error-conversation = Return to the original conversation and review the file again before uploading publicly
 public-upload-error-selection = Selection changed; review the file again before uploading publicly
 public-upload-error-missing = Select the file again before uploading publicly
+
+# Synchronized favorite GIFs (unofficial account settings).
+gif-favorites-sync-loading = Syncing favorites…
+gif-favorites-sync-ready = Discord and local favorites
+gif-favorites-sync-local = Local favorites
+gif-favorites-sync-refresh = Refresh from Discord
+gif-favorites-sync-help = Existing local favorites stay local until you change their star. New star changes sync after loading. Video-only favorites keep a preview placeholder. At most 100 favorites are displayed; saves preserve the other server favorites.
+gif-favorites-sync-failed = Sync failed; local favorites are kept. Refresh before trying another synced change.
+gif-favorites-sync-unsupported = Discord favorites are unsupported or exceed the safe limit.
+gif-favorites-sync-unconfirmed = Favorite change was not confirmed. Refresh before retrying.
