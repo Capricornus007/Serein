@@ -4404,3 +4404,5 @@ public-upload-error-busy = Počkejte na dokončení aktuální operace s přílo
 public-upload-error-conversation = Před veřejným nahráním se vraťte do původní konverzace a znovu zkontrolujte soubor
 public-upload-error-selection = Výběr se změnil; před veřejným nahráním znovu zkontrolujte soubor
 public-upload-error-missing = Před veřejným nahráním znovu vyberte soubor
+
+message-preview-limit = Tato zpráva překračuje limit nativního rozvržení textu.

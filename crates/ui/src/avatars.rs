@@ -355,6 +355,10 @@ impl Avatars {
 		self.revision += 1;
 		textures.insert(key, (self.clock, texture));
 	}
+	/// Read-only admission hint; this never queues an image request or changes recency.
+	pub(crate) fn custom_image_cached(&self, id: model::Id) -> bool {
+		self.emoji_textures.contains_key(&format!("emoji-{id}"))
+	}
 	pub(crate) fn custom_image(
 		&mut self,
 		_ctx: &egui::Context,

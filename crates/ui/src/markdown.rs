@@ -1264,6 +1264,35 @@ impl Formatted {
 						start += count;
 						continue;
 					}
+					if spans[start].1.block.is_none() && (quoted || !spans[start].1.quote) {
+						let count = spans[start..]
+							.iter()
+							.take_while(|(_, style)| {
+								style.block.is_none() && (quoted || !style.quote)
+							})
+							.count();
+						let paragraph = &spans[start..start + count];
+						if paragraph.iter().any(|(text, style)| {
+							style
+								.spoiler
+								.is_none_or(|region| *render.revealed & (1_u32 << region) != 0)
+								&& text.chars().any(|chr| {
+									matches!(
+										unicode_bidi::bidi_class(chr),
+										unicode_bidi::BidiClass::R
+											| unicode_bidi::BidiClass::AL
+											| unicode_bidi::BidiClass::RLE
+											| unicode_bidi::BidiClass::RLO
+											| unicode_bidi::BidiClass::RLI
+									)
+								})
+						}) {
+							reserve(ui);
+							self.show_rtl(ui, paragraph, render);
+							start += count;
+							continue;
+						}
+					}
 					let spoiler = spans[start].1.spoiler;
 					if let Some(region) = spoiler
 						&& *render.revealed & (1_u32 << region) == 0
@@ -1714,6 +1743,337 @@ impl Formatted {
 		}
 		response
 	}
+	/// A whole bidi paragraph must include inline actions before visual ordering.
+	fn show_rtl(&self, ui: &mut egui::Ui, spans: &[(String, Style)], render: &mut Render<'_>) {
+		enum Action {
+			None,
+			Link(usize),
+			Spoiler,
+			User(Id),
+			Channel(Id),
+			Emoji,
+		}
+		struct Object {
+			text: String,
+			custom: Option<Id>,
+			image: Option<egui::Image<'static>>,
+			fallback: Option<std::sync::Arc<egui::epaint::Galley>>,
+			spoiler: Option<u8>,
+		}
+		let mut actions = Vec::new();
+		let mut objects = Vec::new();
+		let mut inputs = Vec::new();
+		let size = crate::emoji::inline_size(ui);
+		let mut atlas = None;
+		let mut hidden = None;
+		for (text, style) in spans {
+			if let Some(region) = style.spoiler
+				&& *render.revealed & (1_u32 << region) == 0
+			{
+				if hidden == Some(region) {
+					continue;
+				}
+				hidden = Some(region);
+				let label = crate::i18n::translate("markdown-show-run-reveal-spoiler");
+				let width = ui
+					.painter()
+					.layout_no_wrap(
+						label.clone(),
+						egui::TextStyle::Body.resolve(ui.style()),
+						ui.visuals().text_color(),
+					)
+					.size()
+					.x + 12.0;
+				let object = objects.len();
+				objects.push(Object {
+					text: label.clone(),
+					custom: None,
+					image: None,
+					fallback: None,
+					spoiler: Some(region),
+				});
+				let action = actions.len();
+				actions.push(Action::Spoiler);
+				inputs.push(crate::rtl::Span {
+					text: label,
+					format: crate::emoji::inline_format(ui, width, size),
+					action,
+					object: Some(object),
+					copy: false,
+				});
+				continue;
+			}
+			hidden = None;
+			let mut style = *style;
+			let resolved;
+			let text = if let Some(id) = style.mention {
+				resolved = crate::mentions::mention_label(id, render.users, render.source);
+				style.mass_mention = true;
+				&resolved
+			} else if let Some(id) = style.channel {
+				resolved = channel_reference_name(id, render.channels, render.source)
+					.map_or_else(|| "#unknown-channel".into(), |name| format!("#{name}"));
+				style.mass_mention = true;
+				&resolved
+			} else if let Some(id) = style.role {
+				resolved = format!(
+					"@{}",
+					render
+						.roles
+						.iter()
+						.find(|role| role.id == id)
+						.map_or("unknown-role", |role| role.name.as_str())
+				);
+				style.mass_mention = true;
+				style.role_color = render
+					.roles
+					.iter()
+					.find(|role| role.id == id)
+					.map(|role| role.color)
+					.filter(|color| *color != 0);
+				&resolved
+			} else if let Some((seconds, kind)) = style.timestamp {
+				resolved = crate::local_time::discord_timestamp(seconds, kind)
+					.unwrap_or_else(|| text.clone());
+				&resolved
+			} else {
+				text
+			};
+			let action = actions.len();
+			actions.push(if let Some(link) = style.link {
+				Action::Link(link)
+			} else if let Some(id) = style.mention {
+				Action::User(id)
+			} else if let Some(id) = style.channel {
+				Action::Channel(id)
+			} else {
+				Action::None
+			});
+			let format = Self::format(ui, &style);
+			let mut start = 0;
+			let mut offset = 0;
+			while offset < text.len() {
+				let custom = (!style.code)
+					.then(|| crate::emoji::custom_prefix(&text[offset..]))
+					.flatten();
+				let len = custom.map_or_else(
+					|| {
+						text[offset..]
+							.graphemes(true)
+							.next()
+							.expect("remaining bounded text")
+							.len()
+					},
+					|(_, len)| len,
+				);
+				let cluster = &text[offset..offset + len];
+				let cell = if custom.is_none() && !style.code {
+					crate::emoji::lookup(cluster)
+				} else {
+					None
+				};
+				if custom.is_some() || cell.is_some() {
+					if start < offset {
+						inputs.push(crate::rtl::Span {
+							text: text[start..offset].into(),
+							format: format.clone(),
+							action,
+							object: None,
+							copy: true,
+						});
+					}
+					let fallback = custom
+						.filter(|(id, _)| !render.images.custom_image_cached(*id))
+						.map(|_| {
+							let name = cluster
+								.trim_start_matches("<a:")
+								.trim_start_matches("<:")
+								.split(':')
+								.next()
+								.unwrap_or("emoji");
+							ui.painter().layout_no_wrap(
+								format!(":{name}:"),
+								format.font_id.clone(),
+								format.color,
+							)
+						});
+					let slot_width = fallback
+						.as_ref()
+						.map_or(size, |label| label.size().x.max(size));
+					let object = objects.len();
+					objects.push(Object {
+						text: cluster.into(),
+						custom: custom.map(|(id, _)| id),
+						image: cell.and_then(|cell| {
+							atlas
+								.get_or_insert_with(|| crate::emoji::atlas(ui.ctx()))
+								.map(|atlas| crate::emoji::image_cell(atlas, cluster, cell, size))
+						}),
+						fallback,
+						spoiler: None,
+					});
+					let emoji_action = if matches!(actions[action], Action::None) {
+						let index = actions.len();
+						actions.push(Action::Emoji);
+						index
+					} else {
+						action
+					};
+					inputs.push(crate::rtl::Span {
+						text: cluster.into(),
+						format: crate::emoji::inline_format(ui, slot_width, size),
+						action: emoji_action,
+						object: Some(object),
+						copy: true,
+					});
+					start = offset + len;
+				}
+				offset += len;
+			}
+			if start < text.len() {
+				inputs.push(crate::rtl::Span {
+					text: text[start..].into(),
+					format,
+					action,
+					object: None,
+					copy: true,
+				});
+			}
+		}
+		let width = ui.available_width().max(1.0);
+		let Some(layout) = crate::rtl::layout(ui.ctx(), &inputs, width) else {
+			// The input/parser remains bounded. Do not expose hidden spans in a complexity fallback.
+			ui.label(crate::i18n::translate("message-preview-limit"));
+			return;
+		};
+		let (rect, response) = ui.allocate_exact_size(layout.size, egui::Sense::hover());
+		response.widget_info(|| {
+			egui::WidgetInfo::labeled(egui::Role::Label, ui.is_enabled(), &layout.source)
+		});
+		let mut artwork = Vec::new();
+		let mut targets: Vec<(usize, egui::Rect)> = Vec::new();
+		let mut join_target = false;
+		for (index, cell) in layout.cells.iter().enumerate() {
+			let target = cell.rect.translate(rect.min.to_vec2());
+			if !ui.is_rect_visible(target) {
+				continue;
+			}
+			let action = &actions[cell.action];
+			if let Some(object) = cell.object {
+				let object = &objects[object];
+				if let Some(region) = object.spoiler {
+					let hit = ui.put(target, egui::Button::new(&object.text));
+					render.surface.keep(&hit);
+					if hit.clicked() {
+						*render.revealed |= 1_u32 << region;
+					}
+				} else {
+					let image = object.custom.map_or_else(
+						|| object.image.clone(),
+						|id| render.images.custom_image(ui.ctx(), id, size, render.demo),
+					);
+					artwork.push(crate::select::Artwork {
+						rect: target,
+						image: image.clone(),
+						fallback: object.fallback.clone(),
+					});
+					if matches!(action, Action::Emoji) {
+						let hit = ui
+							.interact(
+								target,
+								response.id.with(("rtl-emoji", index)),
+								egui::Sense::click(),
+							)
+							.on_hover_text(&object.text);
+						crate::emoji_details::show(ui, &hit, &object.text, image, render.guilds);
+						render.surface.through(&hit);
+					}
+				}
+			}
+			if matches!(action, Action::None | Action::Spoiler | Action::Emoji) {
+				join_target = false;
+				continue;
+			}
+			if join_target
+				&& let Some((last_action, last_rect)) =
+					targets.last_mut().filter(|(last_action, last_rect)| {
+						*last_action == cell.action
+							&& (last_rect.center().y - target.center().y).abs() < 1.0
+							&& target.left() <= last_rect.right() + 2.0
+							&& target.right() >= last_rect.left() - 2.0
+					}) {
+				let _ = last_action;
+				*last_rect = last_rect.union(target);
+			} else {
+				targets.push((cell.action, target));
+			}
+			join_target = true;
+		}
+		for (index, (action, target)) in targets.into_iter().enumerate() {
+			let action = &actions[action];
+			let hit = ui
+				.interact(
+					target,
+					response.id.with(("rtl-action", index)),
+					egui::Sense::click(),
+				)
+				.on_hover_cursor(egui::CursorIcon::PointingHand);
+			render.surface.through(&hit);
+			match action {
+				Action::Link(link) => {
+					let url = &self.links[*link];
+					let hit = hit.on_hover_text(url);
+					if hit.clicked() {
+						*render.opening = Some(url.clone());
+					}
+				}
+				Action::Channel(id) => {
+					if hit.clicked() {
+						*render.channel = Some(*id);
+					}
+				}
+				Action::User(id) => {
+					let user = crate::mentions::find_user(*id, render.users, render.source)
+						.cloned()
+						.unwrap_or(model::User {
+							id: *id,
+							name: format!("User {id}"),
+							avatar: None,
+							webhook: false,
+							kind: Default::default(),
+							discriminator: 0,
+							primary_guild: None,
+						});
+					render.profile.person_click(ui, &hit, None, &user);
+				}
+				_ => {}
+			}
+		}
+		let highlights = if render.query.is_empty() {
+			Vec::new()
+		} else {
+			let matches: Vec<_> = layout
+				.source
+				.match_indices(render.query)
+				.map(|(start, value)| start..start + value.len())
+				.collect();
+			layout
+				.cells
+				.iter()
+				.filter(|cell| {
+					let index = matches.partition_point(|range| range.end <= cell.source.start);
+					!cell.source.is_empty()
+						&& matches
+							.get(index)
+							.is_some_and(|range| range.start < cell.source.end)
+				})
+				.map(|cell| cell.rect.translate(rect.min.to_vec2()))
+				.collect()
+		};
+		render
+			.surface
+			.mapped_run(ui, &response, rect.min, layout, artwork, highlights);
+	}
 	/// One galley per run: emoji occupy fixed-width slots inside the text layout, so rows
 	/// holding artwork grow before any text on them is positioned. Separate widgets would
 	/// leave text placed earlier on the row misaligned with text placed after the emoji.
@@ -1898,6 +2258,7 @@ impl Formatted {
 						Some(id) => images.custom_image(ui.ctx(), id, size, demo),
 						None => inline.image.clone(),
 					},
+					fallback: None,
 				}
 			})
 			.collect();
@@ -4121,5 +4482,404 @@ mod tests {
 		}
 		assert_eq!(cache.entries.len(), 500);
 		assert!(cache.bytes <= 1024 * 1024);
+	}
+	#[test]
+	#[ignore = "release-only complete message layout workload"]
+	fn rtl_message_layout_benchmark() {
+		for width in [360.0, 900.0] {
+			let ctx = egui::Context::default();
+			crate::fonts::install(&ctx);
+			let messages = [
+				Formatted::parse(
+					&"مرحبا بالعالم هذه رسالة عربية لاختبار ترتيب الكلمات والتفاف السطور. "
+						.repeat(4),
+				),
+				Formatted::parse(
+					"العربية مع English 123 و[رابط تجريبي](https://example.com) و**نص عريض** ثم نهاية",
+				),
+				Formatted::parse("שלום עולם mixed English 123 סוף השורה"),
+				Formatted::parse("لَا لَإِ بَ بِ بُ\nEnglish prefix: العربية 123 ثم النهاية"),
+			];
+			let mut images = crate::avatars::Avatars::default();
+			let mut profile = crate::profiles::ProfileSession::default();
+			let mut frame = || {
+				ctx.run_ui(
+					egui::RawInput {
+						screen_rect: Some(egui::Rect::from_min_size(
+							egui::Pos2::ZERO,
+							egui::vec2(width, 1600.0),
+						)),
+						..Default::default()
+					},
+					|ui| {
+						for (index, message) in messages.iter().enumerate() {
+							let mut surface =
+								crate::select::Surface::new(ui, ("rtl-layout-bench", index));
+							message.show_search(
+								ui,
+								&mut None,
+								&[],
+								None,
+								&mut profile,
+								(&[], &mut None, &[], &[]),
+								(&mut images, true, &mut 0),
+								&mut surface,
+								"",
+								crate::design::MessageCardSurface::Opaque,
+							);
+							surface.finish(ui);
+						}
+					},
+				)
+				.drop_without_applying_deltas();
+			};
+			for _ in 0..10 {
+				frame();
+			}
+			let mut samples = Vec::new();
+			for _ in 0..5 {
+				let start = std::time::Instant::now();
+				for _ in 0..200 {
+					frame();
+				}
+				samples.push(start.elapsed().as_secs_f64() * 1000.0);
+			}
+			println!(
+				"RTL_MESSAGE_LAYOUT_BENCH {{\"width\":{width},\"warmup_frames\":10,\"frames_per_sample\":200,\"messages_per_frame\":4,\"samples_ms\":{samples:?}}}"
+			);
+		}
+	}
+	#[test]
+	fn rtl_custom_fallback_queues_artwork_only_for_a_visible_run() {
+		let ctx = egui::Context::default();
+		crate::fonts::install(&ctx);
+		let parsed = Formatted::parse("مرحبا <:synthetic:90001> نهاية");
+		let mut images = crate::avatars::Avatars::default();
+		let mut profile = crate::profiles::ProfileSession::default();
+		for visible in [false, true] {
+			ctx.run_ui(egui::RawInput::default(), |ui| {
+				if !visible {
+					ui.set_clip_rect(egui::Rect::NOTHING);
+				}
+				let mut surface = crate::select::Surface::new(ui, "rtl-offscreen-custom");
+				parsed.show_search(
+					ui,
+					&mut None,
+					&[],
+					None,
+					&mut profile,
+					(&[], &mut None, &[], &[]),
+					(&mut images, false, &mut 0),
+					&mut surface,
+					"",
+					crate::design::MessageCardSurface::Opaque,
+				);
+				surface.finish(ui);
+			})
+			.drop_without_applying_deltas();
+			assert_eq!(
+				images.take_requests(),
+				if visible {
+					vec!["emoji-90001".to_string()]
+				} else {
+					Vec::new()
+				},
+				"fallback measurement cannot schedule an offscreen artwork request"
+			);
+		}
+	}
+	#[test]
+	fn rtl_search_paints_whole_native_clusters_without_highlighting_concealed_text() {
+		let ctx = egui::Context::default();
+		crate::fonts::install(&ctx);
+		let parsed = Formatted::parse("مرحبا بالعالم ||مرحبا_SECRET|| نهاية");
+		let mut images = crate::avatars::Avatars::default();
+		let mut profile = crate::profiles::ProfileSession::default();
+		let mut expected = Vec::new();
+		let output = ctx.run_ui(
+			egui::RawInput {
+				screen_rect: Some(egui::Rect::from_min_size(
+					egui::Pos2::ZERO,
+					egui::vec2(420.0, 400.0),
+				)),
+				..Default::default()
+			},
+			|ui| {
+				let mut surface = crate::select::Surface::new(ui, "rtl-search-clusters");
+				parsed.show_search(
+					ui,
+					&mut None,
+					&[],
+					None,
+					&mut profile,
+					(&[], &mut None, &[], &[]),
+					(&mut images, true, &mut 0),
+					&mut surface,
+					"مرحبا",
+					crate::design::MessageCardSurface::Opaque,
+				);
+				let (pos, layout) = surface.mapped_layouts()[0].clone();
+				assert!(!layout.source.contains("SECRET"));
+				assert_eq!(layout.source.matches("مرحبا").count(), 1);
+				let matched = layout.source.find("مرحبا").unwrap();
+				let end = matched + "مرحبا".len();
+				expected.extend(
+					layout
+						.cells
+						.iter()
+						.filter(|cell| cell.source.start < end && cell.source.end > matched)
+						.map(|cell| cell.rect.translate(pos.to_vec2())),
+				);
+				surface.finish(ui);
+			},
+		);
+		let color = egui::Color32::from_rgba_unmultiplied(200, 160, 30, 85);
+		let painted: Vec<_> = output
+			.shapes
+			.iter()
+			.filter_map(|shape| match &shape.shape {
+				egui::Shape::Rect(rect) if rect.fill == color => Some(rect.rect),
+				_ => None,
+			})
+			.collect();
+		assert!(!expected.is_empty());
+		assert_eq!(
+			painted, expected,
+			"only visible logical matches paint complete shaping-cluster rectangles"
+		);
+		output.drop_without_applying_deltas();
+	}
+	#[test]
+	fn rtl_markdown_links_emoji_and_spoilers_keep_native_actions_and_concealment() {
+		let ctx = egui::Context::default();
+		crate::fonts::install(&ctx);
+		crate::emoji::install(&ctx).unwrap();
+		let source = "مرحبا [رابط English تجريبي](https://example.com) plain_unlinked 🙂 <:synthetic:90001> ||SECRET_PRIVATE|| نهاية";
+		let parsed = Formatted::parse(source);
+		let opening = std::cell::RefCell::new(None);
+		let mut mask = 0;
+		let mut images = crate::avatars::Avatars::default();
+		let mut profile = crate::profiles::ProfileSession::default();
+		let snapshot = std::cell::RefCell::new(Vec::new());
+		let mut clock = 0.0;
+		let mut frame = |events: Vec<egui::Event>| {
+			clock += 0.02;
+			ctx.run_ui(
+				egui::RawInput {
+					screen_rect: Some(egui::Rect::from_min_size(
+						egui::Pos2::ZERO,
+						egui::vec2(400.0, 500.0),
+					)),
+					events,
+					time: Some(clock),
+					..Default::default()
+				},
+				|ui| {
+					let mut surface = crate::select::Surface::new(ui, "rtl-markdown-actions");
+					parsed.show_search(
+						ui,
+						&mut opening.borrow_mut(),
+						&[],
+						None,
+						&mut profile,
+						(&[], &mut None, &[], &[]),
+						(&mut images, true, &mut mask),
+						&mut surface,
+						"",
+						crate::design::MessageCardSurface::Opaque,
+					);
+					*snapshot.borrow_mut() = surface.mapped_layouts();
+					surface.finish(ui);
+				},
+			)
+		};
+		let output = frame(vec![]);
+		assert!(
+			output.shapes.iter().any(|shape| matches!(&shape.shape,
+			egui::Shape::Text(text) if text.galley.text() == ":synthetic:")),
+			"missing custom artwork paints its full visible name fallback"
+		);
+		output.drop_without_applying_deltas();
+		let (pos, layout) = snapshot.borrow()[0].clone();
+		assert!(layout.source.contains("<:synthetic:90001>"));
+		let custom = layout.source.find("<:synthetic:90001>").unwrap();
+		assert_eq!(
+			layout
+				.cells
+				.iter()
+				.find(|cell| cell.source.contains(&custom))
+				.unwrap()
+				.source,
+			custom..custom + "<:synthetic:90001>".len(),
+			"selection preserves the complete original wire token"
+		);
+		assert!(!layout.source.contains("SECRET_PRIVATE"));
+		for line in &layout.lines {
+			assert!(!line.galley.text().contains("SECRET_PRIVATE"));
+		}
+		let cell = layout
+			.cells
+			.iter()
+			.find(|cell| cell.source.contains(&custom))
+			.unwrap();
+		let start = pos
+			+ egui::vec2(
+				if cell.rtl {
+					cell.rect.right() - 0.1
+				} else {
+					cell.rect.left() + 0.1
+				},
+				cell.rect.center().y,
+			);
+		let end = pos
+			+ egui::vec2(
+				if cell.rtl {
+					cell.rect.left() + 0.1
+				} else {
+					cell.rect.right() - 0.1
+				},
+				cell.rect.center().y,
+			);
+		for (point, pressed) in [(start, true), (end, true), (end, false)] {
+			let mut events = vec![egui::Event::PointerMoved(point)];
+			if point == start || !pressed {
+				events.push(egui::Event::PointerButton {
+					pos: point,
+					button: egui::PointerButton::Primary,
+					pressed,
+					modifiers: Default::default(),
+				});
+			}
+			frame(events).drop_without_applying_deltas();
+		}
+		frame(Vec::new()).drop_without_applying_deltas();
+		let output = frame(vec![egui::Event::Copy]);
+		assert!(output.platform_output.commands.iter().any(|command|
+			matches!(command, egui::OutputCommand::CopyText(value) if value == "<:synthetic:90001>")),
+			"dragging across the visible fallback copies the complete original emoji token");
+		output.drop_without_applying_deltas();
+		let plain = layout.source.find("plain_unlinked").unwrap();
+		let plain = pos
+			+ layout
+				.cells
+				.iter()
+				.find(|cell| cell.source.contains(&plain))
+				.unwrap()
+				.rect
+				.center()
+				.to_vec2();
+		for pressed in [true, false] {
+			frame(vec![
+				egui::Event::PointerMoved(plain),
+				egui::Event::PointerButton {
+					pos: plain,
+					button: egui::PointerButton::Primary,
+					pressed,
+					modifiers: Default::default(),
+				},
+			])
+			.drop_without_applying_deltas();
+		}
+		assert!(
+			opening.borrow().is_none(),
+			"unlinked mixed-direction text never inherits a neighbouring link hit target"
+		);
+		let from = layout.source.find("رابط").unwrap();
+		let link = pos
+			+ layout
+				.cells
+				.iter()
+				.find(|cell| cell.source.contains(&from))
+				.unwrap()
+				.rect
+				.center()
+				.to_vec2();
+		for pressed in [true, false] {
+			let output = frame(vec![
+				egui::Event::PointerMoved(link),
+				egui::Event::PointerButton {
+					pos: link,
+					button: egui::PointerButton::Primary,
+					pressed,
+					modifiers: Default::default(),
+				},
+			]);
+			assert!(
+				!output
+					.platform_output
+					.commands
+					.iter()
+					.any(|command| matches!(command, egui::OutputCommand::OpenUrl(_)))
+			);
+			output.drop_without_applying_deltas();
+		}
+		let emoji_at = layout.source.find('🙂').unwrap();
+		let emoji = pos
+			+ layout
+				.cells
+				.iter()
+				.find(|cell| cell.source.contains(&emoji_at))
+				.unwrap()
+				.rect
+				.center()
+				.to_vec2();
+		for pressed in [true, false] {
+			frame(vec![
+				egui::Event::PointerMoved(emoji),
+				egui::Event::PointerButton {
+					pos: emoji,
+					button: egui::PointerButton::Primary,
+					pressed,
+					modifiers: Default::default(),
+				},
+			])
+			.drop_without_applying_deltas();
+		}
+		frame(vec![]).drop_without_applying_deltas();
+		assert!(
+			egui::Popup::is_any_open(&ctx),
+			"emoji retains its native details action"
+		);
+		frame(vec![egui::Event::Key {
+			key: egui::Key::Escape,
+			physical_key: None,
+			pressed: true,
+			repeat: false,
+			modifiers: Default::default(),
+		}])
+		.drop_without_applying_deltas();
+		frame(vec![]).drop_without_applying_deltas();
+		let reveal = pos
+			+ layout
+				.cells
+				.iter()
+				.find(|cell| cell.source.is_empty() && cell.object.is_some())
+				.unwrap()
+				.rect
+				.center()
+				.to_vec2();
+		for pressed in [true, false] {
+			frame(vec![
+				egui::Event::PointerMoved(reveal),
+				egui::Event::PointerButton {
+					pos: reveal,
+					button: egui::PointerButton::Primary,
+					pressed,
+					modifiers: Default::default(),
+				},
+			])
+			.drop_without_applying_deltas();
+		}
+		frame(vec![]).drop_without_applying_deltas();
+		assert!(
+			snapshot
+				.borrow()
+				.iter()
+				.any(|(_, layout)| layout.source.contains("SECRET_PRIVATE")),
+			"explicit reveal changes only the admitted visible source"
+		);
+		// The existing external-link confirmation owns the result; no URL opens implicitly.
+		assert_eq!(opening.borrow().as_deref(), Some("https://example.com/"));
+		assert_eq!(mask, 1);
 	}
 }

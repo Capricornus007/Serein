@@ -2,16 +2,18 @@
 
 use egui::{
 	Color32, CursorIcon, Event, FullOutput, Id, InteractOptions, LayerId, Order, PointerButton,
-	Popup, PopupAnchor, Pos2, RawInput, Rect, Response, Sense, Stroke,
+	Popup, PopupAnchor, Pos2, RawInput, Rect, Response, Sense,
 	epaint::{Galley, TextShape},
 	text_selection::LabelSelectionState,
 };
 use std::sync::Arc;
+mod mapped;
 
 /// Inline artwork positioned inside a run's galley (custom and Unicode emoji).
 pub struct Artwork {
 	pub rect: Rect,
 	pub image: Option<egui::Image<'static>>,
+	pub fallback: Option<Arc<Galley>>,
 }
 
 struct Run {
@@ -22,6 +24,9 @@ struct Run {
 	/// One band per wrapped galley row, so a run never covers a neighbour's line.
 	lines: Vec<Rect>,
 	painted: bool,
+	mapping: Option<Arc<crate::rtl::Layout>>,
+	artwork: Vec<Artwork>,
+	highlights: Vec<Rect>,
 }
 
 struct Hole {
@@ -129,6 +134,42 @@ impl Surface {
 			galley,
 			rect: response.rect,
 			painted,
+			mapping: None,
+			artwork: Vec::new(),
+			highlights: Vec::new(),
+		});
+	}
+
+	/// A bidi paragraph keeps native painting separate from its logical cursor map.
+	pub(crate) fn mapped_run(
+		&mut self,
+		ui: &egui::Ui,
+		response: &Response,
+		pos: Pos2,
+		layout: Arc<crate::rtl::Layout>,
+		artwork: Vec<Artwork>,
+		highlights: Vec<Rect>,
+	) {
+		let galley = ui.painter().layout_no_wrap(
+			String::new(),
+			egui::FontId::proportional(1.0),
+			Color32::TRANSPARENT,
+		);
+		let lines = layout
+			.lines
+			.iter()
+			.map(|line| Rect::from_min_size(pos + line.position, line.galley.size()))
+			.collect();
+		self.runs.push(Run {
+			band: self.base.with(self.runs.len()),
+			galley_pos: pos,
+			galley,
+			rect: response.rect,
+			lines,
+			painted: true,
+			mapping: Some(layout),
+			artwork,
+			highlights,
 		});
 	}
 
@@ -148,6 +189,18 @@ impl Surface {
 			galley_pos,
 			galley,
 		});
+	}
+
+	#[cfg(test)]
+	pub(crate) fn mapped_layouts(&self) -> Vec<(Pos2, Arc<crate::rtl::Layout>)> {
+		self.runs
+			.iter()
+			.filter_map(|run| {
+				run.mapping
+					.as_ref()
+					.map(|layout| (run.galley_pos, layout.clone()))
+			})
+			.collect()
 	}
 
 	/// Tile the block and register selection on the remaining bands.
@@ -184,6 +237,19 @@ impl Surface {
 				continue;
 			}
 			if menu_open {
+				if let Some(layout) = &run.mapping {
+					for rect in &run.highlights {
+						ui.painter().rect_filled(
+							*rect,
+							0.0,
+							Color32::from_rgba_unmultiplied(200, 160, 30, 85),
+						);
+					}
+					layout.paint(ui, run.galley_pos);
+					for art in &run.artwork {
+						paint_artwork(ui, art);
+					}
+				}
 				if !run.galley.job.text.is_empty() {
 					let color = if run.painted {
 						Color32::TRANSPARENT
@@ -215,6 +281,38 @@ impl Surface {
 			let Some(response) = response else {
 				continue;
 			};
+			if let Some(layout) = &run.mapping {
+				for rect in &run.highlights {
+					ui.painter().rect_filled(
+						*rect,
+						0.0,
+						Color32::from_rgba_unmultiplied(200, 160, 30, 85),
+					);
+				}
+				let selected = ui
+					.ctx()
+					.plugin_or_default::<mapped::Selection>()
+					.lock()
+					.run(ui, &response, &layout.source, true, |point| {
+						layout.cursor((point - run.galley_pos).to_pos2())
+					});
+				if !selected.is_empty() {
+					for cell in &layout.cells {
+						if cell.source.start < selected.end && cell.source.end > selected.start {
+							ui.painter().rect_filled(
+								cell.rect.translate(run.galley_pos.to_vec2()),
+								0.0,
+								ui.visuals().selection.bg_fill,
+							);
+						}
+					}
+				}
+				layout.paint(ui, run.galley_pos);
+				for art in &run.artwork {
+					paint_artwork(ui, art);
+				}
+				continue;
+			}
 			if run.galley.job.text.is_empty() {
 				continue;
 			}
@@ -223,14 +321,7 @@ impl Surface {
 			} else {
 				ui.visuals().text_color()
 			};
-			egui::text_selection::LabelSelectionState::label_text_selection(
-				ui,
-				&response,
-				run.galley_pos,
-				run.galley,
-				color,
-				Stroke::NONE,
-			);
+			mapped::native(ui, &response, run.galley_pos, run.galley, color);
 		}
 		for embed in &embeds[embedded..] {
 			show_embed(ui, embed, menu_open);
@@ -264,7 +355,7 @@ impl egui::Plugin for Pointer {
 	}
 
 	fn input_hook(&mut self, ctx: &egui::Context, input: &mut RawInput) {
-		let selecting = ctx.plugin::<LabelSelectionState>().lock().has_selection();
+		let selecting = has_selection(ctx);
 		let secondary = input.events.iter().any(|event| {
 			matches!(
 				event,
@@ -358,9 +449,22 @@ pub fn install(ctx: &egui::Context) {
 	ctx.add_plugin(Pointer::default());
 }
 
+pub(crate) fn clear(ctx: &egui::Context) {
+	if let Some(plugin) = ctx.plugin_opt::<mapped::Selection>() {
+		*plugin.lock() = Default::default();
+	}
+	if let Some(plugin) = ctx.plugin_opt::<LabelSelectionState>() {
+		plugin.lock().clear_selection();
+	}
+	if let Some(plugin) = ctx.plugin_opt::<Pointer>() {
+		*plugin.lock() = Default::default();
+	}
+}
+
 /// True when a label range is active.
 pub fn has_selection(ctx: &egui::Context) -> bool {
 	ctx.plugin::<LabelSelectionState>().lock().has_selection()
+		|| ctx.plugin_or_default::<mapped::Selection>().lock().active()
 }
 
 pub fn open_menu(ctx: &egui::Context) -> bool {
@@ -398,13 +502,12 @@ fn show_embed(ui: &mut egui::Ui, embed: &Embed, menu_open: bool) {
 		));
 		return;
 	}
-	LabelSelectionState::label_text_selection(
+	mapped::native(
 		ui,
 		&embed.response,
 		embed.galley_pos,
 		embed.galley.clone(),
 		color,
-		Stroke::NONE,
 	);
 }
 
@@ -598,6 +701,9 @@ fn blank_run(ui: &egui::Ui, base: egui::Id, block: Rect) -> Run {
 		rect: block,
 		lines: vec![block],
 		painted: true,
+		mapping: None,
+		artwork: Vec::new(),
+		highlights: Vec::new(),
 	}
 }
 
@@ -605,10 +711,16 @@ fn paint_artwork(ui: &egui::Ui, art: &Artwork) {
 	if !ui.is_rect_visible(art.rect) {
 		return;
 	}
-	let size = art.rect.width();
+	let size = art.rect.width().min(art.rect.height());
 	if let Some(image) = &art.image {
 		let painted = image.calc_size(egui::Vec2::splat(size), image.size());
 		image.paint_at(ui, Rect::from_center_size(art.rect.center(), painted));
+	} else if let Some(label) = &art.fallback {
+		ui.painter().galley(
+			Pos2::new(art.rect.left(), art.rect.center().y - label.size().y / 2.0),
+			label.clone(),
+			ui.visuals().text_color(),
+		);
 	}
 }
 
@@ -724,5 +836,163 @@ mod tests {
 			drag(Pos2::new(120.0, 22.0), Pos2::new(60.0, 7.0)),
 			"o charlie delta echo foxtrot golf hotel https://exa"
 		);
+	}
+	#[test]
+	fn rtl_pointer_drag_copies_partial_arabic_in_logical_order_and_crosses_to_latin() {
+		for across in [false, true] {
+			let ctx = egui::Context::default();
+			crate::fonts::install(&ctx);
+			let text = "مرحبا بالعالم English 123";
+			let changed = std::cell::Cell::new(false);
+			let start_pos = std::cell::Cell::new(None);
+			let end_pos = std::cell::Cell::new(None);
+			let mut render = |ui: &mut egui::Ui| {
+				let mut surface = Surface::new(ui, "rtl-pointer-test");
+				let spans = [crate::rtl::Span {
+					text: if changed.get() {
+						"مرحبا changed"
+					} else {
+						text
+					}
+					.into(),
+					format: egui::TextFormat::simple(
+						egui::FontId::proportional(15.0),
+						Color32::WHITE,
+					),
+					action: 0,
+					object: None,
+					copy: true,
+				}];
+				let layout = crate::rtl::layout(ui.ctx(), &spans, WIDTH).unwrap();
+				let (rect, response) = ui.allocate_exact_size(layout.size, Sense::hover());
+				let first = layout
+					.cells
+					.iter()
+					.find(|cell| cell.source.start == 0)
+					.unwrap();
+				start_pos.set(Some(
+					rect.min + egui::vec2(first.rect.right() - 0.1, first.rect.center().y),
+				));
+				let last = layout
+					.cells
+					.iter()
+					.find(|cell| cell.source.end == "مرحبا".len())
+					.unwrap();
+				end_pos.set(Some(
+					rect.min + egui::vec2(last.rect.left() + 0.1, last.rect.center().y),
+				));
+				surface.mapped_run(ui, &response, rect.min, layout, Vec::new(), Vec::new());
+				if across {
+					let (pos, galley, response) =
+						egui::Label::new("tail").selectable(false).layout_in_ui(ui);
+					end_pos.set(Some(
+						pos + egui::vec2(galley.size().x + 1.0, galley.size().y / 2.0),
+					));
+					surface.run(ui, &response, pos, galley, Vec::new());
+				}
+				surface.finish(ui);
+			};
+			ctx.run_ui(input(Vec::new()), &mut render)
+				.drop_without_applying_deltas();
+			// Keep the actual native hit positions, rather than asserting a synthetic index map.
+			let from = start_pos.get().unwrap();
+			let to = end_pos.get().unwrap();
+			let mut copied = None;
+			for events in [
+				press(from, true),
+				vec![Event::PointerMoved(to)],
+				press(to, false),
+				vec![],
+				vec![Event::Copy],
+			] {
+				let output = ctx.run_ui(input(events), &mut render);
+				copied = copied.or_else(|| {
+					output
+						.platform_output
+						.commands
+						.iter()
+						.find_map(|command| match command {
+							egui::OutputCommand::CopyText(text) => Some(text.clone()),
+							_ => None,
+						})
+				});
+				output.drop_without_applying_deltas();
+			}
+			assert_eq!(
+				copied,
+				Some(if across {
+					format!("{text}\ntail")
+				} else {
+					"مرحبا".into()
+				})
+			);
+			for events in [
+				press(from, true),
+				press(from, false),
+				press(from, true),
+				press(from, false),
+				Vec::new(),
+			] {
+				ctx.run_ui(input(events), &mut render)
+					.drop_without_applying_deltas();
+			}
+			let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+			assert!(
+				output.platform_output.commands.iter().any(
+					|command| matches!(command, egui::OutputCommand::CopyText(value) if value == "مرحبا")
+				),
+				"double clicking selects the logical Arabic word"
+			);
+			output.drop_without_applying_deltas();
+			ctx.run_ui(
+				input(vec![Event::Key {
+					key: egui::Key::A,
+					physical_key: None,
+					pressed: true,
+					repeat: false,
+					modifiers: egui::Modifiers {
+						command: true,
+						..Default::default()
+					},
+				}]),
+				&mut render,
+			)
+			.drop_without_applying_deltas();
+			let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+			assert!(
+				output.platform_output.commands.iter().any(
+					|command| matches!(command, egui::OutputCommand::CopyText(value) if value == text)
+				),
+				"select all retains the logical source rather than visual line order"
+			);
+			output.drop_without_applying_deltas();
+			if across {
+				ctx.run_ui(
+					input(vec![Event::Key {
+						key: egui::Key::Escape,
+						physical_key: None,
+						pressed: true,
+						repeat: false,
+						modifiers: Default::default(),
+					}]),
+					&mut render,
+				)
+				.drop_without_applying_deltas();
+			} else {
+				changed.set(true);
+				ctx.run_ui(input(Vec::new()), &mut render)
+					.drop_without_applying_deltas();
+			}
+			let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+			assert!(
+				!output
+					.platform_output
+					.commands
+					.iter()
+					.any(|command| matches!(command, egui::OutputCommand::CopyText(_))),
+				"Escape and edited source retire mapped selection rather than copy old text"
+			);
+			output.drop_without_applying_deltas();
+		}
 	}
 }
