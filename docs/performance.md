@@ -3729,6 +3729,13 @@ format example, the voice manifest and lockfile. This proves that these host
 checks contain the same camera slice; it does not prove whole-application
 equivalence or isolate the camera change's cost.
 
+The actual bounded offline logs are preserved for review:
+[camera tests](pr-evidence/camera-native-formats/logs/camera-focus.log),
+[format example](pr-evidence/camera-native-formats/logs/camera-example.log), and
+[integrated full check](pr-evidence/camera-native-formats/logs/integrated-full-check.log).
+Their byte counts, SHA-256 hashes and verification scope are recorded alongside
+the source identities.
+
 The camera-focused macOS tests passed **3 tests**, including synthetic ranking,
 invalid mode/device bounds and bounded encoded frames. The offline
 `camera_format` example passed without opening a device. The fresh integrated

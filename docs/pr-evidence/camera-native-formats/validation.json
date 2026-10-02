@@ -194,11 +194,6 @@
       }
     ]
   },
-  "private_verification_log_sha256": {
-    "/tmp/serein-camera-final-focus.log": "4c895e98d979ea4e6c74624f02f862b80fab31fced161b66ab3af879822f42cc",
-    "/tmp/serein-camera-final-example.log": "c70048a83ef6a04d62cd465c5bf77ac3c6213502823c6cb8e17c11d8d12cbe50",
-    "/tmp/serein-resume-send-current-full-check.log": "9d8063b8345e3997e9a9c66e4e276a75e305ecd4c41f41b4abaad141c1bdb552"
-  },
   "screenshots": "Not applicable \u2014 native camera format negotiation has no visible UI change",
   "performance": {
     "hardware_camera_fps": "Unmeasured; no physical camera enabled",
@@ -300,5 +295,28 @@
         "url": "https://github.com/ViceVerse-cz/Serein/actions/runs/37014428404/job/110861696676"
       }
     ]
-  }
+  },
+  "verification_logs": [
+    {
+      "path": "docs/pr-evidence/camera-native-formats/logs/camera-focus.log",
+      "sha256": "4c895e98d979ea4e6c74624f02f862b80fab31fced161b66ab3af879822f42cc",
+      "bytes": 6620,
+      "scope": "Actual offline/synthetic verification output; no live account or media device",
+      "source_note": "Historical camera-focused feature verification"
+    },
+    {
+      "path": "docs/pr-evidence/camera-native-formats/logs/camera-example.log",
+      "sha256": "c70048a83ef6a04d62cd465c5bf77ac3c6213502823c6cb8e17c11d8d12cbe50",
+      "bytes": 5819,
+      "scope": "Actual offline/synthetic verification output; no live account or media device",
+      "source_note": "Historical camera-focused feature verification"
+    },
+    {
+      "path": "docs/pr-evidence/camera-native-formats/logs/integrated-full-check.log",
+      "sha256": "9d8063b8345e3997e9a9c66e4e276a75e305ecd4c41f41b4abaad141c1bdb552",
+      "bytes": 130242,
+      "scope": "Actual offline/synthetic verification output; no live account or media device",
+      "source_note": "Fresh integrated d6bf2c8c full check; identical camera slice, not whole-application feature equivalence"
+    }
+  ]
 }
