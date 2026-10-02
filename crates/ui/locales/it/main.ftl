@@ -4353,4 +4353,4 @@ lib-composer-onboarding-incomplete = Completa l'accesso a questo server per sblo
 lib-composer-onboarding-complete = Completa l'accoglienza
 
 voice-stereo-input = Microfono stereo
-voice-stereo-input-warning = Richiede un ingresso a due canali. Usa i primi due senza soppressione del rumore, cancellazione dell’eco, guadagno automatico o sensibilità. Usa le cuffie.
+voice-stereo-input-warning = Richiede un ingresso a due canali. Usa i primi due canali; non applica la soglia di ingresso, la soppressione del rumore, la cancellazione dell’eco o il guadagno automatico. Usa le cuffie.

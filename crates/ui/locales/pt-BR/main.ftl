@@ -4353,4 +4353,4 @@ lib-composer-onboarding-incomplete = Conclua a entrada neste servidor para desbl
 lib-composer-onboarding-complete = Concluir integração
 
 voice-stereo-input = Microfone estéreo
-voice-stereo-input-warning = Requer entrada de dois canais. Usa os dois primeiros sem supressão de ruído, cancelamento de eco, ganho automático ou sensibilidade. Use fones de ouvido.
+voice-stereo-input-warning = Requer entrada de dois canais. Usa os dois primeiros sem supressão de ruído, cancelamento de eco, ganho automático ou controles de sensibilidade. Use fones de ouvido.
