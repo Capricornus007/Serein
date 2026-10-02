@@ -4340,3 +4340,6 @@ lib-composer-onboarding-rules-pending = Sohbete başlamak için bu sunucunun kur
 lib-composer-onboarding-incomplete = Daha fazla kanalın kilidini açmak için sunucuya katılımı tamamla.
 # Context: composer
 lib-composer-onboarding-complete = Tanıtımı tamamla
+
+voice-stereo-input = Stereo mikrofon
+voice-stereo-input-warning = İki kanallı giriş gerektirir. İlk iki kanalı gürültü bastırma, yankı giderme, otomatik kazanç ve hassasiyet olmadan kullanır. Kulaklık kullanın.

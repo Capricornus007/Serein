@@ -4351,3 +4351,6 @@ lib-composer-onboarding-rules-pending = Aceite as regras deste servidor para com
 lib-composer-onboarding-incomplete = Conclua a entrada neste servidor para desbloquear mais canais.
 # Context: composer
 lib-composer-onboarding-complete = Concluir integração
+
+voice-stereo-input = Microfone estéreo
+voice-stereo-input-warning = Requer entrada de dois canais. Usa os dois primeiros sem supressão de ruído, cancelamento de eco, ganho automático ou sensibilidade. Use fones de ouvido.

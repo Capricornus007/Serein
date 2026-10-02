@@ -4370,3 +4370,6 @@ lib-composer-onboarding-rules-pending = Přijmi pravidla tohoto serveru, abys mo
 lib-composer-onboarding-incomplete = Dokonči připojení k serveru a odemkni další kanály.
 # Context: composer
 lib-composer-onboarding-complete = Dokončit uvítání
+
+voice-stereo-input = Stereo mikrofon
+voice-stereo-input-warning = Vyžaduje dvoukanálový vstup. Používá první dva kanály bez potlačení šumu, echa, automatické hlasitosti a citlivosti. Použijte sluchátka.

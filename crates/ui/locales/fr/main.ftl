@@ -4351,3 +4351,6 @@ lib-composer-onboarding-rules-pending = Accepte les règles de ce serveur pour c
 lib-composer-onboarding-incomplete = Termine de rejoindre ce serveur pour débloquer plus de salons.
 # Context: composer
 lib-composer-onboarding-complete = Terminer l'accueil
+
+voice-stereo-input = Microphone stéréo
+voice-stereo-input-warning = Nécessite une entrée à deux canaux. Utilise les deux premiers sans réduction du bruit, annulation de l’écho, gain automatique ni sensibilité. Utilisez un casque.

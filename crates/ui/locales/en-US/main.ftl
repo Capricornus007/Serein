@@ -4368,3 +4368,6 @@ lib-composer-onboarding-rules-pending = Accept this server's rules to start chat
 lib-composer-onboarding-incomplete = Finish joining this server to unlock more channels.
 # Context: composer
 lib-composer-onboarding-complete = Complete Onboarding
+
+voice-stereo-input = Stereo microphone
+voice-stereo-input-warning = Requires a two-channel input. Uses the first two channels and bypasses noise suppression, echo cancellation, automatic gain and sensitivity. Use headphones.
