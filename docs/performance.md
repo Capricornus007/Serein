@@ -3151,3 +3151,41 @@ patch changes build-time string construction; Gateway, voice teardown and fuzz
 repairs affect only synthetic development tests. Runtime CPU, RSS, frame/startup
 latency and live account/audio behavior were not measured. Flatpak source-preparation repairs
 and this measurement documentation do not change the native installed payload.
+
+## Voice session ownership — October 2, 2026
+
+Baseline `eab1961` and the call-takeover change were measured on the same macOS
+27.0 (26A428), Apple M1 MacBookAir10,1 / 16 GiB machine, Rust 1.98.1 and locked
+dependencies. Voice remains in the standard package; no dependencies were added.
+Raw samples: [`voice-call-takeover/measurements.json`](pr-evidence/voice-call-takeover/measurements.json).
+
+| Metric / method | Baseline | After | Delta |
+| --- | ---: | ---: | ---: |
+| Standard desktop executable | 62,006,112 B | 62,022,528 B | +16,416 B / +0.03% |
+| Complete installed package, 206 regular files | 68,016,541 B | 68,032,957 B | +16,416 B / +0.02% |
+| Distribution ZIP, `ditto -c -k --sequesterRsrc` | 43,252,563 B | 43,258,951 B | +6,388 B / +0.01% |
+| Native idle CPU, median 10 samples | 0.0% | 0.0% | 0 percentage points |
+| Native peak RSS | 123,584 KiB | 124,064 KiB | +480 KiB / +0.39% |
+| Native settled RSS, last-five median | 123,536 KiB | 124,016 KiB | +480 KiB / +0.39% |
+| Reducer 100,000 events, alternating-five-pair median | 53.328 ms | 52.654 ms | -0.674 ms / -1.26% |
+| Estimated retained timeline, 500 records | 331,992–332,477 B | 331,992–332,477 B | unchanged |
+
+Native samples used optimized `--features demo` builds, `--demo --demo-chat`,
+Metal, a 1120×760 logical native viewport at 2× display scale (2240×1520
+physical screenshot pixels), a 5-second warmup and ten 1-second
+macOS `ps` samples. Settled RSS is the last-five median; CPU is the process
+percentage, not GPU usage or frame latency. Compilation and other native demos
+were stopped. No microphone, camera or live account was used.
+
+Reducer measurements used the immutable baseline and changed release binaries,
+one warmup each and five alternating pairs. Baseline range 52.906–53.823 ms;
+after 52.444–54.572 ms. The earlier isolated baseline was 65.504 ms and the first
+after run 52.316 ms; the paired rerun demonstrates timing variation rather than
+a 20% improvement. The paired ranges overlap, and this ownership fix does not
+optimize message reduction; no speedup is claimed. Neither workload measures
+actual call takeover latency or live service behavior.
+
+The Gateway retains one owner-session identity, at most 2 KiB in a redacted,
+zeroizing secret, and one latest `(channel, request)` watch value. Takeover drops
+local media and the matching initial ring worker without sending an account-wide
+hangup. No new persistent cache, queue or background worker was added.

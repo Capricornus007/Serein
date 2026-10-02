@@ -4370,3 +4370,5 @@ lib-composer-onboarding-rules-pending = Přijmi pravidla tohoto serveru, abys mo
 lib-composer-onboarding-incomplete = Dokonči připojení k serveru a odemkni další kanály.
 # Context: composer
 lib-composer-onboarding-complete = Dokončit uvítání
+
+voice-call-moved-to-another-client = Hovor přešel do jiného klienta

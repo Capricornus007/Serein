@@ -45,6 +45,15 @@ Reset levels, mute/deafen/PTT precedence and changing devices while custom level
 
 Start calls the selected existing DM; incoming calls require Answer or Decline. One active call is retained while navigating text conversations. Start rings once after Discord voice transport allocation is confirmed; Answer never rings. Required DAVE group readiness and native device readiness precede the connected-audio state. An allocation with no endpoint waits within the deadline; incompatible states fail visibly. Hangup closes local audio immediately and sends departure; another call waits for the service's departure acknowledgment. No uncertain ring write or failed main Gateway session automatically starts another call.
 
+When another client takes over the same voice channel with a different owner session,
+or the confirmed owner call moves to another non-null channel or guild, Serein clears
+its local call and closes its media without sending a hangup for the new client. A translated informational notice explains the move. Pending initial ringing
+is cancelled and queued old ring commands are rejected, without disconnecting text
+signaling. Join explicitly to take the call back after local device teardown; no old-client
+departure acknowledgment is required. This applies to DM and guild calls. Session
+identity is bounded, redacted and zeroized, and is never persisted. Synthetic state
+transitions are tested; cross-client live takeover remains unverified.
+
 Opening a one-to-one or group DM also requests its existing call state. An ongoing call shows a
 **Call in progress** banner and **Join call**, even after ringing stops or this device leaves.
 Join uses the existing connection flow without ringing again; browsing never joins or opens

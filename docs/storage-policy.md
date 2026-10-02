@@ -1482,3 +1482,19 @@ Accepting Save or Remove pauses new REST client acquisition immediately, before
 the credential-store job completes. A failed deletion leaves routing paused; it
 does not resume stored credentials. In-flight requests retain their earlier
 snapshot. Rejected saves retain the credential draft until a valid job can start.
+
+## Voice session takeover identity
+
+The main Gateway retains at most one validated 2 KiB owner voice-session identity,
+in the existing redacted, zeroizing `voice::Secret` type. It is session-only, released
+on takeover, acknowledged hangup, channel invalidation or fresh Gateway login, and
+preserved during Gateway Resume for an active call. A pending manual departure temporarily owns the
+same identity so a replacement client session can release its old departure barrier.
+It is never written to diagnostics or persistent caches. A takeover
+notice contains only channel/request IDs, so it adds no credential payload to the UI.
+The desktop dispatcher retains one latest fixed channel/request invalidation in a
+watch, clears only the matching call ownership, and cancels its initial ring worker.
+Queued commands recheck this invalidation before dispatch; the worker also waits
+for it alongside HTTP so a takeover cancels the pending operation before the UI
+reduces it.
+Watch metadata is additional; no invalidation history or growing queue is retained.

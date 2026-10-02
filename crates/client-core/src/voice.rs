@@ -202,6 +202,11 @@ pub enum Command {
 	},
 }
 pub enum Event {
+	/// Another client replaced this device's voice session. No service hangup is needed.
+	TakenOver {
+		channel: Id,
+		request: u64,
+	},
 	Departed {
 		channel: Id,
 		request: u64,
@@ -572,6 +577,19 @@ impl ClientState {
 	}
 	pub fn apply_voice(&mut self, event: Event) {
 		match event {
+			Event::TakenOver { channel, request } => {
+				if self
+					.voice
+					.active
+					.as_ref()
+					.is_some_and(|call| call.channel == channel && call.request == request)
+				{
+					self.voice.active = None;
+					self.voice.outgoing = None;
+					self.voice.departed = Some((channel, request));
+					self.status = "Call moved to another client";
+				}
+			}
 			Event::Departed { channel, request } => {
 				self.voice.departed = Some((channel, request));
 			}
@@ -1058,6 +1076,38 @@ mod tests {
 		state
 	}
 
+	#[test]
+	fn takeover_clears_only_the_matching_call_and_allows_an_explicit_rejoin() {
+		let mut state = stream_preview_state();
+		state.start_call(Id(20), false).unwrap();
+		let request = state.voice.active.as_ref().unwrap().request;
+		state.apply_voice(Event::TakenOver {
+			channel: Id(20),
+			request: request + 1,
+		});
+		assert!(state.voice.active.is_some());
+		state.apply_voice(Event::TakenOver {
+			channel: Id(21),
+			request,
+		});
+		assert!(state.voice.active.is_some());
+		state.apply_voice(Event::TakenOver {
+			channel: Id(20),
+			request,
+		});
+		assert!(state.voice.active.is_none());
+		assert!(state.voice.outgoing.is_none());
+		assert_eq!(state.voice.departed, Some((Id(20), request)));
+		assert_eq!(state.status, "Call moved to another client");
+		assert!(state.start_call(Id(20), false).is_some());
+		let next = state.voice.active.as_ref().unwrap().request;
+		assert_ne!(request, next);
+		state.apply_voice(Event::TakenOver {
+			channel: Id(20),
+			request,
+		});
+		assert_eq!(state.voice.active.as_ref().unwrap().request, next);
+	}
 	#[test]
 	fn stream_preview_is_scoped_to_the_current_streamer_request() {
 		{

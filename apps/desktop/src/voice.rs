@@ -322,6 +322,22 @@ impl Voice {
 		let Event::Voice(event) = event else {
 			return None;
 		};
+		if let voice::Event::TakenOver { channel, request } = event {
+			let current = self
+				.live
+				.as_ref()
+				.map(|call| (call.generation, call.channel, call.request))
+				.or_else(|| {
+					self.pending
+						.as_ref()
+						.map(|call| (call.generation, call.channel, call.request))
+				});
+			if current == Some((state.generation, *channel, *request)) {
+				// The service session belongs to the other client now; stop only local media.
+				self.stop();
+			}
+			return None;
+		}
 		if let Some(live) = &self.live {
 			match event {
 				voice::Event::State {
@@ -1435,6 +1451,19 @@ pub fn debug_call_cues_check() {
 	);
 }
 
+/// A service takeover is informational and only belongs to the current local call.
+pub fn takeover_notice(state: &State, event: &Event) -> Option<&'static str> {
+	let Event::Voice(voice::Event::TakenOver { channel, request }) = event else {
+		return None;
+	};
+	state
+		.voice
+		.active
+		.as_ref()
+		.is_some_and(|call| call.channel == *channel && call.request == *request)
+		.then_some("voice-call-moved-to-another-client")
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -1744,6 +1773,60 @@ mod tests {
 				.is_none()
 		);
 		assert!(manager.pending.is_none());
+	}
+	#[test]
+	fn takeover_notice_is_only_for_the_current_call_request() {
+		let mut state = test_support::demo_state();
+		state.demo = false;
+		state.start_call(Id(22), false).unwrap();
+		let request = state.voice.active.as_ref().unwrap().request;
+		let event = |channel, request| Event::Voice(voice::Event::TakenOver { channel, request });
+		assert!(takeover_notice(&state, &event(Id(23), request)).is_none());
+		assert!(takeover_notice(&state, &event(Id(22), request + 1)).is_none());
+		assert_eq!(
+			takeover_notice(&state, &event(Id(22), request)),
+			Some("voice-call-moved-to-another-client")
+		);
+		state.apply_voice(voice::Event::TakenOver {
+			channel: Id(22),
+			request,
+		});
+		assert!(takeover_notice(&state, &event(Id(22), request)).is_none());
+	}
+	#[test]
+	fn takeover_stops_local_negotiation_without_sending_a_service_hangup() {
+		let runtime = Runtime::new().unwrap();
+		let mut state = test_support::demo_state();
+		state.demo = false;
+		state.start_call(Id(22), false).unwrap();
+		let request = state.voice.active.as_ref().unwrap().request;
+		let mut manager = Voice::default();
+		manager.begin(&state, false).unwrap();
+		let mut stale = Event::Voice(voice::Event::TakenOver {
+			channel: Id(22),
+			request: request + 1,
+		});
+		assert!(manager.observe(&state, &mut stale).is_none());
+		assert!(manager.pending.is_some());
+		let mut event = Event::Voice(voice::Event::TakenOver {
+			channel: Id(22),
+			request,
+		});
+		assert!(manager.observe(&state, &mut event).is_none());
+		assert!(manager.pending.is_none());
+		let Event::Voice(event) = event else {
+			unreachable!()
+		};
+		state.apply_voice(event);
+		let mut ui = ui::MessagingUi::default();
+		let context = egui::Context::default();
+		assert!(
+			manager
+				.poll(&runtime, &mut state, &mut ui, &context)
+				.is_none()
+		);
+		assert!(state.start_call(Id(22), false).is_some());
+		assert!(manager.begin(&state, false).is_ok());
 	}
 	#[test]
 	fn negotiation_requires_matching_request_owner_and_session_without_opening_devices() {

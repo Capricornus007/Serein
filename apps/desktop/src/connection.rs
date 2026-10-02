@@ -140,6 +140,7 @@ impl Connection {
                 let dm_channels=Arc::new(Mutex::new(BTreeSet::new()));
                 let gateway_channels=dm_channels.clone();
                 let (voice_online,mut voice_availability)=watch::channel(false);
+                let (takeover_send,mut takeover_receive)=watch::channel(None);
                 let gateway_api=api.clone();let gateway_emit=emit.clone();let terminal_send=finished.clone();
                 let gateway_wake=wake.clone();
                 let activity_wake=wake.clone();
@@ -165,6 +166,7 @@ impl Connection {
 
                         if event.ready_navigation().is_some() || matches!(&event,Event::Resumed) {let _=voice_online.send(true);}
                         if matches!(&event,Event::Disconnected|Event::Resync) {let _=voice_online.send(false);}
+                        if let Event::Voice(client_core::voice::Event::TakenOver{channel,request})=&event {let _=takeover_send.send_replace(Some((*channel,*request)));}
                         gateway_emit(event)
                     }).await.err().unwrap_or(Failure::Network).protocol_at("Gateway connection: unsupported handshake or event");
                     gateway_api.stop();let _=terminal_send.send(Some(error));gateway_wake.request_repaint();
@@ -198,6 +200,10 @@ impl Connection {
                     tokio::select! {
                         _=&mut gateway_task.0=>{break;}
                         _=&mut writes.0=>{break;}
+                        changed=takeover_receive.changed()=> {
+                            if changed.is_err() {break;}
+                            if release_taken_over(&mut voice_request,*takeover_receive.borrow_and_update()) {drop(ringing.take());}
+                        }
                         changed=voice_availability.changed()=> {
 							if changed.is_err() {break;}
 							if !*voice_availability.borrow_and_update() {drop(ringing.take());drop(profile.take());drop(stream_preview.take());drop(search.take());voice_request=None;if let Some(cancel)=&upload_cancel {let _=cancel.send(true);}}
@@ -234,6 +240,8 @@ impl Connection {
                             })));
                         }
                         command=receive.recv()=>{
+                            // Select can admit a queued command before the changed-watch branch.
+                            if release_taken_over(&mut voice_request,*takeover_receive.borrow()) {drop(ringing.take());}
                             let Some(command)=command else {break;};
                             if matches!(command,Command::CancelSearch) {drop(search.take());continue;}
                             if matches!(command,Command::CancelGifs) {drop(gifs.take());continue;}
@@ -346,6 +354,10 @@ impl Connection {
                                 if !*voice_availability.borrow() {
                                     emit(Event::Voice(E::Failed{channel,request,message:"Voice is disconnected; no call was started"}))?;continue;
                                 }
+                                if join_taken_over(control,*takeover_receive.borrow()) {
+                                    emit(Event::Voice(E::Failed{channel,request,message:"Call moved to another client; join again to start a new attempt"}))?;continue;
+                                }
+                                if matches!(control,V::Join{..}) {drop(ringing.take());}
                                 if let V::Leave{channel,request}=control && voice_request.is_some_and(|(id,r,_)|id==channel && r==request) {drop(ringing.take());}
                                 let ring=match ring_action(control,user.id,&mut voice_request,dm_channels.lock().map_err(|_|Failure::Protocol)?.contains(&channel)) {
                                     Ok(action)=>action,
@@ -355,8 +367,14 @@ impl Connection {
                                 if let Some((recipient,stop))=ring {
                                     drop(ringing.take());
                                     let api=api.clone();let emit=emit.clone();let voice_send=voice_send.clone();let finished=finished.clone();let ring_wake=wake.clone();
+                                    let takeover=takeover_receive.clone();
                                     ringing=Some(AbortTask(tokio::spawn(async move {
-                                        if let Err(failure)=api.ring_call(channel,recipient,stop).await {
+                                        let result=tokio::select! {
+                                            biased;
+                                            _=wait_for_takeover(takeover,(channel,request))=>return,
+                                            result=api.ring_call(channel,recipient,stop)=>result,
+                                        };
+                                        if let Err(failure)=result {
                                             if !stop {let _=voice_send.try_send(V::Leave{channel,request});}
                                             let _=emit(Event::Voice(E::Failed{channel,request,message:failure.label()}));
                                             if failure.ends_session(){api.stop();let _=finished.send(Some(failure));ring_wake.request_repaint();}
@@ -803,6 +821,36 @@ fn private_call(channel: &model::Channel) -> bool {
 				&& channel.recipients.len() < client_core::voice::MAX_PARTICIPANTS))
 }
 
+// Latest scoped invalidation is rechecked at dispatch, independent of select branch order.
+fn release_taken_over(
+	active: &mut Option<(model::Id, u64, bool)>,
+	latest: Option<(model::Id, u64)>,
+) -> bool {
+	if active.is_some_and(|(channel, request, _)| latest == Some((channel, request))) {
+		*active = None;
+		true
+	} else {
+		false
+	}
+}
+
+// A duplicate queued Join must not recreate the invalidated local request.
+fn join_taken_over(control: client_core::voice::Command, latest: Option<(model::Id, u64)>) -> bool {
+	matches!(control, client_core::voice::Command::Join { channel, request, .. } if latest == Some((channel, request)))
+}
+
+async fn wait_for_takeover(
+	mut takeover: watch::Receiver<Option<(model::Id, u64)>>,
+	scope: (model::Id, u64),
+) {
+	loop {
+		let matching = *takeover.borrow_and_update() == Some(scope);
+		if matching || takeover.changed().await.is_err() {
+			return;
+		}
+	}
+}
+
 // Ring only after the media adapter confirms transport allocation, and only once per current call.
 fn ring_action(
 	control: client_core::voice::Command,
@@ -821,8 +869,16 @@ fn ring_action(
 	if !dm {
 		return match control {
 			V::Ring { .. } | V::Decline { .. } | V::Join { ring: true, .. } => Err(()),
+			V::Join {
+				channel,
+				request,
+				ring: false,
+				..
+			} => {
+				*active = Some((channel, request, true));
+				Ok(None)
+			}
 			V::Sync { .. }
-			| V::Join { .. }
 			| V::Leave { .. }
 			| V::SetMute { .. }
 			| V::SetCamera { .. }
@@ -892,6 +948,160 @@ fn scope_history_failure(event: Event, channel: model::Id, request: u64) -> Even
 
 #[cfg(test)]
 mod tests {
+	#[test]
+	fn takeover_rejects_queued_initial_ringing_but_preserves_new_call_ownership() {
+		use client_core::voice::Command as V;
+		let channel = model::Id(22);
+		let mut active = Some((channel, 5, false));
+		let (send, receive) = watch::channel(None);
+		let _ = send.send_replace(Some((channel, 5)));
+		// The command is ready before the changed-watch select branch executes.
+		assert!(release_taken_over(&mut active, *receive.borrow()));
+		assert_eq!(active, None);
+		let old_join = V::Join {
+			channel,
+			request: 5,
+			ring: true,
+			mute: false,
+			deaf: false,
+		};
+		assert!(join_taken_over(old_join, *receive.borrow()));
+		assert!(
+			active.is_none(),
+			"rejected duplicate Join cannot repopulate ownership"
+		);
+		let new_join = V::Join {
+			channel,
+			request: 6,
+			ring: true,
+			mute: false,
+			deaf: false,
+		};
+		assert!(!join_taken_over(new_join, *receive.borrow()));
+		assert!(!join_taken_over(
+			V::Join {
+				channel: model::Id(23),
+				request: 5,
+				ring: true,
+				mute: false,
+				deaf: false
+			},
+			*receive.borrow()
+		));
+		assert_eq!(
+			ring_action(
+				V::Ring {
+					channel,
+					request: 5
+				},
+				model::Id(1),
+				&mut active,
+				true
+			),
+			Err(())
+		);
+		assert_eq!(
+			ring_action(
+				V::Join {
+					channel,
+					request: 6,
+					ring: true,
+					mute: false,
+					deaf: false
+				},
+				model::Id(1),
+				&mut active,
+				true
+			),
+			Ok(None)
+		);
+		assert!(!release_taken_over(&mut active, *receive.borrow()));
+		assert_eq!(
+			ring_action(
+				V::Ring {
+					channel,
+					request: 6
+				},
+				model::Id(1),
+				&mut active,
+				true
+			),
+			Ok(Some((None, false)))
+		);
+		assert!(!release_taken_over(&mut active, Some((model::Id(23), 6))));
+		assert_eq!(active, Some((channel, 6, true)));
+		// Moving from an unringed DM attempt to a guild replaces dispatcher ownership too.
+		active = Some((channel, 7, false));
+		let guild_channel = model::Id(30);
+		assert_eq!(
+			ring_action(
+				V::Join {
+					channel: guild_channel,
+					request: 8,
+					ring: false,
+					mute: false,
+					deaf: false
+				},
+				model::Id(1),
+				&mut active,
+				false
+			),
+			Ok(None)
+		);
+		assert_eq!(active, Some((guild_channel, 8, true)));
+		assert_eq!(
+			ring_action(
+				V::Ring {
+					channel,
+					request: 7
+				},
+				model::Id(1),
+				&mut active,
+				true
+			),
+			Err(())
+		);
+		assert!(release_taken_over(&mut active, Some((guild_channel, 8))));
+	}
+	#[test]
+	fn initial_ringing_wait_cancels_only_matching_takeover_or_connection_teardown() {
+		let runtime = tokio::runtime::Runtime::new().unwrap();
+		runtime.block_on(async {
+			let scope = (model::Id(22), 5);
+			let (send, receive) = watch::channel(Some((model::Id(22), 4)));
+			let task = tokio::spawn(wait_for_takeover(receive.clone(), scope));
+			tokio::task::yield_now().await;
+			assert!(!task.is_finished());
+			let _ = send.send_replace(Some(scope));
+			tokio::time::timeout(Duration::from_secs(1), task)
+				.await
+				.unwrap()
+				.unwrap();
+			// Match production biased selection with a synthetic HTTP future side effect.
+			let contacted = std::cell::Cell::new(false);
+			tokio::select! {
+				biased;
+				_=wait_for_takeover(receive.clone(), scope)=>{},
+				_=async {contacted.set(true);std::future::pending::<()>().await}=>unreachable!(),
+			}
+			assert!(
+				!contacted.get(),
+				"already invalidated ownership must never poll the HTTP write"
+			);
+			// A task spawned after the notification also cancels before its HTTP future.
+			let task = tokio::spawn(wait_for_takeover(receive.clone(), scope));
+			tokio::time::timeout(Duration::from_secs(1), task)
+				.await
+				.unwrap()
+				.unwrap();
+			let task = tokio::spawn(wait_for_takeover(receive, (model::Id(22), 6)));
+			drop(send);
+			tokio::time::timeout(Duration::from_secs(1), task)
+				.await
+				.unwrap()
+				.unwrap();
+		});
+	}
 	#[test]
 	fn stream_preview_capacity_is_local_but_auth_failures_end_the_session() {
 		for (failure, expected) in [
