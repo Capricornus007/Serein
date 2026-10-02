@@ -4339,28 +4339,27 @@ lib-composer-onboarding-complete = Tanıtımı tamamla
 
 voice-call-moved-to-another-client = Bu cihazın arama oturumu değiştirildi
 
-# English fallback until these Soundboard labels are translated.
-soundboard-open = Soundboard
-soundboard-heading = Soundboard
-soundboard-subtitle = Play a sound for everyone in your connected voice channel
-soundboard-channel = Connected channel: { $channel }
-soundboard-offline = Offline preview · sounds are not played
-soundboard-default = Default sounds
-soundboard-guild = Current server
-soundboard-pending = Waiting for Discord…
-soundboard-empty = No soundboard sounds are available
-soundboard-play = Play this sound in the current voice channel
-soundboard-unavailable = This sound is unavailable on Discord
-soundboard-close = Close
-soundboard-refresh = Refresh sounds
-soundboard-error-permission = Discord denied this soundboard action; check voice permissions
-soundboard-error-rate = Soundboard is rate limited; wait before trying again
-soundboard-error-ambiguous = The sound may already have played; check the call before trying again
-soundboard-error-network = Could not reach Discord for the soundboard action
-soundboard-error-response = Discord rejected the action or returned unsupported soundboard data
-soundboard-error-unavailable = Soundboard action is unavailable; reopen the picker to try again
-soundboard-error-capacity = Soundboard response exceeded its safe limit
-soundboard-error-session = Soundboard needs an active session; reconnect explicitly
+soundboard-open = Ses paneli
+soundboard-heading = Ses paneli
+soundboard-subtitle = Bağlı ses kanalındaki herkes için bir ses çal
+soundboard-channel = Bağlı kanal: { $channel }
+soundboard-offline = Çevrimdışı önizleme · sesler çalınmaz
+soundboard-default = Varsayılan sesler
+soundboard-guild = Geçerli sunucu
+soundboard-pending = Discord bekleniyor…
+soundboard-empty = Ses panelinde kullanılabilir ses yok
+soundboard-play = Bu sesi geçerli ses kanalında çal
+soundboard-unavailable = Bu ses Discord’da kullanılamıyor
+soundboard-close = Kapat
+soundboard-refresh = Sesleri yenile
+soundboard-error-permission = Discord bu ses paneli işlemini reddetti; ses izinlerini kontrol edin
+soundboard-error-rate = Ses paneli istek sınırına ulaştı; yeniden denemeden önce bekleyin
+soundboard-error-ambiguous = Ses zaten çalınmış olabilir; yeniden denemeden önce aramayı kontrol edin
+soundboard-error-network = Ses paneli işlemi için Discord’a ulaşılamadı
+soundboard-error-response = Discord işlemi reddetti veya desteklenmeyen ses paneli verileri döndürdü
+soundboard-error-unavailable = Bu işlem kullanılamıyor; yeniden denemek için seçim penceresini tekrar açın
+soundboard-error-capacity = Ses paneli yanıtı güvenli sınırı aştı
+soundboard-error-session = Ses paneli için etkin bir oturum gerekir; yeniden bağlanın
 
 server-settings-page-safety = Güvenlik Kurulumu
 

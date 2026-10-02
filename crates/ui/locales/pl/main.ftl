@@ -4353,28 +4353,27 @@ lib-composer-onboarding-complete = Dokończ wprowadzenie
 
 voice-call-moved-to-another-client = Sesja połączenia na tym urządzeniu została zastąpiona
 
-# English fallback until these Soundboard labels are translated.
-soundboard-open = Soundboard
-soundboard-heading = Soundboard
-soundboard-subtitle = Play a sound for everyone in your connected voice channel
-soundboard-channel = Connected channel: { $channel }
-soundboard-offline = Offline preview · sounds are not played
-soundboard-default = Default sounds
-soundboard-guild = Current server
-soundboard-pending = Waiting for Discord…
-soundboard-empty = No soundboard sounds are available
-soundboard-play = Play this sound in the current voice channel
-soundboard-unavailable = This sound is unavailable on Discord
-soundboard-close = Close
-soundboard-refresh = Refresh sounds
-soundboard-error-permission = Discord denied this soundboard action; check voice permissions
-soundboard-error-rate = Soundboard is rate limited; wait before trying again
-soundboard-error-ambiguous = The sound may already have played; check the call before trying again
-soundboard-error-network = Could not reach Discord for the soundboard action
-soundboard-error-response = Discord rejected the action or returned unsupported soundboard data
-soundboard-error-unavailable = Soundboard action is unavailable; reopen the picker to try again
-soundboard-error-capacity = Soundboard response exceeded its safe limit
-soundboard-error-session = Soundboard needs an active session; reconnect explicitly
+soundboard-open = Tablica dźwięków
+soundboard-heading = Tablica dźwięków
+soundboard-subtitle = Odtwórz dźwięk dla wszystkich na połączonym kanale głosowym
+soundboard-channel = Połączony kanał: { $channel }
+soundboard-offline = Podgląd offline · dźwięki nie są odtwarzane
+soundboard-default = Domyślne dźwięki
+soundboard-guild = Bieżący serwer
+soundboard-pending = Oczekiwanie na Discorda…
+soundboard-empty = Brak dostępnych dźwięków w tablicy
+soundboard-play = Odtwórz ten dźwięk na bieżącym kanale głosowym
+soundboard-unavailable = Ten dźwięk jest niedostępny na Discordzie
+soundboard-close = Zamknij
+soundboard-refresh = Odśwież dźwięki
+soundboard-error-permission = Discord odrzucił tę akcję tablicy dźwięków; sprawdź uprawnienia głosowe
+soundboard-error-rate = Tablica dźwięków osiągnęła limit żądań; zaczekaj przed ponowną próbą
+soundboard-error-ambiguous = Dźwięk mógł już zostać odtworzony; sprawdź połączenie głosowe przed ponowną próbą
+soundboard-error-network = Nie udało się połączyć z Discordem w celu wykonania tej akcji tablicy dźwięków
+soundboard-error-response = Discord odrzucił akcję lub zwrócił nieobsługiwane dane tablicy dźwięków
+soundboard-error-unavailable = Ta akcja jest niedostępna; otwórz ponownie wybór dźwięków, aby spróbować jeszcze raz
+soundboard-error-capacity = Odpowiedź tablicy dźwięków przekroczyła bezpieczny limit
+soundboard-error-session = Tablica dźwięków wymaga aktywnej sesji; połącz się ponownie
 
 server-settings-page-safety = Konfiguracja bezpieczeństwa
 

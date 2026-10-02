@@ -4350,28 +4350,27 @@ lib-composer-onboarding-complete = Completa l'accoglienza
 
 voice-call-moved-to-another-client = La sessione di chiamata di questo dispositivo è stata sostituita
 
-# English fallback until these Soundboard labels are translated.
 soundboard-open = Soundboard
 soundboard-heading = Soundboard
-soundboard-subtitle = Play a sound for everyone in your connected voice channel
-soundboard-channel = Connected channel: { $channel }
-soundboard-offline = Offline preview · sounds are not played
-soundboard-default = Default sounds
-soundboard-guild = Current server
-soundboard-pending = Waiting for Discord…
-soundboard-empty = No soundboard sounds are available
-soundboard-play = Play this sound in the current voice channel
-soundboard-unavailable = This sound is unavailable on Discord
-soundboard-close = Close
-soundboard-refresh = Refresh sounds
-soundboard-error-permission = Discord denied this soundboard action; check voice permissions
-soundboard-error-rate = Soundboard is rate limited; wait before trying again
-soundboard-error-ambiguous = The sound may already have played; check the call before trying again
-soundboard-error-network = Could not reach Discord for the soundboard action
-soundboard-error-response = Discord rejected the action or returned unsupported soundboard data
-soundboard-error-unavailable = Soundboard action is unavailable; reopen the picker to try again
-soundboard-error-capacity = Soundboard response exceeded its safe limit
-soundboard-error-session = Soundboard needs an active session; reconnect explicitly
+soundboard-subtitle = Riproduci un suono per tutti nel canale vocale connesso
+soundboard-channel = Canale connesso: { $channel }
+soundboard-offline = Anteprima offline · i suoni non vengono riprodotti
+soundboard-default = Suoni predefiniti
+soundboard-guild = Server attuale
+soundboard-pending = In attesa di Discord…
+soundboard-empty = Nessun suono disponibile nella soundboard
+soundboard-play = Riproduci questo suono nel canale vocale attuale
+soundboard-unavailable = Questo suono non è disponibile su Discord
+soundboard-close = Chiudi
+soundboard-refresh = Aggiorna suoni
+soundboard-error-permission = Discord ha negato questa azione della soundboard; controlla i permessi vocali
+soundboard-error-rate = La soundboard ha raggiunto il limite di richieste; attendi prima di riprovare
+soundboard-error-ambiguous = Il suono potrebbe essere già stato riprodotto; controlla la chiamata prima di riprovare
+soundboard-error-network = Impossibile contattare Discord per questa azione della soundboard
+soundboard-error-response = Discord ha rifiutato l’azione o restituito dati della soundboard non supportati
+soundboard-error-unavailable = Questa azione non è disponibile; riapri il selettore per riprovare
+soundboard-error-capacity = La risposta della soundboard ha superato il limite di sicurezza
+soundboard-error-session = La soundboard richiede una sessione attiva; riconnettiti
 
 server-settings-page-safety = Configurazione sicurezza
 

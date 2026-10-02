@@ -4350,28 +4350,27 @@ lib-composer-onboarding-complete = Concluir integração
 
 voice-call-moved-to-another-client = A sessão de chamada deste dispositivo foi substituída
 
-# English fallback until these Soundboard labels are translated.
-soundboard-open = Soundboard
-soundboard-heading = Soundboard
-soundboard-subtitle = Play a sound for everyone in your connected voice channel
-soundboard-channel = Connected channel: { $channel }
-soundboard-offline = Offline preview · sounds are not played
-soundboard-default = Default sounds
-soundboard-guild = Current server
-soundboard-pending = Waiting for Discord…
-soundboard-empty = No soundboard sounds are available
-soundboard-play = Play this sound in the current voice channel
-soundboard-unavailable = This sound is unavailable on Discord
-soundboard-close = Close
-soundboard-refresh = Refresh sounds
-soundboard-error-permission = Discord denied this soundboard action; check voice permissions
-soundboard-error-rate = Soundboard is rate limited; wait before trying again
-soundboard-error-ambiguous = The sound may already have played; check the call before trying again
-soundboard-error-network = Could not reach Discord for the soundboard action
-soundboard-error-response = Discord rejected the action or returned unsupported soundboard data
-soundboard-error-unavailable = Soundboard action is unavailable; reopen the picker to try again
-soundboard-error-capacity = Soundboard response exceeded its safe limit
-soundboard-error-session = Soundboard needs an active session; reconnect explicitly
+soundboard-open = Painel de sons
+soundboard-heading = Painel de sons
+soundboard-subtitle = Reproduzir um som para todos no canal de voz conectado
+soundboard-channel = Canal conectado: { $channel }
+soundboard-offline = Prévia offline · os sons não são reproduzidos
+soundboard-default = Sons padrão
+soundboard-guild = Servidor atual
+soundboard-pending = Aguardando o Discord…
+soundboard-empty = Nenhum som disponível no painel
+soundboard-play = Reproduzir este som no canal de voz atual
+soundboard-unavailable = Este som não está disponível no Discord
+soundboard-close = Fechar
+soundboard-refresh = Atualizar sons
+soundboard-error-permission = O Discord negou esta ação do painel de sons; verifique as permissões de voz
+soundboard-error-rate = O painel de sons atingiu o limite de solicitações; aguarde antes de tentar novamente
+soundboard-error-ambiguous = O som pode já ter sido reproduzido; verifique a chamada antes de tentar novamente
+soundboard-error-network = Não foi possível acessar o Discord para esta ação do painel de sons
+soundboard-error-response = O Discord recusou a ação ou retornou dados do painel de sons não compatíveis
+soundboard-error-unavailable = Esta ação não está disponível; reabra o seletor para tentar novamente
+soundboard-error-capacity = A resposta do painel de sons excedeu o limite seguro
+soundboard-error-session = O painel de sons precisa de uma sessão ativa; conecte-se novamente
 
 server-settings-page-safety = Configuração de segurança
 

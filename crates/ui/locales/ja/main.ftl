@@ -4339,28 +4339,27 @@ lib-composer-onboarding-complete = オンボーディングを完了
 
 voice-call-moved-to-another-client = このデバイスの通話セッションが置き換えられました
 
-# English fallback until these Soundboard labels are translated.
-soundboard-open = Soundboard
-soundboard-heading = Soundboard
-soundboard-subtitle = Play a sound for everyone in your connected voice channel
-soundboard-channel = Connected channel: { $channel }
-soundboard-offline = Offline preview · sounds are not played
-soundboard-default = Default sounds
-soundboard-guild = Current server
-soundboard-pending = Waiting for Discord…
-soundboard-empty = No soundboard sounds are available
-soundboard-play = Play this sound in the current voice channel
-soundboard-unavailable = This sound is unavailable on Discord
-soundboard-close = Close
-soundboard-refresh = Refresh sounds
-soundboard-error-permission = Discord denied this soundboard action; check voice permissions
-soundboard-error-rate = Soundboard is rate limited; wait before trying again
-soundboard-error-ambiguous = The sound may already have played; check the call before trying again
-soundboard-error-network = Could not reach Discord for the soundboard action
-soundboard-error-response = Discord rejected the action or returned unsupported soundboard data
-soundboard-error-unavailable = Soundboard action is unavailable; reopen the picker to try again
-soundboard-error-capacity = Soundboard response exceeded its safe limit
-soundboard-error-session = Soundboard needs an active session; reconnect explicitly
+soundboard-open = サウンドボード
+soundboard-heading = サウンドボード
+soundboard-subtitle = 接続中のボイスチャンネルにいる全員に音を再生します
+soundboard-channel = 接続中のチャンネル: { $channel }
+soundboard-offline = オフラインプレビュー · 音は再生されません
+soundboard-default = 既定のサウンド
+soundboard-guild = 現在のサーバー
+soundboard-pending = Discord の応答を待っています…
+soundboard-empty = 利用できるサウンドボードの音はありません
+soundboard-play = この音を現在のボイスチャンネルで再生
+soundboard-unavailable = この音は Discord で利用できません
+soundboard-close = 閉じる
+soundboard-refresh = サウンドを更新
+soundboard-error-permission = Discord がこのサウンドボード操作を拒否しました。ボイス権限を確認してください
+soundboard-error-rate = サウンドボードのリクエスト上限に達しました。しばらく待ってから再試行してください
+soundboard-error-ambiguous = 音がすでに再生された可能性があります。再試行する前に通話を確認してください
+soundboard-error-network = サウンドボード操作のために Discord に接続できませんでした
+soundboard-error-response = Discord が操作を拒否したか、未対応のサウンドボードデータを返しました
+soundboard-error-unavailable = この操作は利用できません。選択画面を開き直して再試行してください
+soundboard-error-capacity = サウンドボードの応答が安全上の上限を超えました
+soundboard-error-session = サウンドボードには有効なセッションが必要です。再接続してください
 
 server-settings-page-safety = 安全設定
 

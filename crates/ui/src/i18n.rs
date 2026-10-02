@@ -355,6 +355,15 @@ mod tests {
 					"{language:?} {key}"
 				);
 			}
+			if !matches!(language, Language::System | Language::English) {
+				for key in ["soundboard-subtitle", "soundboard-error-network"] {
+					assert_ne!(
+						language.text(key),
+						Language::English.text(key),
+						"{language:?}: {key}"
+					);
+				}
+			}
 			let channel =
 				language.text_with_args("soundboard-channel", &[("channel", "Synthetic voice")]);
 			assert!(

@@ -1,6 +1,6 @@
 {
   "baseline_source": "3f96877f553bbe50eab91d31611cd97ad94b64b8",
-  "after_source": "f7929911f9928f521a11da729eb92b2adf1f803d",
+  "after_source": "5391e4ec0ec3ffe91b1995b2fd8c1662b9510a31",
   "renderer": "Actual native eframe/WGPU Apple M1 Metal framebuffer, 2x scale",
   "method": "Temporary bounded native screenshot callback; no image editing",
   "fixtures": "Synthetic connected guild voice state before; explicit disabled offline Soundboard preview after; no microphone, sound effect, Discord session or external upload",
@@ -13,10 +13,12 @@
   "verification": {
     "focused_soundboard_tests": 11,
     "full_cargo_xtask_check": "passed",
-    "ui_tests_passed": 355,
+    "ui_tests_passed": 361,
     "ui_tests_ignored": 5,
     "live_account": false,
-    "release_package_and_performance": "pending; no improvement claim"
+    "release_package_and_performance": "pending; no improvement claim",
+    "confirmation_filtered_tests": 8,
+    "translated_soundboard_catalogs": 11
   },
   "files": {
     "before.png": {
@@ -24,17 +26,18 @@
       "sha256": "883b40df5a9b7ed992b32c8b292d557d85ffca5204821f2f8d093d13ce24afd2"
     },
     "after.png": {
-      "bytes": 1382909,
-      "sha256": "2af530774a0f23f86c5f6665b64e013eec267582779b325e7920a5d0caf5eaa0"
+      "bytes": 1382348,
+      "sha256": "e0ff1476b163af994e4f8e8c1adb921d15820808b12a20c200ac7d45a83d8602"
     },
     "before-light-narrow.png": {
       "bytes": 341615,
       "sha256": "9e1f85b5ac3dfddbb726ec56f23f1043291205abc411d179cc0ba0f810449199"
     },
     "after-light-narrow.png": {
-      "bytes": 995530,
-      "sha256": "4e49620851b7b657b725ce46f8cd2597eb5c786e75c2a420efb6a2850a97a33c"
+      "bytes": 995894,
+      "sha256": "ae0273eaa980d93d46110f818acb67c0c6bf3604a9ea1a399cb78e8b50417328"
     }
   },
-  "integration_note": "Normal integration with main 1107d904; actual native wide and narrow frames are byte-identical to previously inspected images. Temporary hooks were removed exactly; the full check passed with 355 UI tests and 5 ignored tests, plus 11 focused tests."
+  "integration_note": "Normal integration with main 66cc09d2 and the validated voice-confirmation queue fix 9cdad91c. Both actual native wide and narrow frames were refreshed and visually inspected. Temporary hooks were removed exactly; the full check passed with 361 UI tests and 5 ignored tests, plus 11 Soundboard-focused and 8 confirmation-filtered tests.",
+  "after_note": "The actual screenshots were captured on source5391e4ec before the subsequent nine-language translation correction. All rendering and English/Czech catalogs remain byte-identical; target-language lookup and channel formatting, and a fresh full check, pass after that correction."
 }
