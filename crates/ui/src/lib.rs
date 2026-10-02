@@ -3494,6 +3494,23 @@ impl MessagingUi {
 
 	pub fn show(&mut self, ui: &mut egui::Ui, state: &mut State) -> Vec<Command> {
 		crate::scroll::apply_preferences(ui.ctx(), self.reading_preferences);
+		if self.keybind_capture.is_none()
+			&& !self.ime_active
+			&& ui.input(|input| {
+				input.focused
+					&& !input
+						.events
+						.iter()
+						.any(|event| matches!(event, egui::Event::Ime(_)))
+			}) && ui.input_mut(|input| {
+			crate::keybinds::pressed_exact(
+				input,
+				self.keybinds
+					.chord(model::KeybindAction::CopyIssueDiagnostics),
+			)
+		}) {
+			self.copy_diagnostic_info(ui.ctx());
+		}
 		crate::i18n::set_current(self.language);
 		let language = self.language;
 		if let Some(status) = state.take_user_action_status() {
@@ -4782,6 +4799,61 @@ impl MessagingUi {
 #[cfg(test)]
 mod composer_tests {
 	use super::*;
+
+	#[test]
+	fn diagnostics_shortcut_copies_existing_report_and_respects_key_capture() {
+		let ctx = egui::Context::default();
+		let mut state = test_support::demo_state();
+		let mut view = MessagingUi::default();
+		let event = || egui::Event::Key {
+			key: egui::Key::F12,
+			physical_key: None,
+			pressed: true,
+			repeat: false,
+			modifiers: egui::Modifiers::NONE,
+		};
+		for (assigned, capturing, composing, copies) in [
+			(false, false, false, false),
+			(true, false, false, true),
+			(true, true, false, false),
+			(true, false, true, false),
+		] {
+			view.keybinds.copy_issue_diagnostics =
+				model::KeyChord::new(if assigned { "F12" } else { "" }, 0);
+			view.keybind_capture = capturing.then_some(model::KeybindAction::ToggleMute);
+			view.ime_active = composing;
+			let expected = view.diagnostic_info(&ctx);
+			let output = ctx.run_ui(
+				egui::RawInput {
+					focused: true,
+					events: vec![
+						egui::Event::Key {
+							key: egui::Key::F12,
+							physical_key: None,
+							pressed: false,
+							repeat: false,
+							modifiers: egui::Modifiers::NONE,
+						},
+						event(),
+					],
+					..Default::default()
+				},
+				|ui| {
+					assert!(!view.show(ui, &mut state).iter().any(|command| matches!(
+						command,
+						Command::Send { .. } | Command::Edit { .. }
+					)));
+				},
+			);
+			assert_eq!(
+				output.platform_output.commands.iter().any(
+					|command| matches!(command, egui::OutputCommand::CopyText(text) if text == &expected)
+				),
+				copies
+			);
+			output.drop_without_applying_deltas();
+		}
+	}
 
 	#[test]
 	fn download_cancel_remains_visible_without_a_text_composer() {
