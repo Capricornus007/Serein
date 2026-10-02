@@ -4340,3 +4340,6 @@ lib-composer-onboarding-rules-pending = チャットを始めるには、この�
 lib-composer-onboarding-incomplete = 参加を完了すると、さらにチャンネルが開放されます。
 # Context: composer
 lib-composer-onboarding-complete = オンボーディングを完了
+
+voice-media-output = メディア出力
+voice-media-output-hint = 新しく再生する音声・動画と視聴中の配信に適用します。

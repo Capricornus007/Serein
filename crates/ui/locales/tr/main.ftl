@@ -4340,3 +4340,6 @@ lib-composer-onboarding-rules-pending = Sohbete başlamak için bu sunucunun kur
 lib-composer-onboarding-incomplete = Daha fazla kanalın kilidini açmak için sunucuya katılımı tamamla.
 # Context: composer
 lib-composer-onboarding-complete = Tanıtımı tamamla
+
+voice-media-output = Medya çıkışı
+voice-media-output-hint = Yeni ses/video oynatımlarına ve izlenen yayınlara uygulanır.

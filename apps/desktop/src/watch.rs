@@ -103,6 +103,8 @@ struct Live {
 
 #[derive(Default)]
 pub(super) struct Watch {
+	output: Option<crate::media_output::StreamRoute>,
+	retiring_output: Option<crate::media_output::StreamRoute>,
 	pending: Option<Pending>,
 	live: Option<Live>,
 	/// The streamer stopped or Discord failed the view; the state choice is cleared next poll.
@@ -114,6 +116,10 @@ pub(super) struct Watch {
 }
 impl Watch {
 	pub fn stop(&mut self) {
+		if let Some(output) = self.output.take() {
+			output.cancel();
+			self.retiring_output = Some(output);
+		}
 		self.pending = None;
 		self.ended = None;
 		if let Some(live) = self.live.take() {
@@ -195,6 +201,31 @@ impl Watch {
 			)
 			.then_some((state.generation, active.channel, active.request, streamer))
 		});
+		if self
+			.retiring_output
+			.as_ref()
+			.is_some_and(|output| output.finished())
+		{
+			self.retiring_output = None;
+		}
+		if self.retiring_output.is_some() && wanted.is_some() {
+			self.status = "Waiting for previous stream audio to stop";
+			ctx.request_repaint_after(Duration::from_millis(200));
+		}
+		let deafened = ui.voice_deafened
+			|| state
+				.voice
+				.active
+				.as_ref()
+				.is_some_and(|call| call.deafened || call.server_deafened);
+		if let Some(output) = &self.output {
+			output.configure(&ui.media_output, ui.voice_stream_volume(), deafened);
+			if output.failed() {
+				self.notice = "Stream media output unavailable; choose another device";
+			} else if self.notice == "Stream media output unavailable; choose another device" {
+				self.notice = "";
+			}
+		}
 		let current = self.context();
 		let mut command = None;
 		if let Some(context) = current
@@ -246,6 +277,7 @@ impl Watch {
 		}
 		if let Some((generation, channel, request, streamer)) = wanted
 			&& self.context().is_none()
+			&& self.retiring_output.is_none()
 			&& command.is_none()
 		{
 			let Some(call) = call.filter(|call| {
@@ -262,6 +294,22 @@ impl Watch {
 				stream_request: self.sequence,
 				streamer,
 			};
+			self.notice = "";
+			let audio = match audio {
+				Some(fallback) => match crate::media_output::StreamRoute::new(fallback) {
+					Ok(route) => {
+						route.configure(&ui.media_output, ui.voice_stream_volume(), deafened);
+						let sender = route.sender.clone();
+						self.output = Some(route);
+						Some(sender)
+					}
+					Err(error) => {
+						self.notice = error;
+						None
+					}
+				},
+				None => None,
+			};
 			self.pending = Some(Pending {
 				context,
 				user: call.user,
@@ -274,7 +322,6 @@ impl Watch {
 				started: Instant::now(),
 			});
 			self.status = "Requesting the stream…";
-			self.notice = "";
 			command = Some(Command::Voice(voice::Command::WatchStream {
 				channel,
 				request,

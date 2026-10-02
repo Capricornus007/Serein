@@ -4355,3 +4355,6 @@ lib-composer-onboarding-rules-pending = Примите правила серве
 lib-composer-onboarding-incomplete = Завершите вступление, чтобы открыть больше каналов.
 # Context: composer
 lib-composer-onboarding-complete = Завершить знакомство
+
+voice-media-output = Вывод мультимедиа
+voice-media-output-hint = Применяется к новому воспроизведению аудио/видео и просматриваемым трансляциям.

@@ -4351,3 +4351,6 @@ lib-composer-onboarding-rules-pending = Accetta le regole di questo server per i
 lib-composer-onboarding-incomplete = Completa l'accesso a questo server per sbloccare altri canali.
 # Context: composer
 lib-composer-onboarding-complete = Completa l'accoglienza
+
+voice-media-output = Uscita multimediale
+voice-media-output-hint = Si applica alle nuove riproduzioni audio/video e alle trasmissioni guardate.

@@ -4370,3 +4370,6 @@ lib-composer-onboarding-rules-pending = Přijmi pravidla tohoto serveru, abys mo
 lib-composer-onboarding-incomplete = Dokonči připojení k serveru a odemkni další kanály.
 # Context: composer
 lib-composer-onboarding-complete = Dokončit uvítání
+
+voice-media-output = Výstup médií
+voice-media-output-hint = Platí pro nově spuštěné audio/video a sledované streamy.
