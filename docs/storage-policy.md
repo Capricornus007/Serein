@@ -1482,3 +1482,9 @@ Accepting Save or Remove pauses new REST client acquisition immediately, before
 the credential-store job completes. A failed deletion leaves routing paused; it
 does not resume stored credentials. In-flight requests retain their earlier
 snapshot. Rejected saves retain the credential draft until a valid job can start.
+
+Tray voice presentation retains one desired state and one successfully applied
+state. Windows keeps at most four owned 32×32 icons and one fixed 128-code-unit
+tooltip descriptor. Background voice/tray logic runs once per event tick; active
+calls request a 50 ms repaint. These ticks neither open audio devices nor create
+new network payloads.

@@ -21,6 +21,21 @@ pub enum VoiceState {
 	Deafened = 3,
 }
 
+// Keep the desired state for Explorer recovery, and only remember a successful
+// presentation. A rejected native update is retried on the next background tick.
+#[cfg(any(target_os = "windows", test))]
+fn update_voice_state(
+	desired: &std::cell::Cell<VoiceState>,
+	applied: &std::cell::Cell<Option<VoiceState>>,
+	state: VoiceState,
+	apply: impl FnOnce(VoiceState) -> bool,
+) {
+	desired.set(state);
+	if applied.get() != Some(state) && apply(state) {
+		applied.set(Some(state));
+	}
+}
+
 pub const fn supported() -> bool {
 	cfg!(any(
 		target_os = "windows",
@@ -122,6 +137,7 @@ mod native {
 		wake: Box<dyn Fn()>,
 		voice_icons: [Option<HICON>; 4],
 		current_voice_state: Cell<super::VoiceState>,
+		applied_voice_state: Cell<Option<super::VoiceState>>,
 	}
 
 	impl Tray {
@@ -158,7 +174,6 @@ mod native {
 			if notification == 0 || restart == 0 {
 				return Err(UNAVAILABLE);
 			}
-			let voice_icons = create_voice_icons();
 			// SAFETY: request a borrowed window icon; the fallback is a shared system icon.
 			let fallback_icon = unsafe {
 				let handle = HICON(
@@ -171,9 +186,11 @@ mod native {
 					handle
 				}
 			};
-			let icon = voice_icons[super::VoiceState::Unmuted as usize].unwrap_or(fallback_icon);
 			// SAFETY: creates a menu owned by State, released on every success/error path.
 			let menu = unsafe { CreatePopupMenu() }.map_err(|_| UNAVAILABLE)?;
+			// Create owned icons only after fallible borrowed-icon/menu initialization.
+			let voice_icons = create_voice_icons();
+			let icon = voice_icons[super::VoiceState::Unmuted as usize].unwrap_or(fallback_icon);
 			let mut data = NOTIFYICONDATAW {
 				cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
 				hWnd: hwnd,
@@ -202,6 +219,7 @@ mod native {
 					wake: Box::new(wake),
 					voice_icons,
 					current_voice_state: Cell::new(super::VoiceState::Unmuted),
+					applied_voice_state: Cell::new(None),
 				}),
 				_window: window,
 			};
@@ -239,30 +257,32 @@ mod native {
 		}
 
 		pub fn set_voice_state(&self, state: super::VoiceState) {
-			if self.state.current_voice_state.get() == state {
-				return;
-			}
-			self.state.current_voice_state.set(state);
-			if let Some(hicon) = self.state.voice_icons[state as usize] {
-				let mut data = NOTIFYICONDATAW {
-					cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
-					hWnd: self.state.icon.hWnd,
-					uID: self.state.icon.uID,
-					uFlags: NIF_ICON | NIF_TIP | NIF_SHOWTIP,
-					hIcon: hicon,
-					Anonymous: NOTIFYICONDATAW_0 {
-						uVersion: NOTIFYICON_VERSION_4,
-					},
-					..Default::default()
-				};
-				let tip = voice_state_tip(state);
-				for (slot, unit) in data.szTip.iter_mut().zip(tip.encode_utf16()) {
-					*slot = unit;
-				}
-				unsafe {
-					let _ = Shell_NotifyIconW(NIM_MODIFY, &data);
-				}
-			}
+			super::update_voice_state(
+				&self.state.current_voice_state,
+				&self.state.applied_voice_state,
+				state,
+				|state| {
+					let hicon =
+						self.state.voice_icons[state as usize].unwrap_or(self.state.icon.hIcon);
+					let mut data = NOTIFYICONDATAW {
+						cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
+						hWnd: self.state.icon.hWnd,
+						uID: self.state.icon.uID,
+						uFlags: NIF_ICON | NIF_TIP | NIF_SHOWTIP,
+						hIcon: hicon,
+						Anonymous: NOTIFYICONDATAW_0 {
+							uVersion: NOTIFYICON_VERSION_4,
+						},
+						..Default::default()
+					};
+					let tip = voice_state_tip(state);
+					for (slot, unit) in data.szTip.iter_mut().zip(tip.encode_utf16()) {
+						*slot = unit;
+					}
+					// SAFETY: the descriptor uses retained UI-thread handles and fixed tooltip text.
+					unsafe { Shell_NotifyIconW(NIM_MODIFY, &data).as_bool() }
+				},
+			);
 		}
 	}
 
@@ -301,9 +321,11 @@ mod native {
 				}
 			}
 			self.present.set(true);
+			self.applied_voice_state.set(Some(state));
 			true
 		}
 		fn remove_icon(&self) {
+			self.applied_voice_state.set(None);
 			if self.present.replace(false) {
 				// SAFETY: hwnd/uID identify only this application's owned notification icon.
 				let _ = unsafe { Shell_NotifyIconW(NIM_DELETE, &self.icon) };
@@ -383,10 +405,8 @@ mod native {
 		fn drop(&mut self) {
 			// SAFETY: this state owns the menu; callback Rc copies keep it alive during nested menus.
 			let _ = unsafe { DestroyMenu(self.menu) };
-			for icon in self.voice_icons {
-				if let Some(hicon) = icon {
-					let _ = unsafe { DestroyIcon(hicon) };
-				}
+			for hicon in self.voice_icons.into_iter().flatten() {
+				let _ = unsafe { DestroyIcon(hicon) };
 			}
 		}
 	}
@@ -480,7 +500,7 @@ mod native {
 		};
 		use windows::Win32::UI::WindowsAndMessaging::{CreateIconIndirect, ICONINFO};
 
-		let mask_stride = ((width + 31) / 32) * 4;
+		let mask_stride = width.div_ceil(32) * 4;
 		let mask_bytes = vec![0u8; (mask_stride * height) as usize];
 		// SAFETY: mask_bytes has valid stride and length for width * height monochrome bitmap.
 		let mask = unsafe {
@@ -669,6 +689,35 @@ mod native {
 
 #[cfg(test)]
 mod tests {
+	#[test]
+	fn failed_voice_icon_updates_retry_without_losing_the_desired_state() {
+		use super::{VoiceState, update_voice_state};
+		use std::cell::Cell;
+		let desired = Cell::new(VoiceState::Unmuted);
+		let applied = Cell::new(Some(VoiceState::Unmuted));
+		let attempts = Cell::new(0);
+		let update = |success| {
+			update_voice_state(&desired, &applied, VoiceState::Muted, |_| {
+				attempts.set(attempts.get() + 1);
+				success
+			});
+		};
+		update(false);
+		assert_eq!(desired.get(), VoiceState::Muted);
+		assert_eq!(applied.get(), Some(VoiceState::Unmuted));
+		update(true);
+		update(true);
+		assert_eq!(attempts.get(), 2);
+		assert_eq!(applied.get(), Some(VoiceState::Muted));
+		applied.set(None); // Explorer lost the registration.
+		update(true);
+		assert_eq!(attempts.get(), 3);
+		for state in [VoiceState::Speaking, VoiceState::Deafened] {
+			update_voice_state(&desired, &applied, state, |_| true);
+			assert_eq!(applied.get(), Some(state));
+		}
+	}
+
 	use super::*;
 	#[test]
 	fn clicks_coalesce_without_losing_quit_or_failure() {
