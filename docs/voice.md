@@ -358,7 +358,8 @@ the newest frame each network tick. One 20 ms lookahead frame smooths normal
 callback/worker scheduling variation. Mute, deafen, encryption pauses and a
 transport stall of at least 80 ms discard queued capture rather than replaying
 stale speech. The existing eight-frame capture channel plus lookahead retains
-at most nine frames (34,560 PCM bytes). This adds 20 ms of intentional buffering.
+at most nine fixed stereo-capable frames (under 70 KiB). This adds 20 ms of
+intentional buffering.
 The offline echo example also checks alternating two-frame/no-frame arrivals
 and mute/stall flushing; physical cutout resolution still needs a listening check.
 
