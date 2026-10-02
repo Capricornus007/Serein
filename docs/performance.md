@@ -3442,3 +3442,71 @@ GPU memory, frame/startup latency and real-account interoperability remain
 unmeasured. Raw source identities, binary hashes, sizes and all samples are in
 `docs/pr-evidence/gif-favorite-sync/measurements.json`. This evidence follow-up
 changes no measured runtime source.
+
+
+## Arabic/Hebrew message layout and logical selection — October 2, 2026
+
+Standard source `73aa31e1a81629d3eebf901eac70ed881a6dd462` is compared with
+main `1107d9045fb9d98980d6d8e9987c96a362b4f9ab`. The native pair uses the preserved
+FAT demo from renderer source `5eb13e07`; the later change adds nine other-language
+limit notices and a lookup regression, with runtime rendering, i18n code and the
+English/Czech catalogs byte-identical. Fresh actual wide dark and narrow light
+English captures on `73aa31e1` are byte-identical to the reviewed `5eb` pixels.
+The common CPU layout fixture compares original `47a81035` with `73aa31e1`.
+Raw samples, commands, source identities, binary hashes and capacity limits are in
+[`rtl-message-layout/measurements.json`](pr-evidence/rtl-message-layout/measurements.json).
+
+Environment: macOS 27.0 (26A428), Apple M1 MacBookAir10,1 / 16 GiB, Rust 1.98.1,
+locked dependencies, two build jobs.
+
+| Metric / method | Baseline | After | Delta |
+| --- | ---: | ---: | ---: |
+| Standard executable, bytes | 62,154,064 | 62,252,688 | +98,624 / +0.1587% |
+| Installed package, bytes | 68,164,493 | 68,266,274 | +101,781 / +0.1493% |
+| Distribution ZIP, bytes | 43,322,199 | 43,388,480 | +66,281 / +0.1530% |
+| Native idle CPU, ten-sample median | 0.0% | 0.0% | 0 percentage points |
+| Sampled peak RSS, KiB | 124,464 | 124,832 | +368 / +0.2957% |
+| Settled RSS, KiB | 124,416 | 124,784 | +368 / +0.2958% |
+| CPU layout, 200 frames at 360 px, ms | 27.298334 | 26.033583 | -1.264751 / -4.633% |
+| CPU layout, 200 frames at 900 px, ms | 26.678542 | 25.596833 | -1.081709 / -4.055% |
+
+Both standard packages use the unchanged default FAT release profile and include
+voice. The xtask internally uses `--no-default-features` to omit development data.
+The final package has 207 regular files versus 206 before, including the additional
+epaint patch notice. Deep/strict local ad-hoc signature verification passed.
+Installed size sums all regular files; ZIP uses identical
+`ditto -c -k --sequesterRsrc` over complete portable contents without an enclosing
+directory. Workspace artifacts across worktree IDs were inspected and cleared;
+the log confirms all twelve runtime workspace crates compiled from `73aa31e1`.
+
+Both native executables use `cargo build --release --locked -p serein --features demo`,
+default features and FAT LTO, without instrumentation. Both run `--demo --demo-chat`
+at 1120×760 logical pixels, 2× display scale, Metal. A five-second warmup precedes
+ten one-second process `ps` samples; settled RSS is the last-five median. All team
+compilers, tests, replays and other apps were held during the pair. The +368 KiB
+difference is small idle variation; no memory improvement is claimed. These
+samples measure inactive English/common chat overhead, not Arabic rendering.
+The source distinction above is retained; other-language RSS is unmeasured.
+
+The CPU component harness uses the exact same five messages at 360 and 900 logical
+pixels: long Arabic, mixed Arabic/Latin/digits/link/bold, Hebrew/Latin/digits,
+Arabic marks with a newline, and forty repetitions of formatted Latin text.
+Parsing and setup are outside timing. Each width has ten warmup frames and five
+measured batches of 200 complete egui layout passes. The fixture body is
+byte-identical, SHA256 `84a246bf25a840dcea103a64b54ddf56935691bbe2ef95a8a14fcb05f1c35846`.
+The baseline receives only this manual test fixture; the changed source includes
+it in the ignored test `markdown::tests::rtl_message_layout_benchmark`. Both
+harnesses were built with `CARGO_PROFILE_RELEASE_LTO=thin CARGO_BUILD_JOBS=2 cargo
+test --release --locked --offline -p ui --lib --no-run --message-format=json`,
+then run directly with that exact test, `--ignored --nocapture --test-threads=1`.
+This process-only thin-LTO override does not change repository profiles or the
+default FAT shipping/native measurements. No compiler or native app was active
+during the component pair. Small cached-workload timing differences do not establish
+a general speed improvement and exclude cold layout, GPU frame latency and input.
+
+The bounded RTL path admits 8 KiB / 512 spans / 128 rows per run, with 32 entries / 8 MiB
+and 4 MiB per cache entry. Selection stages at most 4,096 current-pass shared
+references / 4 MiB of actual referenced capacities plus a separate 4 MiB copy
+buffer; all references drop after the pass. Oversized or indivisible content
+shows an explicit localized preview limit. Stored message/draft/edit text remains
+logical. No live account, upload, message, call, microphone or camera was used.
