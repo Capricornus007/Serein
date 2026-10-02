@@ -3805,7 +3805,12 @@ mod tests {
 
 	#[test]
 	fn high_dpi_inline_emoji_keep_the_atlas_while_jumbo_requests_vectors() {
-		for (source, expected_vector) in [("Inline 🙂", false), ("🙂", true)] {
+		for (source, expected_vector) in [
+			("Inline 🙂", false),
+			("שלום 🙂", false),
+			("مرحبا 🙂", false),
+			("🙂", true),
+		] {
 			let ctx = egui::Context::default();
 			crate::design::apply(&ctx);
 			let parsed = Formatted::parse(source);
