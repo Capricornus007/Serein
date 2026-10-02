@@ -2142,6 +2142,9 @@ impl State {
 				voice::Command::Join {
 					channel, request, ..
 				}
+				| voice::Command::ConfirmSession {
+					channel, request, ..
+				}
 				| voice::Command::Ring { channel, request } => self.apply_voice(voice::Event::Failed {
 					channel,
 					request,

@@ -4358,3 +4358,4 @@ lib-composer-onboarding-complete = Завершить знакомство
 
 voice-media-output = Вывод мультимедиа
 voice-media-output-hint = Применяется к новому воспроизведению аудио/видео и просматриваемым трансляциям.
+voice-call-moved-to-another-client = Сеанс звонка на этом устройстве был заменён

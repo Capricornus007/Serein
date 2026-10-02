@@ -4354,3 +4354,4 @@ lib-composer-onboarding-complete = Concluir integração
 
 voice-media-output = Saída de mídia
 voice-media-output-hint = Aplica-se a novas reproduções de áudio/vídeo e às transmissões assistidas.
+voice-call-moved-to-another-client = A sessão de chamada deste dispositivo foi substituída
