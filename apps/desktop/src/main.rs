@@ -856,6 +856,8 @@ struct Desktop {
 	startup: startup::Startup,
 	tray: Option<platform::tray::Tray>,
 	hotkeys: platform::hotkeys::Hotkeys,
+	/// Linux desktop light/dark preference; winit reports it everywhere else.
+	system_theme: platform::system_theme::SystemTheme,
 	tray_error: Option<&'static str>,
 	tray_window: tray_window::State,
 	/// `--demo-reply`: keeps two synthetic typists active on the selected fixture channel.
@@ -2008,6 +2010,10 @@ impl Desktop {
 		if !demo {
 			hotkeys.sync(&messaging.keybinds, &runtime);
 		}
+		let system_theme = platform::system_theme::SystemTheme::watch(&runtime, {
+			let ctx = cc.egui_ctx.clone();
+			move || ctx.request_repaint()
+		});
 		let window = cc
 			.winit_window()
 			.ok_or("Native window unavailable")?
@@ -2105,6 +2111,7 @@ impl Desktop {
 			tray: None,
 			tray_window,
 			hotkeys,
+			system_theme,
 			tray_error: None,
 			#[cfg(feature = "demo")]
 			demo_typing,
@@ -2286,6 +2293,7 @@ impl Desktop {
 		let _ = ui::emoji::install(ctx);
 		ui::design::apply(ctx);
 		ctx.set_theme(self.appearance);
+		self.sync_system_theme(ctx);
 		self.messaging
 			.apply_reading_preferences(ctx, self.reading.current);
 		ctx.clear_animations();
@@ -2653,6 +2661,21 @@ impl Desktop {
 		}
 		self.messaging.adopt_account_presence(remote);
 		self.presence_authoritative = true;
+	}
+	/// egui resolves System through `fallback_theme` when winit reports no system theme, as on
+	/// Wayland and X11. A reported system theme still takes precedence on Windows and macOS.
+	fn sync_system_theme(&self, ctx: &egui::Context) {
+		let Some(dark) = self.system_theme.dark() else {
+			return;
+		};
+		let theme = if dark {
+			egui::Theme::Dark
+		} else {
+			egui::Theme::Light
+		};
+		if ctx.options(|options| options.fallback_theme) != theme {
+			ctx.options_mut(|options| options.fallback_theme = theme);
+		}
 	}
 	fn persist_account_presence(&mut self) {
 		if !self.presence_authoritative || self.state.demo || self.fixture_only {
@@ -5356,6 +5379,14 @@ impl Desktop {
 			}
 			let typing_count = events.len() - reliable_count;
 			events.rotate_right(typing_count);
+			// A local candidate failure must remain deliverable when reliable account
+			// events are full. Apply queued signaling first; observe rechecks its scope.
+			if let Some(failure) = connection::take_confirmation_failure(
+				&mut connection.confirmation_failure,
+				&connection.events,
+			) {
+				events.push(failure);
+			}
 			terminal = *connection.terminal.borrow();
 		}
 		let mut persist_timeline = false;
@@ -5735,6 +5766,8 @@ impl eframe::App for Desktop {
 		false
 	}
 	fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+		// Before the pass begins, so the whole frame resolves System to the same theme.
+		self.sync_system_theme(ctx);
 		// Viewport position/scale comes from native events; avoid an OS monitor query on paints.
 		if let Some(viewport) = raw_input.viewports.get(&raw_input.viewport_id) {
 			let geometry = (viewport.outer_rect, viewport.native_pixels_per_point);
