@@ -4406,6 +4406,7 @@ public-upload-error-selection = Výběr se změnil; před veřejným nahráním 
 public-upload-error-missing = Před veřejným nahráním znovu vyberte soubor
 
 message-preview-limit = Tato zpráva překračuje limit nativního rozvržení textu.
+voice-call-moved-to-another-client = Relace hovoru na tomto zařízení byla nahrazena
 
 # Synchronizované oblíbené GIFy (neoficiální nastavení účtu).
 gif-favorites-sync-loading = Synchronizuji oblíbené…

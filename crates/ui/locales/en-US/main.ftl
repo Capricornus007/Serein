@@ -4404,6 +4404,7 @@ public-upload-error-selection = Selection changed; review the file again before 
 public-upload-error-missing = Select the file again before uploading publicly
 
 message-preview-limit = This message exceeds the native text layout limit.
+voice-call-moved-to-another-client = This device's call session was replaced
 
 # Synchronized favorite GIFs (unofficial account settings).
 gif-favorites-sync-loading = Syncing favorites…
