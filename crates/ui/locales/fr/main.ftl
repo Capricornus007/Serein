@@ -4353,4 +4353,4 @@ lib-composer-onboarding-incomplete = Termine de rejoindre ce serveur pour déblo
 lib-composer-onboarding-complete = Terminer l'accueil
 
 voice-media-output = Sortie multimédia
-voice-media-output-hint = S’applique aux nouvelles lectures audio/vidéo et aux diffusions regardées.
+voice-media-output-hint = S’applique aux nouvelles lectures audio/vidéo et aux flux que vous regardez.

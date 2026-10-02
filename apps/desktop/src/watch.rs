@@ -111,7 +111,7 @@ pub(super) struct Watch {
 	ended: Option<&'static str>,
 	sequence: u64,
 	status: &'static str,
-	/// Why the last view stopped; shown as a stage notice until the next request or hang-up.
+	/// Playback failure; visible even while video continues, until recovery or the next request.
 	notice: &'static str,
 }
 impl Watch {
@@ -124,6 +124,15 @@ impl Watch {
 		self.ended = None;
 		if let Some(live) = self.live.take() {
 			live.task.abort();
+		}
+	}
+	fn stage_status(&self, watching: bool) -> &'static str {
+		if !self.notice.is_empty() {
+			self.notice
+		} else if watching {
+			self.status
+		} else {
+			""
 		}
 	}
 	fn context(&self) -> Option<Context> {
@@ -372,11 +381,7 @@ impl Watch {
 		} else {
 			ui.voice_stream_view = None;
 		}
-		ui.voice_stream_status = if wanted.is_some() {
-			self.status
-		} else {
-			self.notice
-		};
+		ui.voice_stream_status = self.stage_status(wanted.is_some());
 		command
 	}
 	fn start(
@@ -471,6 +476,18 @@ mod tests {
 		}
 	}
 
+	#[test]
+	fn media_output_failure_remains_visible_while_stream_video_continues() {
+		let mut view = Watch::default();
+		view.status = "Watching the stream";
+		view.notice = "Stream media output unavailable; choose another device";
+		assert_eq!(view.stage_status(true), view.notice);
+		view.status = "Connecting to the stream…";
+		assert_eq!(view.stage_status(true), view.notice);
+		view.notice = ""; // Worker recovery after an explicit output selection change.
+		assert_eq!(view.stage_status(true), view.status);
+		assert_eq!(view.stage_status(false), "");
+	}
 	#[test]
 	fn watch_reuses_dropped_frames_and_delivers_only_updates() {
 		let mut picture = None;
