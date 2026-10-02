@@ -299,7 +299,7 @@
             "overflow_checks": false,
             "test": true
           },
-          "source_patch": "diff --git a/crates/ui/src/markdown.rs b/crates/ui/src/markdown.rs\nindex 17254d21..7a7ecea4 100644\n--- a/crates/ui/src/markdown.rs\n+++ b/crates/ui/src/markdown.rs\n@@ -4122,4 +4122,71 @@ mod tests {\n \t\tassert_eq!(cache.entries.len(), 500);\n \t\tassert!(cache.bytes <= 1024 * 1024);\n \t}\n+\t#[test]\n+\t#[ignore = \"release-only complete message layout workload\"]\n+\tfn rtl_message_layout_benchmark() {\n+\t\tfor width in [360.0, 900.0] {\n+\t\t\tlet ctx = egui::Context::default();\n+\t\t\tcrate::fonts::install(&ctx);\n+\t\t\tlet messages = [\n+\t\t\t\tFormatted::parse(\n+\t\t\t\t\t&\"مرحبا بالعالم هذه رسالة عربية لاختبار ترتيب الكلمات والتفاف السطور. \"\n+\t\t\t\t\t\t.repeat(4),\n+\t\t\t\t),\n+\t\t\t\tFormatted::parse(\n+\t\t\t\t\t\"العربية مع English 123 و[رابط تجريبي](https://example.com) و**نص عريض** ثم نهاية\",\n+\t\t\t\t),\n+\t\t\t\tFormatted::parse(\"שלום עולם mixed English 123 סוף השורה\"),\n+\t\t\t\tFormatted::parse(\"لَا لَإِ بَ بِ بُ\\nEnglish prefix: العربية 123 ثم النهاية\"),\n+\t\t\t\tFormatted::parse(&\"**Bold** plain *italic* `code` \".repeat(40)),\n+\t\t\t];\n+\t\t\tlet mut images = crate::avatars::Avatars::default();\n+\t\t\tlet mut profile = crate::profiles::ProfileSession::default();\n+\t\t\tlet mut frame = || {\n+\t\t\t\tctx.run_ui(\n+\t\t\t\t\tegui::RawInput {\n+\t\t\t\t\t\tscreen_rect: Some(egui::Rect::from_min_size(\n+\t\t\t\t\t\t\tegui::Pos2::ZERO,\n+\t\t\t\t\t\t\tegui::vec2(width, 1600.0),\n+\t\t\t\t\t\t)),\n+\t\t\t\t\t\t..Default::default()\n+\t\t\t\t\t},\n+\t\t\t\t\t|ui| {\n+\t\t\t\t\t\tfor (index, message) in messages.iter().enumerate() {\n+\t\t\t\t\t\t\tlet mut surface =\n+\t\t\t\t\t\t\t\tcrate::select::Surface::new(ui, (\"rtl-layout-bench\", index));\n+\t\t\t\t\t\t\tmessage.show_search(\n+\t\t\t\t\t\t\t\tui,\n+\t\t\t\t\t\t\t\t&mut None,\n+\t\t\t\t\t\t\t\t&[],\n+\t\t\t\t\t\t\t\tNone,\n+\t\t\t\t\t\t\t\t&mut profile,\n+\t\t\t\t\t\t\t\t(&[], &mut None, &[], &[]),\n+\t\t\t\t\t\t\t\t(&mut images, true, &mut 0),\n+\t\t\t\t\t\t\t\t&mut surface,\n+\t\t\t\t\t\t\t\t\"\",\n+\t\t\t\t\t\t\t\tcrate::design::MessageCardSurface::Opaque,\n+\t\t\t\t\t\t\t);\n+\t\t\t\t\t\t\tsurface.finish(ui);\n+\t\t\t\t\t\t}\n+\t\t\t\t\t},\n+\t\t\t\t)\n+\t\t\t\t.drop_without_applying_deltas();\n+\t\t\t};\n+\t\t\tfor _ in 0..10 {\n+\t\t\t\tframe();\n+\t\t\t}\n+\t\t\tlet mut samples = Vec::new();\n+\t\t\tfor _ in 0..5 {\n+\t\t\t\tlet start = std::time::Instant::now();\n+\t\t\t\tfor _ in 0..200 {\n+\t\t\t\t\tframe();\n+\t\t\t\t}\n+\t\t\t\tsamples.push(start.elapsed().as_secs_f64() * 1000.0);\n+\t\t\t}\n+\t\t\tprintln!(\n+\t\t\t\t\"RTL_MESSAGE_LAYOUT_BENCH {{\\\"width\\\":{width},\\\"warmup_frames\\\":10,\\\"frames_per_sample\\\":200,\\\"messages_per_frame\\\":5,\\\"samples_ms\\\":{samples:?}}}\"\n+\t\t\t);\n+\t\t}\n+\t}\n }\n"
+          "source_patch": "diff --git a/crates/ui/src/markdown.rs b/crates/ui/src/markdown.rs\nindex 17254d21..7a7ecea4 100644\n--- a/crates/ui/src/markdown.rs\n+++ b/crates/ui/src/markdown.rs\n@@ -4122,4 +4122,71 @@ mod tests {\n \t\tassert_eq!(cache.entries.len(), 500);\n \t\tassert!(cache.bytes <= 1024 * 1024);\n \t}\n+\t#[test]\n+\t#[ignore = \"release-only complete message layout workload\"]\n+\tfn rtl_message_layout_benchmark() {\n+\t\tfor width in [360.0, 900.0] {\n+\t\t\tlet ctx = egui::Context::default();\n+\t\t\tcrate::fonts::install(&ctx);\n+\t\t\tlet messages = [\n+\t\t\t\tFormatted::parse(\n+\t\t\t\t\t&\"\u0645\u0631\u062d\u0628\u0627 \u0628\u0627\u0644\u0639\u0627\u0644\u0645 \u0647\u0630\u0647 \u0631\u0633\u0627\u0644\u0629 \u0639\u0631\u0628\u064a\u0629 \u0644\u0627\u062e\u062a\u0628\u0627\u0631 \u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u0643\u0644\u0645\u0627\u062a \u0648\u0627\u0644\u062a\u0641\u0627\u0641 \u0627\u0644\u0633\u0637\u0648\u0631. \"\n+\t\t\t\t\t\t.repeat(4),\n+\t\t\t\t),\n+\t\t\t\tFormatted::parse(\n+\t\t\t\t\t\"\u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u0645\u0639 English 123 \u0648[\u0631\u0627\u0628\u0637 \u062a\u062c\u0631\u064a\u0628\u064a](https://example.com) \u0648**\u0646\u0635 \u0639\u0631\u064a\u0636** \u062b\u0645 \u0646\u0647\u0627\u064a\u0629\",\n+\t\t\t\t),\n+\t\t\t\tFormatted::parse(\"\u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd mixed English 123 \u05e1\u05d5\u05e3 \u05d4\u05e9\u05d5\u05e8\u05d4\"),\n+\t\t\t\tFormatted::parse(\"\u0644\u064e\u0627 \u0644\u064e\u0625\u0650 \u0628\u064e \u0628\u0650 \u0628\u064f\\nEnglish prefix: \u0627\u0644\u0639\u0631\u0628\u064a\u0629 123 \u062b\u0645 \u0627\u0644\u0646\u0647\u0627\u064a\u0629\"),\n+\t\t\t\tFormatted::parse(&\"**Bold** plain *italic* `code` \".repeat(40)),\n+\t\t\t];\n+\t\t\tlet mut images = crate::avatars::Avatars::default();\n+\t\t\tlet mut profile = crate::profiles::ProfileSession::default();\n+\t\t\tlet mut frame = || {\n+\t\t\t\tctx.run_ui(\n+\t\t\t\t\tegui::RawInput {\n+\t\t\t\t\t\tscreen_rect: Some(egui::Rect::from_min_size(\n+\t\t\t\t\t\t\tegui::Pos2::ZERO,\n+\t\t\t\t\t\t\tegui::vec2(width, 1600.0),\n+\t\t\t\t\t\t)),\n+\t\t\t\t\t\t..Default::default()\n+\t\t\t\t\t},\n+\t\t\t\t\t|ui| {\n+\t\t\t\t\t\tfor (index, message) in messages.iter().enumerate() {\n+\t\t\t\t\t\t\tlet mut surface =\n+\t\t\t\t\t\t\t\tcrate::select::Surface::new(ui, (\"rtl-layout-bench\", index));\n+\t\t\t\t\t\t\tmessage.show_search(\n+\t\t\t\t\t\t\t\tui,\n+\t\t\t\t\t\t\t\t&mut None,\n+\t\t\t\t\t\t\t\t&[],\n+\t\t\t\t\t\t\t\tNone,\n+\t\t\t\t\t\t\t\t&mut profile,\n+\t\t\t\t\t\t\t\t(&[], &mut None, &[], &[]),\n+\t\t\t\t\t\t\t\t(&mut images, true, &mut 0),\n+\t\t\t\t\t\t\t\t&mut surface,\n+\t\t\t\t\t\t\t\t\"\",\n+\t\t\t\t\t\t\t\tcrate::design::MessageCardSurface::Opaque,\n+\t\t\t\t\t\t\t);\n+\t\t\t\t\t\t\tsurface.finish(ui);\n+\t\t\t\t\t\t}\n+\t\t\t\t\t},\n+\t\t\t\t)\n+\t\t\t\t.drop_without_applying_deltas();\n+\t\t\t};\n+\t\t\tfor _ in 0..10 {\n+\t\t\t\tframe();\n+\t\t\t}\n+\t\t\tlet mut samples = Vec::new();\n+\t\t\tfor _ in 0..5 {\n+\t\t\t\tlet start = std::time::Instant::now();\n+\t\t\t\tfor _ in 0..200 {\n+\t\t\t\t\tframe();\n+\t\t\t\t}\n+\t\t\t\tsamples.push(start.elapsed().as_secs_f64() * 1000.0);\n+\t\t\t}\n+\t\t\tprintln!(\n+\t\t\t\t\"RTL_MESSAGE_LAYOUT_BENCH {{\\\"width\\\":{width},\\\"warmup_frames\\\":10,\\\"frames_per_sample\\\":200,\\\"messages_per_frame\\\":5,\\\"samples_ms\\\":{samples:?}}}\"\n+\t\t\t);\n+\t\t}\n+\t}\n }\n"
         },
         "command": [
           "/Users/claw/Code/Serein/target/issue-sweep/rtl/baseline47a-component/ui-component-test-thin",
@@ -452,5 +452,109 @@
     "copy_bytes": 4194304,
     "accounting": "Retained Vec/String capacities, layout/galleys and shared current-pass references are counted; references drop after the pass. Explicit localized preview limit on admission failure; logical stored message/draft/edit source is unchanged."
   },
-  "limitations": "CPU component layout timing excludes parsing/setup, cold layout, GPU frame latency and pointer/clipboard interactions. Native idle CPU/RSS is not affected Arabic layout latency. Small cached-workload differences are not a general speed/memory improvement claim. No live account, service upload, message, call, microphone or camera was used."
+  "limitations": "CPU component layout timing excludes parsing/setup, cold layout, GPU frame latency and pointer/clipboard interactions. Native idle CPU/RSS is not affected Arabic layout latency. Small cached-workload differences are not a general speed/memory improvement claim. No live account, service upload, message, call, microphone or camera was used.",
+  "integration_verification": {
+    "source": "c36b585d8e4868b50194aec90ec202b59238f6f9",
+    "main": "71ebbc1c0393a0ba4f4e6c93ae9b7b0bd3e06d35",
+    "merge_note": "Only performance-doc conflict; both independent sections preserved. Unrelated incoming runtime changes are included. Existing feature measurements retain their original source pins.",
+    "cargo_xtask_check": "passed;383 UI tests/6 ignored,168 desktop tests/6 ignored;workspace tests/fmt/strict Clippy/policy passed",
+    "standard": {
+      "commit": "c36b585d8e4868b50194aec90ec202b59238f6f9",
+      "command": "cargo xtask package",
+      "features": "standard xtask package; voice included; internal --no-default-features omits development data",
+      "executable": 62368128,
+      "installed": 68381714,
+      "compressed": 43429267,
+      "files": 207,
+      "executable_sha256": "9d6e114a321d66e0e96a549986937f14c7fa6dfbb9c0972273db93f0e6ca78ab",
+      "zip_sha256": "6b9a8717a79ec2422b0dbda99def65311bd8a816e5ececce02cfd714d1a5640e",
+      "zip_method": "ditto -c -k --sequesterRsrc full standard-dist contents without enclosing directory"
+    },
+    "build_provenance": {
+      "source": "c36b585d8e4868b50194aec90ec202b59238f6f9",
+      "all_runtime_workspace_crates_fresh": {
+        "model": true,
+        "session-cache": true,
+        "client-core": true,
+        "discord-protocol": true,
+        "discord-api": true,
+        "discord-gateway": true,
+        "discord-voice": true,
+        "extensions": true,
+        "local-store": true,
+        "platform": true,
+        "ui": true,
+        "serein": true
+      },
+      "standard_log_sha256": "589efae8611fae85c7a79acf9a1133f63696f46dec86dfc0991a51a429ba2d97",
+      "workspace_release_prune_sha256": "5b86376814f75212229ffa8449682bb3c9c592890705684e7c1adc77be82a36c",
+      "method": "Fresh current aggregate standard on owned all-ID release-pruned cache; default FAT profile, voice included; strict local ad-hoc signature verification passed. Historic feature measurements remain source-pinned separately."
+    },
+    "rtl_renderer_and_configuration_byte_identical_to_measured73": {
+      "Cargo.toml": "00c3c2a00ea4ce8259fc0619898b17f1801807f160d9691497628a9b14a75648",
+      "Cargo.lock": "de5e1270c42774dbd1ded633e652f6839f6d99be61021a0d02ad76474960d062",
+      "crates/ui/src/rtl.rs": "8aaf608634b3b52ae8d67959daea2089d18db74cb8cf9c8b80f9c4f2ce41170b",
+      "crates/ui/src/markdown.rs": "fa0feab0c03565c0b6f27191275bb3e9819f0e953d2f4f8c4d4ad09f74970a48",
+      "crates/ui/src/select.rs": "1a6ee0142b8cb00089351f9e2283c2d04b1c366eb77571691e655532f3b8373f",
+      "crates/ui/src/select/mapped.rs": "42fe1f89c47c377ecc2c0d81ba145100b3c7d29ba3337c51e39af519d9993f4e",
+      "crates/ui/src/fonts.rs": "617fc1ce680d68d70be9c6afa73e9dc176ecf19cc675681a3b8487622fb08b71"
+    },
+    "scope": "Current main71 versus integrated RTL package comparison, separate from source73 standard and source5eb native/source73 thin component measurements. No additional optimized native/component run is inferred from the integration.",
+    "baseline_standard": {
+      "commit": "71ebbc1c0393a0ba4f4e6c93ae9b7b0bd3e06d35",
+      "command": "cargo xtask package",
+      "features": "standard xtask package; voice included; xtask internally uses --no-default-features",
+      "executable": 62269488,
+      "installed": 68279917,
+      "compressed": 43363423,
+      "files": 206,
+      "executable_sha256": "c6b3b2ac3f9d801cdd81f91ba36a68200e96f072d7fd18e3bb3707a919e50988",
+      "zip_method": "ditto -c -k --sequesterRsrc full standard-dist contents, without enclosing directory"
+    },
+    "baseline_build_provenance": {
+      "source": "71ebbc1c0393a0ba4f4e6c93ae9b7b0bd3e06d35",
+      "source_clean": true,
+      "capture_hooks": false,
+      "all_runtime_crates_fresh": {
+        "model": true,
+        "session-cache": true,
+        "client-core": true,
+        "discord-protocol": true,
+        "discord-api": true,
+        "discord-gateway": true,
+        "discord-voice": true,
+        "extensions": true,
+        "local-store": true,
+        "platform": true,
+        "ui": true,
+        "serein": true
+      },
+      "standard_log_sha256": "9b7bcc132d6e6c19587409b14e6f993da47c8488f5abd380298677898454c1ab",
+      "workspace_cache_prune_sha256": "c376c77f990a1e96ed553b23e34b512e31b6a8313e4205a196b45963ecbeadee",
+      "strict_deep_signature_verification": "passed; local ad-hoc, not notarized",
+      "profile": "Repository default FAT standard package, voice included, xtask internal --no-default-features",
+      "elapsed": [
+        "Finished `release` profile [optimized + debuginfo] target(s) in 12m 32s"
+      ]
+    },
+    "package_deltas_bytes": {
+      "executable": 98640,
+      "installed": 101797,
+      "compressed": 65844
+    },
+    "package_file_comparison": {
+      "baseline_files": 206,
+      "after_files": 207,
+      "added_paths": [
+        "Serein.app/Contents/Resources/licenses/dependencies/epaint-SEREIN-PATCH.md"
+      ],
+      "removed_paths": [],
+      "unchanged_hash_files": 200,
+      "existing_dependency_provenance_changed": [
+        "Serein.app/Contents/Resources/licenses/dependencies/PROVENANCE.md"
+      ],
+      "existing_license_texts_unchanged": true,
+      "notice_note": "PROVENANCE.md gains the intentional epaint minimal-vendor patch/source entry; epaint-SEREIN-PATCH.md is added. Existing license texts remain byte-identical."
+    }
+  }
 }

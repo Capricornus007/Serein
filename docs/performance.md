@@ -3742,3 +3742,25 @@ references / 4 MiB of actual referenced capacities plus a separate 4 MiB copy
 buffer; all references drop after the pass. Oversized or indivisible content
 shows an explicit localized preview limit. Stored message/draft/edit text remains
 logical. No live account, upload, message, call, microphone or camera was used.
+
+
+Current main integration `c36b585d8e4868b50194aec90ec202b59238f6f9` separately
+passes the fresh full check (383 UI / 168 desktop tests plus strict lint and policy)
+and standard package. Exact main `71ebbc1c0393a0ba4f4e6c93ae9b7b0bd3e06d35`
+was built independently with the same default FAT standard command; both builds
+freshly compiled all twelve runtime workspace crates after inspected cache pruning
+and passed deep/strict local signature verification. The RTL renderer, selection,
+font and manifest/lock files remain byte-identical to 73. The historic native and
+component results above keep their source identities; no new native/component
+measurement is implied by this package integration.
+
+| Current standard package | Main 71 | Integrated c36 | Delta |
+| --- | ---: | ---: | ---: |
+| Executable, bytes | 62,269,488 | 62,368,128 | +98,640 / +0.1584% |
+| Installed, bytes | 68,279,917 | 68,381,714 | +101,797 / +0.1491% |
+| ZIP, bytes | 43,363,423 | 43,429,267 | +65,844 / +0.1518% |
+
+The additional regular file is the epaint patch notice (207 versus 206). Existing
+license texts are unchanged; PROVENANCE.md gains the intentional minimal-vendor
+source/patch entry. Raw hashes, source proof and integration size records are
+included separately in the linked measurement JSON.
