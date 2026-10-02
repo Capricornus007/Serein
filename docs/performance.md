@@ -3705,3 +3705,45 @@ unmeasured. No audio device, account, microphone or live media request was used.
 Reproduce after packaging either revision, with the same `CARGO_TARGET_DIR` used
 for that build: `python3 docs/pr-evidence/voice-attachment-playback/benchmark.py`.
 The script also accepts a baseline-worktree path as its first argument.
+
+
+## Separate media output: isolated native verification (October 2, 2026)
+
+Measured source `f6cd7384f0180aba40e18340762b2826163d8247` uses recorded main110 and the
+confirmation-pressure dependency `9cdad91c86139543a370f3658e5f92257a9064fe`. Its
+standard comparator uses `5724cf5be34f17a62ee1b5fc07f2cd2653be3d79`; 9cd changes
+only cfg(test) coverage. These measurements precede later main integration and
+the reliable confirmation-failure watch correction 5ecd; they are historical
+feature evidence, not measurements of the current aggregate head.
+
+On macOS 27.0 (26A428), Apple M1 / 16 GiB, Rust 1.98.1 and locked dependencies,
+the feature passed the full workspace check (173 desktop/352 UI),
+strict lint/format/policy and the standard voice-inclusive package. All 12
+runtime workspace crates were freshly compiled after all-worktree-ID release
+invalidation. The optimized default-plus-demo build immediately followed the
+same unchanged source, with normal FAT-LTO, jobs 2 and no capture hooks.
+Both packages retain 206 paths, 203 unchanged hashes and 199 unchanged notices.
+
+| Metric / method | Baseline | Feature | Delta |
+| --- | ---: | ---: | ---: |
+| Standard executable | 62,154,064 B | 62,186,960 B | +32,896 B /+0.0529% |
+| Installed package | 68,164,493 B | 68,197,389 B | +32,896 B /+0.0483% |
+| Distribution ZIP | 43,321,986 B | 43,334,962 B | +12,976 B /+0.0300% |
+| Idle median process CPU | 0.0 % | 0.0 % | +0.0 % |
+| Peak process RSS | 123,696 KiB | 124,480 KiB | +784 KiB /+0.6338% |
+| Settled process RSS | 123,648 KiB | 124,432 KiB | +784 KiB /+0.6341% |
+
+Native Metal at 2× scale used the same `--demo --demo-chat` workload, 5-second
+warmup and ten 1-second `ps` CPU/RSS samples per revision. Settled RSS is the
+median of the final five. All other agent compilers, native apps and heavy IO
+were held. Both apps stopped with SIGINT. Idle CPU quantization and small RSS
+differences are noise; no improvement is claimed. GPU memory, frame/startup
+latency, physical device routing/capture and normal-account compatibility are
+unmeasured. No account, microphone or output device was used.
+
+Wide and narrow native voice-settings screenshots were inspected; temporary
+capture hooks were removed byte-exactly. These demonstrate layout only; offline
+controls are disabled. Pure reducer trees and configuration are unchanged, so
+no new reducer benchmark was warranted. Actual samples, source/blob proofs,
+image/binary hashes and resource bounds are preserved in
+[`separate-media-output/measurements.json`](pr-evidence/separate-media-output/measurements.json).
