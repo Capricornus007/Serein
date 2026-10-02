@@ -1,6 +1,9 @@
 //! Native poll cards and a bounded creation dialog.
 use crate::{
-	design,
+	avatars::Avatars,
+	design, dialog,
+	emoji_picker::Picker,
+	i18n::{translate, translate_args},
 	icons::{self, Icon},
 };
 use client_core::{
@@ -9,8 +12,8 @@ use client_core::{
 };
 use egui::{RichText, Stroke};
 use model::{
-	Id, Message,
-	polls::{Create, Media},
+	Id, Message, ReactionEmoji,
+	polls::{Create, MAX_ANSWERS, Media},
 };
 
 #[derive(Default)]
@@ -18,7 +21,13 @@ pub struct Cards {
 	selection: Option<(Id, Id, Vec<u32>, bool)>,
 }
 impl Cards {
-	pub fn show(&mut self, ui: &mut egui::Ui, state: &State, message: &Message) -> Option<Action> {
+	pub fn show(
+		&mut self,
+		ui: &mut egui::Ui,
+		state: &State,
+		message: &Message,
+		avatars: &mut Avatars,
+	) -> Option<Action> {
 		let poll = message.poll.as_ref()?;
 		let colors = crate::design::palette(ui);
 		let ended = poll.ended(now_ms());
@@ -47,13 +56,13 @@ impl Cards {
 					crate::design::semibold(ui, &poll.question, 18.0).color(colors.text_strong),
 				);
 				ui.label(
-					RichText::new(if ended {
-						"Poll ended"
+					RichText::new(translate(if ended {
+						"polls-card-ended"
 					} else if poll.multiselect {
-						"Select one or more answers"
+						"polls-card-select-many"
 					} else {
-						"Select one answer"
-					})
+						"polls-card-select-one"
+					}))
 					.small()
 					.color(colors.muted),
 				);
@@ -65,9 +74,21 @@ impl Cards {
 					} else {
 						selected.contains(&answer.id)
 					};
+					let emoji =
+						answer.media.emoji.as_ref().and_then(|emoji| {
+							emoji_image(ui.ctx(), avatars, emoji, 24.0, state.demo)
+						});
 					let response = ui
 						.add_enabled_ui(results || enabled, |ui| {
-							answer_row(ui, answer, checked, results, poll.results_known, total)
+							answer_row(
+								ui,
+								answer,
+								emoji,
+								checked,
+								results,
+								poll.results_known,
+								total,
+							)
 						})
 						.inner;
 					if response.clicked() {
@@ -85,26 +106,33 @@ impl Cards {
 				ui.add_space(8.0);
 				let remaining = poll.expiry.map(|e| (e - now_ms()).max(0) / 60000);
 				let footer = if ended {
-					if poll.finalized {
-						"Final results".to_owned()
+					translate(if poll.finalized {
+						"polls-card-final-results"
 					} else {
-						"Awaiting final results".to_owned()
-					}
+						"polls-card-awaiting-results"
+					})
 				} else {
-					remaining
-						.map(|m| {
+					remaining.map_or_else(
+						|| translate("polls-card-in-progress"),
+						|m| {
 							if m >= 60 {
-								format!("{}h left", (m + 59) / 60)
+								translate_args(
+									"polls-card-hours-left",
+									&[("hours", &((m + 59) / 60).to_string())],
+								)
 							} else {
-								format!("{m}m left")
+								translate_args(
+									"polls-card-minutes-left",
+									&[("minutes", &m.to_string())],
+								)
 							}
-						})
-						.unwrap_or_else(|| "In progress".into())
+						},
+					)
 				};
 				let footer = if poll.results_known {
 					format!("{} • {footer}", vote_label(poll.votes()))
 				} else {
-					format!("Results not loaded • {footer}")
+					format!("{} • {footer}", translate("polls-card-results-not-loaded"))
 				};
 				ui.horizontal_wrapped(|ui| {
 					ui.spacing_mut().item_spacing.x = 12.0;
@@ -125,11 +153,11 @@ impl Cards {
 						ui.end_row();
 					}
 					let read_label = if *preview && !voted && !ended {
-						"Back to voting"
+						"polls-card-back-to-voting"
 					} else if results {
-						"Refresh results"
+						"polls-card-refresh-results"
 					} else {
-						"Show results"
+						"polls-card-show-results"
 					};
 					if ui
 						.add_enabled_ui(state.polls.pending.is_none(), |ui| {
@@ -150,7 +178,11 @@ impl Cards {
 					if voted && !ended {
 						if ui
 							.add_enabled_ui(enabled, |ui| {
-								design::button(ui, "Remove Vote", design::ButtonKind::Outline)
+								design::button(
+									ui,
+									"polls-card-remove-vote",
+									design::ButtonKind::Outline,
+								)
 							})
 							.inner
 							.clicked()
@@ -163,7 +195,7 @@ impl Cards {
 					} else if !ended
 						&& !results && ui
 						.add_enabled_ui(enabled && !selected.is_empty(), |ui| {
-							design::button(ui, "Vote", design::ButtonKind::Primary)
+							design::button(ui, "polls-card-vote", design::ButtonKind::Primary)
 						})
 						.inner
 						.clicked()
@@ -177,9 +209,12 @@ impl Cards {
 							.is_some_and(|u| u.id == message.author.id)
 					{
 						ui.menu_button(icons::atom(Icon::More, 16.0, colors.muted), |ui| {
-							ui.label("End this poll for everyone?");
+							ui.label(translate("polls-card-end-confirm"));
 							if ui
-								.add_enabled(enabled, egui::Button::new("End now"))
+								.add_enabled(
+									enabled,
+									egui::Button::new(translate("polls-card-end-now")),
+								)
 								.clicked()
 							{
 								action = Some(Action::End);
@@ -187,7 +222,7 @@ impl Cards {
 							}
 						})
 						.response
-						.on_hover_text("End Poll");
+						.on_hover_text(translate("polls-card-end-poll"));
 					}
 				});
 				if let Some(error) = state.polls.error {
@@ -202,12 +237,34 @@ impl Cards {
 }
 
 fn vote_label(votes: u64) -> String {
-	format!("{votes} {}", if votes == 1 { "vote" } else { "votes" })
+	translate_args(
+		if votes == 1 {
+			"polls-card-vote-count-one"
+		} else {
+			"polls-card-vote-count-many"
+		},
+		&[("count", &votes.to_string())],
+	)
+}
+
+/// Bundled Twemoji artwork for Unicode emoji, the bounded image cache for custom ones.
+fn emoji_image(
+	ctx: &egui::Context,
+	avatars: &mut Avatars,
+	emoji: &ReactionEmoji,
+	size: f32,
+	demo: bool,
+) -> Option<egui::Image<'static>> {
+	match emoji.id {
+		Some(id) => avatars.custom_image(ctx, id, size, demo),
+		None => crate::emoji::image(ctx, emoji.name.as_deref()?, size),
+	}
 }
 
 fn answer_row(
 	ui: &mut egui::Ui,
 	answer: &model::polls::Answer,
+	emoji_image: Option<egui::Image<'static>>,
 	checked: bool,
 	results: bool,
 	known: bool,
@@ -223,13 +280,6 @@ fn answer_row(
 		|| answer.media.text.clone(),
 		|emoji| format!("{} {}", emoji.label(), answer.media.text),
 	);
-	let emoji_image = answer
-		.media
-		.emoji
-		.as_ref()
-		.filter(|emoji| emoji.id.is_none())
-		.and_then(|emoji| emoji.name.as_deref())
-		.and_then(|name| crate::emoji::image(ui.ctx(), name, 24.0));
 	let emoji_width = if emoji_image.is_some() { 32.0 } else { 0.0 };
 	let width = ui.available_width();
 	let show_tally = results && known;
@@ -401,16 +451,33 @@ fn answer_row(
 	response
 }
 
+/// Durations Discord's poll creator offers, in hours.
+const DURATIONS: [u16; 6] = [1, 4, 8, 24, 72, 168];
+/// Height shared by the answer fields and the "add another answer" row.
+const FIELD: f32 = 40.0;
+/// Width the trailing remove-answer control and its gap reserve beside each field.
+const REMOVE: f32 = 40.0;
+
+struct Draft {
+	channel: Id,
+	poll: Create,
+	created: u64,
+	posting: bool,
+	/// Answer whose emoji the picker is choosing.
+	picking: Option<usize>,
+}
+
 #[derive(Default)]
 pub struct Creator {
-	draft: Option<(Id, Create, u64, bool)>,
+	draft: Option<Draft>,
+	picker: Picker,
 }
 impl Creator {
 	pub fn open(&mut self, state: &State, channel: Id) {
 		if self.draft.is_none() {
-			self.draft = Some((
+			self.draft = Some(Draft {
 				channel,
-				Create {
+				poll: Create {
 					question: String::new(),
 					answers: vec![
 						Media {
@@ -422,241 +489,351 @@ impl Creator {
 					duration: 24,
 					multiselect: false,
 				},
-				state.polls.created,
-				false,
-			));
+				created: state.polls.created,
+				posting: false,
+				picking: None,
+			});
 		}
 	}
-	pub fn show(&mut self, ctx: &egui::Context, state: &State) -> Option<Action> {
-		let (channel, draft, created, posting) = self.draft.as_mut()?;
-		if state.selected != Some(*channel) || state.polls.created != *created {
-			self.draft = None;
+	pub fn show(
+		&mut self,
+		ctx: &egui::Context,
+		state: &mut State,
+		avatars: &mut Avatars,
+	) -> Option<Action> {
+		let Self {
+			draft: slot,
+			picker,
+		} = self;
+		let draft = slot.as_mut()?;
+		if state.selected != Some(draft.channel) || state.polls.created != draft.created {
+			*slot = None;
+			picker.dismiss(state, &mut Vec::new());
 			return None;
 		}
-		if *posting && state.polls.pending.is_none() {
-			*posting = false;
+		if draft.posting && state.polls.pending.is_none() {
+			draft.posting = false;
 		}
+		let posting = draft.posting;
+		let narrow = ctx.content_rect().width() < 380.0;
 		let mut action = None;
-		let mut close = false;
-		let modal = egui::Modal::new(egui::Id::unique("poll-create"))
-			.frame(
-				egui::Frame::new()
-					.fill(ctx.global_style().visuals.window_fill)
-					.corner_radius(8),
-			)
-			.show(ctx, |ui| {
-				let p = design::palette(ui);
-				let width = 480.0_f32.min((ctx.content_rect().width() - 48.0).max(160.0));
-				ui.set_width(width);
-				ui.spacing_mut().item_spacing.y = 0.0;
-				egui::Frame::new().inner_margin(20).show(ui, |ui| {
-					ui.set_width(width - 40.0);
-					ui.horizontal(|ui| {
-						let title_width = (ui.available_width() - 36.0).max(40.0);
-						ui.allocate_ui(egui::vec2(title_width, 28.0), |ui| {
-							ui.set_width(title_width);
-							ui.add(
-								egui::Label::new(
-									design::semibold(ui, "Create a Poll", 20.0)
-										.color(p.text_strong),
-								)
-								.wrap(),
-							);
-						});
-						if ui
-							.add_enabled_ui(!*posting, |ui| {
-								icons::button(ui, Icon::Close, 28.0, "Close poll editor")
-							})
-							.inner
-							.clicked()
-						{
-							close = true;
-						}
-					});
-					ui.add_space(20.0);
-					egui::ScrollArea::vertical()
-						.max_height(
-							(ctx.content_rect().height()
-								- if width < 340.0 { 260.0 } else { 200.0 })
-							.max(60.0),
-						)
-						.show(ui, |ui| {
-							ui.spacing_mut().item_spacing.y = 8.0;
-							ui.add_enabled_ui(!*posting, |ui| {
-								ui.label(design::eyebrow(ui, "QUESTION", p.text));
-								ui.add(
-									egui::TextEdit::multiline(&mut draft.question)
-										.hint_text("What would you like to ask?")
-										.char_limit(300)
-										.desired_rows(1)
-										.desired_width(f32::INFINITY)
-										.background_color(p.base)
-										.margin(12),
-								);
-								ui.add_space(12.0);
-								ui.label(design::eyebrow(ui, "ANSWERS", p.text));
-								let mut remove = None;
-								let count = draft.answers.len();
-								for (i, answer) in draft.answers.iter_mut().enumerate() {
-									ui.push_id(i, |ui| {
-										ui.horizontal(|ui| {
-											ui.spacing_mut().item_spacing.x = 8.0;
-											let field_width =
-												(ui.available_width() - 36.0).max(80.0);
-											egui::Frame::new()
-												.fill(p.base)
-												.corner_radius(4)
-												.inner_margin(10)
-												.show(ui, |ui| {
-													ui.set_width(field_width - 20.0);
-													ui.horizontal(|ui| {
-														let mut emoji = answer
-															.emoji
-															.as_ref()
-															.and_then(|e| e.name.clone())
-															.unwrap_or_default();
-														if ui
-															.add(
-																egui::TextEdit::singleline(
-																	&mut emoji,
-																)
-																.hint_text("☺")
-																.char_limit(32)
-																.desired_width(28.0)
-																.frame(egui::Frame::NONE),
-															)
-															.on_hover_text("Optional Unicode emoji")
-															.changed()
-														{
-															answer.emoji = (!emoji
-																.trim()
-																.is_empty())
-															.then_some(model::ReactionEmoji {
-																id: None,
-																name: Some(emoji),
-															});
-														}
-														ui.add(
-															egui::TextEdit::singleline(
-																&mut answer.text,
-															)
-															.hint_text(format!("Answer {}", i + 1))
-															.char_limit(55)
-															.desired_width(ui.available_width())
-															.frame(egui::Frame::NONE),
-														);
-													});
-												});
-											if ui
-												.add_enabled_ui(count > 2, |ui| {
-													icons::button(
-														ui,
-														Icon::Trash,
-														28.0,
-														"Remove answer",
-													)
-												})
-												.inner
-												.clicked()
-											{
-												remove = Some(i);
-											}
-										});
-									});
-								}
-								if let Some(i) = remove {
-									draft.answers.remove(i);
-								}
-								if ui
-									.add_enabled(
-										draft.answers.len() < 10,
-										egui::Button::new(
-											RichText::new("+ Add another answer").color(p.muted),
-										)
-										.fill(p.chat)
-										.corner_radius(4)
-										.min_size(egui::vec2(ui.available_width() - 36.0, 40.0)),
-									)
-									.clicked()
-								{
-									draft.answers.push(Media {
-										text: String::new(),
-										emoji: None,
-									});
-								}
-								ui.add_space(12.0);
-								ui.horizontal(|ui| {
-									ui.label(RichText::new("Duration").color(p.text));
-									egui::ComboBox::from_id_salt("poll-duration")
-										.width(140.0_f32.min(ui.available_width()))
-										.selected_text(duration_label(draft.duration))
-										.show_ui(ui, |ui| {
-											for hours in [1, 4, 8, 24, 72, 168] {
-												ui.selectable_value(
-													&mut draft.duration,
-													hours,
-													duration_label(hours),
-												);
-											}
-										});
-								});
-							});
-						});
-					if let Some(error) = state.polls.error {
-						ui.add_space(8.0);
-						ui.colored_label(p.danger, error);
-					}
+		let response = dialog::Dialog::new("poll-create", translate("polls-creator-title"))
+			.width(480.0)
+			.show(ctx, |body| {
+				body.scroll(if narrow { 250.0 } else { 210.0 }, |ui| {
+					ui.add_enabled_ui(!posting, |ui| editor(ui, state, avatars, picker, draft));
 				});
-				egui::Frame::new()
-					.fill(p.sidebar)
-					.inner_margin(16)
-					.show(ui, |ui| {
-						ui.set_width(width - 32.0);
-						ui.spacing_mut().item_spacing.x = 12.0;
-						// Stack the footer at narrow widths so both controls stay reachable.
-						if width < 340.0 {
-							multiple_answers(ui, &mut draft.multiselect, !*posting);
-							ui.add_space(8.0);
-						}
-						ui.horizontal(|ui| {
-							if width >= 340.0 {
-								multiple_answers(ui, &mut draft.multiselect, !*posting);
-							}
-
-							ui.with_layout(
-								egui::Layout::right_to_left(egui::Align::Center),
-								|ui| {
-									if ui
-										.add_enabled_ui(
-											!*posting
-												&& draft.valid() && state.can_create_poll(*channel),
-											|ui| {
-												design::button(
-													ui,
-													if *posting { "Posting…" } else { "Post" },
-													design::ButtonKind::Primary,
-												)
-											},
-										)
-										.inner
-										.clicked()
-									{
-										action = Some(Action::Create(Box::new(draft.clone())));
-										*posting = true;
-									}
-								},
-							);
-						});
+				if let Some(error) = state.polls.error {
+					body.content(|ui| {
+						ui.add_space(8.0);
+						design::notice(ui, design::Level::Error, error);
 					});
+				}
+				body.footer(|ui| {
+					let ready =
+						!posting && draft.poll.valid() && state.can_create_poll(draft.channel);
+					if ui
+						.add_enabled_ui(ready, |ui| {
+							design::button(
+								ui,
+								if posting {
+									"polls-creator-posting"
+								} else {
+									"polls-creator-post"
+								},
+								design::ButtonKind::Primary,
+							)
+						})
+						.inner
+						.clicked()
+					{
+						action = Some(Action::Create(Box::new(draft.poll.clone())));
+						draft.posting = true;
+					}
+					// The checkbox takes the rest of the strip from the left edge and wraps
+					// rather than pushing the Post button out of narrow dialogs.
+					ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+						multiple_answers(ui, &mut draft.poll.multiselect, !posting);
+					});
+				});
 			});
-		close |= !*posting && modal.should_close();
-
-		if close {
-			self.draft = None;
+		if response.close && !posting {
+			*slot = None;
+			picker.dismiss(state, &mut Vec::new());
 		}
 		action
 	}
 }
+
+/// Question, answer rows and duration, laid out like Discord's poll creator.
+fn editor(
+	ui: &mut egui::Ui,
+	state: &mut State,
+	avatars: &mut Avatars,
+	picker: &mut Picker,
+	draft: &mut Draft,
+) {
+	ui.spacing_mut().item_spacing.y = 8.0;
+	design::label(ui, "polls-creator-question");
+	design::input(
+		ui,
+		egui::TextEdit::multiline(&mut draft.poll.question)
+			.hint_text(translate("polls-creator-question-hint"))
+			.char_limit(300)
+			.desired_rows(1),
+	);
+	ui.add_space(12.0);
+	design::label(ui, "polls-creator-answers");
+	if draft.picking.is_some() && !picker.choosing() {
+		draft.picking = None;
+	}
+	let removable = draft.poll.answers.len() > 2;
+	let mut remove = None;
+	let mut trigger = None;
+	for (index, answer) in draft.poll.answers.iter_mut().enumerate() {
+		let open = draft.picking == Some(index);
+		let row = ui
+			.push_id(index, |ui| {
+				answer_field(ui, answer, index, removable, open, (avatars, state.demo))
+			})
+			.inner;
+		if row.emoji.clicked() {
+			if open {
+				picker.dismiss(state, &mut Vec::new());
+				draft.picking = None;
+			} else {
+				picker.open_choice(state, draft.channel, &row.emoji, answer.emoji.is_some());
+				draft.picking = Some(index);
+			}
+		}
+		if draft.picking == Some(index) {
+			trigger = Some(row.emoji);
+		}
+		if row.remove.clicked() {
+			remove = Some(index);
+		}
+	}
+	if let Some(index) = remove {
+		draft.poll.answers.remove(index);
+		if draft.picking.take().is_some() {
+			picker.dismiss(state, &mut Vec::new());
+		}
+		trigger = None;
+	}
+	if draft.poll.answers.len() < MAX_ANSWERS
+		&& add_answer(ui, (ui.available_width() - REMOVE).max(80.0)).clicked()
+	{
+		draft.poll.answers.push(Media {
+			text: String::new(),
+			emoji: None,
+		});
+	}
+	ui.add_space(12.0);
+	design::label(ui, "polls-creator-duration");
+	duration_select(ui, &mut draft.poll.duration);
+	if let (Some(index), Some(trigger)) = (draft.picking, trigger) {
+		if let Some(choice) = picker.show_choice(ui, state, draft.channel, avatars, &trigger)
+			&& let Some(answer) = draft.poll.answers.get_mut(index)
+		{
+			answer.emoji =
+				choice.filter(|emoji| emoji.valid() && emoji.id.is_none_or(|id| id.0 != 0));
+		}
+		if !picker.choosing() {
+			draft.picking = None;
+		}
+	}
+}
+
+struct AnswerRow {
+	emoji: egui::Response,
+	remove: egui::Response,
+}
+
+/// One answer input: the emoji button sits inside the field, the remove control beside it.
+fn answer_field(
+	ui: &mut egui::Ui,
+	answer: &mut Media,
+	index: usize,
+	removable: bool,
+	open: bool,
+	(avatars, demo): (&mut Avatars, bool),
+) -> AnswerRow {
+	let p = design::palette(ui);
+	ui.horizontal(|ui| {
+		ui.spacing_mut().item_spacing.x = 8.0;
+		let width = (ui.available_width() - REMOVE).max(80.0);
+		let field = egui::Frame::new()
+			.fill(p.base)
+			.corner_radius(8)
+			.inner_margin(egui::Margin {
+				left: 4,
+				right: 12,
+				top: 4,
+				bottom: 4,
+			})
+			.show(ui, |ui| {
+				ui.set_width(width - 16.0);
+				ui.horizontal(|ui| {
+					ui.spacing_mut().item_spacing.x = 6.0;
+					let emoji = emoji_button(ui, answer.emoji.as_ref(), open, avatars, demo);
+					let text = ui.add(
+						egui::TextEdit::singleline(&mut answer.text)
+							.hint_text(translate_args(
+								"polls-creator-answer-hint",
+								&[("number", &(index + 1).to_string())],
+							))
+							.char_limit(55)
+							.desired_width(ui.available_width())
+							.frame(egui::Frame::NONE),
+					);
+					(emoji, text)
+				})
+				.inner
+			});
+		let (emoji, text) = field.inner;
+		let stroke = if text.has_focus() {
+			Stroke::new(2.0, p.accent)
+		} else {
+			Stroke::new(1.0, p.border)
+		};
+		ui.painter()
+			.rect_stroke(field.response.rect, 8, stroke, egui::StrokeKind::Inside);
+		let remove = ui
+			.add_enabled_ui(removable, |ui| {
+				icons::button(ui, Icon::Trash, 32.0, "polls-creator-remove-answer")
+			})
+			.inner;
+		AnswerRow { emoji, remove }
+	})
+	.inner
+}
+
+/// The answer's Twemoji (or custom emoji) artwork, or a smiley inviting one.
+fn emoji_button(
+	ui: &mut egui::Ui,
+	emoji: Option<&ReactionEmoji>,
+	open: bool,
+	avatars: &mut Avatars,
+	demo: bool,
+) -> egui::Response {
+	let p = design::palette(ui);
+	let label = translate(if emoji.is_some() {
+		"polls-creator-change-emoji"
+	} else {
+		"polls-creator-add-emoji"
+	});
+	let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(32.0), egui::Sense::click());
+	response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), &label));
+	let hot = ui.is_enabled() && (response.hovered() || response.has_focus());
+	if hot || open {
+		ui.painter().rect_filled(rect, 6, p.hover);
+	}
+	let art = egui::Rect::from_center_size(rect.center(), egui::Vec2::splat(22.0));
+	match emoji {
+		Some(emoji) => match emoji_image(ui.ctx(), avatars, emoji, 22.0, demo) {
+			Some(image) => image.paint_at(ui, art),
+			// Outside the bundled set: the raw glyph keeps the choice visible.
+			None if emoji.id.is_none() => {
+				ui.painter().text(
+					rect.center(),
+					egui::Align2::CENTER_CENTER,
+					emoji.label(),
+					egui::FontId::proportional(18.0),
+					p.text_strong,
+				);
+			}
+			// Custom artwork still loading.
+			None => {}
+		},
+		None => icons::paint(
+			ui.painter(),
+			Icon::Smile,
+			art,
+			if hot || open { p.text_strong } else { p.muted },
+		),
+	}
+	response.on_hover_text(label)
+}
+
+/// Row under the answers, as wide as an answer field, that appends an empty answer.
+fn add_answer(ui: &mut egui::Ui, width: f32) -> egui::Response {
+	let p = design::palette(ui);
+	let label = translate("polls-creator-add-answer");
+	let (rect, response) = ui.allocate_exact_size(egui::vec2(width, FIELD), egui::Sense::click());
+	response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), &label));
+	let hot = ui.is_enabled() && (response.hovered() || response.has_focus());
+	let color = if hot { p.text_strong } else { p.muted };
+	let painter = ui.painter();
+	painter.rect(
+		rect,
+		8,
+		if hot {
+			p.hover
+		} else {
+			egui::Color32::TRANSPARENT
+		},
+		if response.has_focus() {
+			Stroke::new(2.0, p.accent)
+		} else {
+			Stroke::new(1.0, p.border)
+		},
+		egui::StrokeKind::Inside,
+	);
+	// Centred where the emoji button sits inside an answer field, so the glyphs line up.
+	icons::paint(
+		painter,
+		Icon::Plus,
+		egui::Rect::from_center_size(
+			egui::pos2(rect.left() + 20.0, rect.center().y),
+			egui::Vec2::splat(18.0),
+		),
+		color,
+	);
+	let mut job = egui::text::LayoutJob::simple_singleline(
+		label,
+		egui::FontId::new(14.0, design::medium_family(ui.ctx())),
+		color,
+	);
+	job.wrap = egui::text::TextWrapping::truncate_at_width((rect.width() - 52.0).max(8.0));
+	let galley = painter.layout_job(job);
+	painter.galley(
+		egui::pos2(rect.left() + 42.0, rect.center().y - galley.size().y * 0.5),
+		galley,
+		color,
+	);
+	response
+}
+
+/// Duration dropdown styled like the dialog's text inputs.
+fn duration_select(ui: &mut egui::Ui, duration: &mut u16) {
+	let p = design::palette(ui);
+	ui.scope(|ui| {
+		ui.spacing_mut().button_padding = egui::vec2(12.0, 9.0);
+		ui.spacing_mut().interact_size.y = 38.0;
+		let widgets = &mut ui.visuals_mut().widgets;
+		for (widget, stroke) in [
+			(&mut widgets.inactive, Stroke::new(1.0, p.border)),
+			(&mut widgets.hovered, Stroke::new(1.0, p.muted)),
+			(&mut widgets.active, Stroke::new(2.0, p.accent)),
+			(&mut widgets.open, Stroke::new(2.0, p.accent)),
+		] {
+			widget.weak_bg_fill = p.base;
+			widget.bg_fill = p.base;
+			widget.bg_stroke = stroke;
+			widget.corner_radius = 8.into();
+			widget.expansion = 0.0;
+		}
+		egui::ComboBox::from_id_salt("poll-duration")
+			.width(ui.available_width().min(220.0))
+			.selected_text(RichText::new(duration_label(*duration)).color(p.text_strong))
+			.show_ui(ui, |ui| {
+				for hours in DURATIONS {
+					ui.selectable_value(duration, hours, duration_label(hours));
+				}
+			});
+	});
+}
+
 fn multiple_answers(ui: &mut egui::Ui, checked: &mut bool, enabled: bool) {
 	let p = design::palette(ui);
 	ui.scope(|ui| {
@@ -679,18 +856,23 @@ fn multiple_answers(ui: &mut egui::Ui, checked: &mut bool, enabled: bool) {
 		}
 		ui.add_enabled(
 			enabled,
-			egui::Checkbox::new(checked, RichText::new("Allow Multiple Answers").size(14.0)),
+			egui::Checkbox::new(
+				checked,
+				RichText::new(translate("polls-creator-multiple-answers")).size(14.0),
+			),
 		);
 	});
 }
 
 fn duration_label(hours: u16) -> String {
 	match hours {
-		1 => "1 hour".into(),
-		24 => "24 hours".into(),
-		168 => "1 week".into(),
-		72 => "3 days".into(),
-		_ => format!("{hours} hours"),
+		1 => translate("polls-duration-1-hour"),
+		4 => translate("polls-duration-4-hours"),
+		8 => translate("polls-duration-8-hours"),
+		24 => translate("polls-duration-24-hours"),
+		72 => translate("polls-duration-3-days"),
+		168 => translate("polls-duration-1-week"),
+		_ => translate_args("polls-duration-hours", &[("hours", &hours.to_string())]),
 	}
 }
 
@@ -750,8 +932,9 @@ pub fn debug_poll_check(state: &State) {
 				}
 				ui.set_width(width - 16.0);
 				let mut cards = Cards::default();
+				let mut avatars = Avatars::default();
 				for message in state.timeline.iter() {
-					cards.show(ui, state, message);
+					cards.show(ui, state, message, &mut avatars);
 				}
 				assert!(
 					ui.min_rect().width() <= width,

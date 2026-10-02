@@ -1,4 +1,5 @@
 use super::*;
+use crate::avatars::Avatars;
 use egui::{Pos2, Rect, Vec2};
 
 fn fixture() -> (State, Message) {
@@ -32,6 +33,7 @@ fn fixture() -> (State, Message) {
 }
 
 fn context(light: bool) -> egui::Context {
+	crate::i18n::set_current(crate::i18n::Language::English);
 	let ctx = egui::Context::default();
 	design::apply(&ctx);
 	ctx.set_visuals(if light {
@@ -98,7 +100,7 @@ fn card_frame(
 	let output = ctx.run_ui(input(Vec2::new(width, 3000.0), events), |ui| {
 		ui.set_width(width - 16.0);
 		let mut surface = crate::select::Surface::new(ui, "poll-row");
-		let shown = ui.scope(|ui| cards.show(ui, state, message));
+		let shown = ui.scope(|ui| cards.show(ui, state, message, &mut Avatars::default()));
 		surface.exclude(shown.response.rect);
 		action = shown.inner;
 		bounds = ui.min_rect();
@@ -111,6 +113,28 @@ fn card_frame(
 	}
 	output.drop_without_applying_deltas();
 	(action, bounds, text)
+}
+
+fn artwork_bounds(shape: &egui::Shape, texture: egui::TextureId, output: &mut Vec<Rect>) {
+	match shape {
+		egui::Shape::Rect(rect)
+			if rect
+				.brush
+				.as_ref()
+				.is_some_and(|brush| brush.fill_texture_id == texture) =>
+		{
+			output.push(rect.rect)
+		}
+		egui::Shape::Mesh(mesh) if mesh.texture_id == texture => {
+			output.push(shape.visual_bounding_rect())
+		}
+		egui::Shape::Vec(shapes) => {
+			for shape in shapes {
+				artwork_bounds(shape, texture, output);
+			}
+		}
+		_ => {}
+	}
 }
 
 fn position(text: &[(String, Rect)], target: &str) -> Pos2 {
@@ -274,7 +298,7 @@ fn answer_rows_accept_keyboard_activation_and_results_are_read_only() {
 	let answer = &message.poll.as_ref().unwrap().answers[0];
 	let ctx = context(false);
 	ctx.run_ui(input(Vec2::new(300.0, 200.0), vec![]), |ui| {
-		answer_row(ui, answer, false, false, true, 0).request_focus();
+		answer_row(ui, answer, None, false, false, true, 0).request_focus();
 	})
 	.drop_without_applying_deltas();
 	let enter = || {
@@ -287,11 +311,11 @@ fn answer_rows_accept_keyboard_activation_and_results_are_read_only() {
 		}]
 	};
 	ctx.run_ui(input(Vec2::new(300.0, 200.0), enter()), |ui| {
-		assert!(answer_row(ui, answer, false, false, true, 0).clicked());
+		assert!(answer_row(ui, answer, None, false, false, true, 0).clicked());
 	})
 	.drop_without_applying_deltas();
 	ctx.run_ui(input(Vec2::new(300.0, 200.0), enter()), |ui| {
-		assert!(!answer_row(ui, answer, false, true, true, 0).clicked());
+		assert!(!answer_row(ui, answer, None, false, true, true, 0).clicked());
 	})
 	.drop_without_applying_deltas();
 }
@@ -311,29 +335,15 @@ fn bundled_emoji_artwork_fits_wrapped_answer_rows() {
 	let mut row = Rect::NOTHING;
 	let output = ctx.run_ui(input(Vec2::new(260.0, 900.0), vec![]), |ui| {
 		ui.set_width(220.0);
-		row = answer_row(ui, &answer, true, true, true, 0).rect;
+		let image = emoji_image(
+			ui.ctx(),
+			&mut Avatars::default(),
+			answer.media.emoji.as_ref().unwrap(),
+			24.0,
+			true,
+		);
+		row = answer_row(ui, &answer, image, true, true, true, 0).rect;
 	});
-	fn artwork_bounds(shape: &egui::Shape, texture: egui::TextureId, output: &mut Vec<Rect>) {
-		match shape {
-			egui::Shape::Rect(rect)
-				if rect
-					.brush
-					.as_ref()
-					.is_some_and(|brush| brush.fill_texture_id == texture) =>
-			{
-				output.push(rect.rect)
-			}
-			egui::Shape::Mesh(mesh) if mesh.texture_id == texture => {
-				output.push(shape.visual_bounding_rect())
-			}
-			egui::Shape::Vec(shapes) => {
-				for shape in shapes {
-					artwork_bounds(shape, texture, output);
-				}
-			}
-			_ => {}
-		}
-	}
 	let mut artwork = Vec::new();
 	for shape in &output.shapes {
 		artwork_bounds(
@@ -361,7 +371,7 @@ fn maximum_creator_draft_fits_short_narrow_windows_and_closes_on_navigation() {
 			let ctx = context(light);
 			let mut creator = Creator::default();
 			creator.open(&state, state.selected.unwrap());
-			let draft = &mut creator.draft.as_mut().unwrap().1;
+			let draft = &mut creator.draft.as_mut().unwrap().poll;
 			draft.question = "Question ".repeat(33);
 			draft.answers = vec![
 				Media {
@@ -375,11 +385,20 @@ fn maximum_creator_draft_fits_short_narrow_windows_and_closes_on_navigation() {
 			];
 			assert!(draft.valid());
 			// Modal areas settle their position after their first sizing frame.
+			let mut text = Vec::new();
 			for _ in 0..3 {
-				ctx.run_ui(input(size, vec![]), |ui| {
-					assert!(creator.show(ui.ctx(), &state).is_none());
-				})
-				.drop_without_applying_deltas();
+				let output = ctx.run_ui(input(size, vec![]), |ui| {
+					assert!(
+						creator
+							.show(ui.ctx(), &mut state, &mut Avatars::default())
+							.is_none()
+					);
+				});
+				text.clear();
+				for shape in &output.shapes {
+					labels(&shape.shape, shape.clip_rect, &mut text);
+				}
+				output.drop_without_applying_deltas();
 			}
 			let rect = ctx
 				.memory(|memory| memory.area_rect(egui::Id::unique("poll-create")))
@@ -391,6 +410,17 @@ fn maximum_creator_draft_fits_short_narrow_windows_and_closes_on_navigation() {
 					&& rect.bottom() <= size.y + 1.0,
 				"creator exceeds {size:?}: {rect:?}"
 			);
+			// The footer keeps both controls inside the dialog, even when the checkbox wraps.
+			for label in ["Post", "Allow Multiple Answers"] {
+				let (_, bounds) = text
+					.iter()
+					.find(|(text, _)| text == label)
+					.unwrap_or_else(|| panic!("missing footer label {label}"));
+				assert!(
+					rect.expand(1.0).contains_rect(*bounds),
+					"{label} leaves the creator at {size:?}: {bounds:?}, {rect:?}"
+				);
+			}
 		}
 	}
 	let ctx = context(false);
@@ -398,10 +428,116 @@ fn maximum_creator_draft_fits_short_narrow_windows_and_closes_on_navigation() {
 	creator.open(&state, state.selected.unwrap());
 	state.selected = None;
 	ctx.run_ui(input(Vec2::new(500.0, 500.0), vec![]), |ui| {
-		assert!(creator.show(ui.ctx(), &state).is_none());
+		assert!(
+			creator
+				.show(ui.ctx(), &mut state, &mut Avatars::default())
+				.is_none()
+		);
 	})
 	.drop_without_applying_deltas();
 	assert!(creator.draft.is_none());
+}
+
+#[test]
+fn answer_emoji_comes_from_the_picker_as_twemoji_and_can_be_cleared() {
+	let (mut state, _) = fixture();
+	let ctx = context(false);
+	crate::emoji::install(&ctx).unwrap();
+	let atlas = crate::emoji::atlas(&ctx).unwrap().id;
+	let mut creator = Creator::default();
+	let mut avatars = Avatars::default();
+	creator.open(&state, state.selected.unwrap());
+	let key = |key| egui::Event::Key {
+		key,
+		physical_key: None,
+		pressed: true,
+		repeat: false,
+		modifiers: egui::Modifiers::NONE,
+	};
+	let mut frame = |creator: &mut Creator, state: &mut State, events| {
+		let output = ctx.run_ui(input(Vec2::new(900.0, 900.0), events), |ui| {
+			assert!(creator.show(ui.ctx(), state, &mut avatars).is_none());
+		});
+		let (mut text, mut art) = (Vec::new(), Vec::new());
+		for shape in &output.shapes {
+			labels(&shape.shape, shape.clip_rect, &mut text);
+			artwork_bounds(&shape.shape, atlas, &mut art);
+		}
+		output.drop_without_applying_deltas();
+		let focused = ctx
+			.memory(|m| m.focused())
+			.and_then(|id| ctx.read_response(id))
+			.map(|r| r.rect.size());
+		(text, art, focused)
+	};
+	// Tab through the popout and activate the first focused control of `size`.
+	macro_rules! choose {
+		($size:expr) => {{
+			let mut chosen = false;
+			for _ in 0..16 {
+				let (_, _, focused) = frame(&mut creator, &mut state, vec![key(egui::Key::Tab)]);
+				if focused == Some(Vec2::splat($size)) {
+					frame(&mut creator, &mut state, vec![key(egui::Key::Enter)]);
+					chosen = true;
+					break;
+				}
+			}
+			assert!(chosen, "no focusable {}px picker control", $size);
+		}};
+	}
+	for _ in 0..3 {
+		frame(&mut creator, &mut state, vec![]);
+	}
+	let (text, art, _) = frame(&mut creator, &mut state, vec![]);
+	assert!(art.is_empty(), "empty answers show the smiley glyph");
+	// The emoji button sits inside the field, just left of the answer text.
+	let hint = text
+		.iter()
+		// Fluent wraps placeables in invisible bidi isolation marks.
+		.find(|(label, _)| label.replace(['\u{2068}', '\u{2069}'], "") == "Answer 1")
+		.unwrap()
+		.1;
+	let button = egui::pos2(hint.left() - 30.0, hint.center().y);
+	frame(&mut creator, &mut state, click(button));
+	assert!(creator.picker.choosing());
+	assert_eq!(creator.draft.as_ref().unwrap().picking, Some(0));
+	// Above the dialog the popout becomes focusable a frame after opening; typing then
+	// lands in its search field.
+	let (_, _, focused) = frame(&mut creator, &mut state, vec![]);
+	assert!(focused.is_some(), "the picker search takes focus");
+	frame(
+		&mut creator,
+		&mut state,
+		vec![egui::Event::Text("rocket".into())],
+	);
+	choose!(40.0);
+	let draft = creator.draft.as_ref().unwrap();
+	assert_eq!(
+		draft.poll.answers[0].emoji,
+		Some(model::ReactionEmoji {
+			id: None,
+			name: Some("🚀".into())
+		})
+	);
+	assert!(draft.poll.answers[1].emoji.is_none());
+	assert!(!creator.picker.choosing() && draft.picking.is_none());
+	let (_, art, _) = frame(&mut creator, &mut state, vec![]);
+	assert_eq!(art.len(), 1, "the chosen emoji paints bundled Twemoji");
+	assert_eq!(art[0].size(), Vec2::splat(22.0));
+	assert!((art[0].center().x - button.x).abs() < 16.0);
+
+	// Reopening offers removal, which clears only this answer's emoji.
+	frame(&mut creator, &mut state, click(button));
+	assert!(creator.picker.choosing());
+	choose!(30.0);
+	assert!(
+		creator.draft.as_ref().unwrap().poll.answers[0]
+			.emoji
+			.is_none()
+	);
+	assert!(!creator.picker.choosing());
+	let (_, art, _) = frame(&mut creator, &mut state, vec![]);
+	assert!(art.is_empty());
 }
 
 #[test]

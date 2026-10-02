@@ -1127,6 +1127,14 @@ impl State {
 		self.select(channel)
 	}
 	pub fn select(&mut self, channel: Id) -> Option<Command> {
+		// Choosing another server's channel while a join is pending cancels its navigation.
+		if let Some((_, guild)) = self.invite_join.navigate
+			&& self
+				.channel(channel)
+				.is_some_and(|c| c.guild != Some(guild))
+		{
+			self.invite_join.navigate = None;
+		}
 		// Keep the current conversation intact, but allow a restored channel to load again.
 		if self.selected == Some(channel) && self.freshness != Freshness::Unavailable {
 			return None;
@@ -2385,7 +2393,7 @@ impl State {
 			&envelope.event,
 			Event::History { .. } | Event::Message(_) | Event::Patch(_) | Event::SendResult { .. }
 		)
-		.then(|| self.timeline.iter().last().map(|message| message.id))
+		.then(|| self.timeline.iter().next_back().map(|message| message.id))
 		.flatten();
 		let incoming_tail = match &envelope.event {
 			Event::Message(message)
@@ -3526,7 +3534,7 @@ impl State {
 			&& self
 				.timeline
 				.iter()
-				.last()
+				.next_back()
 				.is_none_or(|message| message.id < tail)
 		{
 			self.history_targeted = true;
@@ -4381,7 +4389,21 @@ mod tests {
 					..
 				})
 			));
+			// A joined server opens once delivered; choosing another server cancels that.
+			state.invite_join.navigate = Some((std::time::Instant::now(), Id(2)));
+			assert!(state.navigate_after_join().is_some());
+			assert_eq!(
+				state
+					.selected
+					.and_then(|id| state.channel(id))
+					.and_then(|c| c.guild),
+				Some(Id(2))
+			);
+			assert!(state.navigate_after_join().is_none());
+			state.invite_join.navigate = Some((std::time::Instant::now(), Id(2)));
 			state.select(Id(11));
+			assert!(state.navigate_after_join().is_none());
+			assert_eq!(state.selected, Some(Id(11)));
 			state.select(Id(20));
 			assert!(matches!(
 				state.select_guild(Id(1)),

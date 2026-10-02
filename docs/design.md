@@ -94,7 +94,8 @@ The bundled faces remain upstream's hinted TrueType builds. See `assets/README.m
   divider, floating hover toolbar (react, reply, edit, more) overlapping the row above.
 - Composer: rounded `raised` bar with attach (+), placeholder `Message #channel`, emoji picker
   and send icons; a character counter appears within 200 characters of the limit.
-- Member list (240px): ONLINE/OFFLINE eyebrows with counts (DMs show MEMBERS), 42px rows with
+- Member list (240px): ONLINE/OFFLINE eyebrows with counts; group DMs show a localized
+  Members — N heading including the current account, updated with participant changes. 42px rows with
   presence dots, custom status and hover fill; opens a Members window on narrow layouts.
 
 Confirmed empty guild text, announcement and thread histories show a welcome above the
