@@ -4352,4 +4352,6 @@ lib-composer-onboarding-incomplete = Schließe den Beitritt ab, um weitere Kanä
 # Context: composer
 lib-composer-onboarding-complete = Einführung abschließen
 
+message-preview-limit = Diese Nachricht überschreitet das Limit für das native Textlayout.
+
 voice-call-moved-to-another-client = Die Anrufsitzung dieses Geräts wurde ersetzt

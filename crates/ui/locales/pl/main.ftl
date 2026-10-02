@@ -4355,4 +4355,6 @@ lib-composer-onboarding-incomplete = Dokończ dołączanie do serwera, aby odblo
 # Context: composer
 lib-composer-onboarding-complete = Dokończ wprowadzenie
 
+message-preview-limit = Ta wiadomość przekracza limit natywnego układu tekstu.
+
 voice-call-moved-to-another-client = Sesja połączenia na tym urządzeniu została zastąpiona

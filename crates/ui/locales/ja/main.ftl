@@ -4341,4 +4341,6 @@ lib-composer-onboarding-incomplete = 参加を完了すると、さらにチャ�
 # Context: composer
 lib-composer-onboarding-complete = オンボーディングを完了
 
+message-preview-limit = このメッセージはネイティブテキストレイアウトの上限を超えています。
+
 voice-call-moved-to-another-client = このデバイスの通話セッションが置き換えられました

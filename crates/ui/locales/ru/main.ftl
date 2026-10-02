@@ -4356,4 +4356,6 @@ lib-composer-onboarding-incomplete = Завершите вступление, ч
 # Context: composer
 lib-composer-onboarding-complete = Завершить знакомство
 
+message-preview-limit = Это сообщение превышает ограничение нативной раскладки текста.
+
 voice-call-moved-to-another-client = Сеанс звонка на этом устройстве был заменён
