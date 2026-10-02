@@ -1,6 +1,6 @@
 {
   "baseline_source": "47a81035047695fe1d81edc4cb7efe46c14d87a8",
-  "after_source": "b5a36218bf7bc9a552994a40d838a8293a1aa9ba",
+  "after_source": "f6ac9925e314b49ea5e9b6d70f03a19b2a1c5be0",
   "renderer": "Native eframe/WGPU Apple M1 Metal framebuffer at 2x scale",
   "fixture": "Four synthetic Arabic/Hebrew/mixed-script chat messages; no reporter screenshot or live account data",
   "method": "Temporary native WGPU screenshot callback and bounded demo fixture; no image editing",
@@ -33,5 +33,5 @@
     "live_account_tests": false,
     "performance": "Pending release measurements; no improvement claim"
   },
-  "after_note": "Normal main 456fdc1f integration, reviewed font/cluster mapping and current-source mapped context-menu Copy. Temporary hooks removed byte-for-byte."
+  "after_note": "Normal main 456fdc1f integration, reviewed native shaping and current-source mapped context-menu Copy, plus selection-popup scope reset. Temporary hooks removed byte-for-byte."
 }
