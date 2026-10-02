@@ -4343,3 +4343,4 @@ lib-composer-onboarding-complete = オンボーディングを完了
 
 voice-stereo-input = ステレオマイク
 voice-stereo-input-warning = 2チャンネル入力が必要です。最初の2チャンネルを使用し、ノイズ抑制、エコー除去、自動ゲイン、感度設定を無効にします。ヘッドホンを使用してください。
+voice-call-moved-to-another-client = このデバイスの通話セッションが置き換えられました

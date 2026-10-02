@@ -4354,3 +4354,4 @@ lib-composer-onboarding-complete = Completa l'accoglienza
 
 voice-stereo-input = Microfono stereo
 voice-stereo-input-warning = Richiede un ingresso a due canali. Usa i primi due canali; non applica la soglia di ingresso, la soppressione del rumore, la cancellazione dell’eco o il guadagno automatico. Usa le cuffie.
+voice-call-moved-to-another-client = La sessione di chiamata di questo dispositivo è stata sostituita

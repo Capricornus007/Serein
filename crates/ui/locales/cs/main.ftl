@@ -4408,6 +4408,8 @@ public-upload-error-conversation = Před veřejným nahráním se vraťte do pů
 public-upload-error-selection = Výběr se změnil; před veřejným nahráním znovu zkontrolujte soubor
 public-upload-error-missing = Před veřejným nahráním znovu vyberte soubor
 
+voice-call-moved-to-another-client = Relace hovoru na tomto zařízení byla nahrazena
+
 # Synchronizované oblíbené GIFy (neoficiální nastavení účtu).
 gif-favorites-sync-loading = Synchronizuji oblíbené…
 gif-favorites-sync-ready = Oblíbené z Discordu a místní
