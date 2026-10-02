@@ -1533,3 +1533,20 @@ confirmation is acknowledged, the desktop keeps one extra pending credential set
 replacement behind the existing audio retirement fence. It keeps the original
 30-second deadline and zeroizes that set on confirmation, cancellation or failure
 teardown. Failed candidates do not spawn retries until credentials actually change.
+
+## Connected guild soundboard metadata (October 2, 2026)
+
+Soundboard catalogs are session-only, attached to one generation, guild, channel
+and current call request. The combined catalog has at most 128 items and 64 KiB
+of retained allocations, including vector spare capacity and each name/emoji
+string capacity. Each HTTP response is capped at 64 KiB before parsing; list decoding
+uses the existing bounded sequence visitor. No sound bytes, creator records,
+thumbnail, temporary file, database table or cross-guild cache is introduced.
+
+One metadata load or play is pending at a time, with a single bounded connection
+job and latest-value authorization scope watch. Names are bounded to 128 bytes/32
+scalars and emoji text to 128 bytes/32 scalars. POST bodies contain only a decimal
+sound ID. The adapter uses the existing fixed Discord origin, redacted active
+credential, REST admission and connection/request deadlines, without implicit retry.
+Leaving, switching calls, logout, gateway loss or soundboard permission loss clears
+metadata and cancels the job. Received successful sound effects cannot be undone.

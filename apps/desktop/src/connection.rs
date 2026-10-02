@@ -41,6 +41,7 @@ pub struct Connection {
 	pub activity_observation: watch::Receiver<discord_gateway::ActivityObservation>,
 	pub activity_sharing: watch::Receiver<Result<Option<bool>, Failure>>,
 	pub activity_sharing_request: mpsc::Sender<bool>,
+	pub soundboard_access: watch::Sender<Option<client_core::soundboard::Scope>>,
 	typing_channel: Arc<AtomicU64>,
 	task: JoinHandle<()>,
 }
@@ -91,6 +92,7 @@ impl Connection {
 			watch::channel(discord_gateway::ActivityObservation::Unconfirmed);
 		let (sharing_report, activity_sharing) = watch::channel(Ok(None));
 		let (activity_sharing_request, sharing_requests) = mpsc::channel(1);
+		let (soundboard_access, mut soundboard_authorized) = watch::channel(None);
 		let wake = ctx.clone();
 		let typing_channel = Arc::new(AtomicU64::new(0));
 		let active_typing = typing_channel.clone();
@@ -200,6 +202,8 @@ impl Connection {
                 let mut voice_request=None;
                 // One local release may wait for queue space; later joins cannot overtake it.
                 let mut pending_abandonment=None;
+                let mut soundboard:Option<(client_core::soundboard::Scope,AbortTask)>=None;
+                let mut last_soundboard_play:Option<(client_core::soundboard::Scope,Instant)>=None;
                 loop {
                     tokio::select! {
                         _=&mut gateway_task.0=>{break;}
@@ -214,11 +218,17 @@ impl Connection {
                         }
                         changed=takeover_receive.changed()=> {
                             if changed.is_err() {break;}
-                            if release_taken_over(&mut voice_request,*takeover_receive.borrow_and_update()) {drop(ringing.take());}
+                            if release_taken_over(&mut voice_request,*takeover_receive.borrow_and_update()) {drop(ringing.take());drop(soundboard.take());last_soundboard_play=None;}
                         }
                         changed=voice_availability.changed()=> {
 							if changed.is_err() {break;}
-							if !*voice_availability.borrow_and_update() {drop(ringing.take());drop(profile.take());drop(stream_preview.take());drop(search.take());voice_request=None;if let Some(cancel)=&upload_cancel {let _=cancel.send(true);}}
+                            if !*voice_availability.borrow_and_update() {drop(ringing.take());drop(profile.take());drop(stream_preview.take());drop(search.take());drop(soundboard.take());last_soundboard_play=None;voice_request=None;if let Some(cancel)=&upload_cancel {let _=cancel.send(true);}}
+                        }
+                        changed=soundboard_authorized.changed()=> {
+                            if changed.is_err() {break;}
+                            let current=*soundboard_authorized.borrow_and_update();
+                            if soundboard.as_ref().is_some_and(|(scope,_)|Some(*scope)!=current) {drop(soundboard.take());}
+                            if last_soundboard_play.is_some_and(|(scope,_)|Some(scope)!=current) {last_soundboard_play=None;}
                         }
                         request=upload_receive.recv()=>{
                             let Some(request)=request else {break;};
@@ -253,8 +263,34 @@ impl Connection {
                         }
                         command=receive.recv()=>{
                             // Select can admit a queued command before the changed-watch branch.
-                            if release_taken_over(&mut voice_request,*takeover_receive.borrow()) {drop(ringing.take());}
+                            if release_taken_over(&mut voice_request,*takeover_receive.borrow()) {drop(ringing.take());drop(soundboard.take());last_soundboard_play=None;}
                             let Some(command)=command else {break;};
+                            if let Command::Soundboard(request)=command {
+                                use client_core::soundboard::{Action,Event as E};
+                                let busy=soundboard.as_ref().is_some_and(|(_,job)|!job.0.is_finished());
+                                let throttled=matches!(request.action,Action::Play(_)) && last_soundboard_play.is_some_and(|(scope,last)|scope==request.scope && last.elapsed()<Duration::from_secs(1));
+                                if !soundboard_dispatch_allowed(request,voice_request,*soundboard_authorized.borrow(),*voice_availability.borrow(),busy) || throttled {
+                                    emit(Event::Soundboard(E{scope:request.scope,request:request.request,result:Err(Failure::ProtocolAt("Soundboard action expired or busy; open it again to retry"))}))?;
+                                    continue;
+                                }
+                                if matches!(request.action,Action::Play(_)) {last_soundboard_play=Some((request.scope,Instant::now()));}
+                                drop(soundboard.take());
+                                let api=api.clone();let emit=emit.clone();let finished=finished.clone();let wake=wake.clone();
+                                let authorized=soundboard_authorized.clone();let online=voice_availability.clone();let takeover=takeover_receive.clone();
+                                soundboard=Some((request.scope,AbortTask(tokio::spawn(async move {
+                                    let event=tokio::select! {
+                                        biased;
+                                        _=wait_for_takeover(takeover,(request.scope.channel,request.scope.call_request))=>return,
+                                        _=wait_for_soundboard_invalidation(request.scope,authorized,online)=>return,
+                                        event=api.execute(Command::Soundboard(request))=>event,
+                                    };
+                                    let auth_failure=match &event {Event::Soundboard(E{result:Err(f),..}) if matches!(f,Failure::Expired|Failure::InvalidCredential|Failure::Challenged)=>Some(*f),_=>None};
+                                    let error=emit(event).err().or(auth_failure);
+                                    if let Some(error)=error {api.stop();let _=finished.send(Some(error));}
+                                    wake.request_repaint();
+                                }))));
+                                continue;
+                            }
                             if matches!(command,Command::CancelSearch) {drop(search.take());continue;}
                             if matches!(command,Command::CancelGifs) {drop(gifs.take());continue;}
                             if matches!(command,Command::GifFavorites{..}) {
@@ -381,6 +417,7 @@ impl Connection {
                                         let _=takeover_send.send_replace(Some((channel,request)));
                                         let _=release_taken_over(&mut voice_request,Some((channel,request)));
                                         drop(ringing.take());
+                                        drop(soundboard.take());last_soundboard_play=None;
                                     }
                                     queue_abandonment(&voice_send,&mut pending_abandonment,control,owner);
                                     continue;
@@ -400,6 +437,7 @@ impl Connection {
                                     Ok(action)=>action,
                                     Err(())=>{emit(Event::Voice(E::Failed{channel,request,message:"Call action expired; no ringing request was sent"}))?;continue;}
                                 };
+                                if matches!(control,V::Join{..}) || matches!(control,V::Leave{channel,request} if soundboard.as_ref().is_some_and(|(scope,_)|scope.channel==channel&&scope.call_request==request)) {drop(soundboard.take());last_soundboard_play=None;}
                                 if matches!(control,V::Join{..}) {
                                     if let Some(error)=queue_join(&voice_send,control,(channel,request),&mut voice_request) {
                                         emit(Event::Voice(error))?;
@@ -519,6 +557,7 @@ impl Connection {
 			activity_observation,
 			activity_sharing,
 			activity_sharing_request,
+			soundboard_access,
 			typing_channel,
 			task,
 		}
@@ -949,6 +988,38 @@ fn abandonment_blocks_join(
 	pending.is_some() && matches!(control, client_core::voice::Command::Join { .. })
 }
 
+/// Observe latest authorization before the worker first polls HTTP, then cancel on loss.
+async fn wait_for_soundboard_invalidation(
+	scope: client_core::soundboard::Scope,
+	mut authorized: watch::Receiver<Option<client_core::soundboard::Scope>>,
+	mut online: watch::Receiver<bool>,
+) {
+	loop {
+		if *authorized.borrow_and_update() != Some(scope) || !*online.borrow_and_update() {
+			return;
+		}
+		tokio::select! {
+			changed = authorized.changed() => if changed.is_err() { return; },
+			changed = online.changed() => if changed.is_err() { return; },
+		}
+	}
+}
+
+fn soundboard_dispatch_allowed(
+	request: client_core::soundboard::Request,
+	active: Option<(model::Id, u64, bool)>,
+	authorized: Option<client_core::soundboard::Scope>,
+	online: bool,
+	busy: bool,
+) -> bool {
+	online
+		&& !busy
+		&& authorized == Some(request.scope)
+		&& active.is_some_and(|(channel, call_request, _)| {
+			channel == request.scope.channel && call_request == request.scope.call_request
+		})
+}
+
 // Ring only after the media adapter confirms transport allocation, and only once per current call.
 fn ring_action(
 	control: client_core::voice::Command,
@@ -1056,6 +1127,124 @@ fn scope_history_failure(event: Event, channel: model::Id, request: u64) -> Even
 
 #[cfg(test)]
 mod tests {
+	#[tokio::test]
+	async fn soundboard_worker_rechecks_latest_access_before_http_and_cancels_on_loss() {
+		use client_core::soundboard::Scope;
+		let scope = Scope {
+			generation: 1,
+			channel: model::Id(20),
+			guild: model::Id(10),
+			call_request: 7,
+		};
+		for (access, available, taken) in [
+			(None, true, None),
+			(Some(scope), false, None),
+			(Some(scope), true, Some((scope.channel, scope.call_request))),
+		] {
+			let (_access, authorized) = watch::channel(access);
+			let (_online, online) = watch::channel(available);
+			let (_takeover, takeover) = watch::channel(taken);
+			let polled = std::sync::atomic::AtomicBool::new(false);
+			tokio::select! {
+				biased;
+				_ = wait_for_takeover(takeover, (scope.channel, scope.call_request)) => {},
+				_ = wait_for_soundboard_invalidation(scope, authorized, online) => {},
+				_ = async { polled.store(true, Ordering::Relaxed); } => panic!("expired worker polled HTTP"),
+			}
+			assert!(!polled.load(Ordering::Relaxed));
+		}
+		for change_access in [true, false] {
+			let (access, authorized) = watch::channel(Some(scope));
+			let (availability, online) = watch::channel(true);
+			let worker = wait_for_soundboard_invalidation(scope, authorized, online);
+			tokio::pin!(worker);
+			assert!(
+				tokio::time::timeout(Duration::from_millis(1), &mut worker)
+					.await
+					.is_err()
+			);
+			if change_access {
+				access.send_replace(Some(Scope {
+					call_request: 8,
+					..scope
+				}));
+			} else {
+				availability.send_replace(false);
+			}
+			tokio::time::timeout(Duration::from_secs(1), worker)
+				.await
+				.unwrap();
+		}
+	}
+	#[test]
+	fn soundboard_dispatch_requires_current_online_authorized_call_and_free_slot() {
+		use client_core::soundboard::{Action, Request, Scope};
+		let scope = Scope {
+			generation: 1,
+			channel: model::Id(20),
+			guild: model::Id(10),
+			call_request: 7,
+		};
+		let request = Request {
+			scope,
+			request: 1,
+			action: Action::Play(model::Id(99)),
+		};
+		assert!(soundboard_dispatch_allowed(
+			request,
+			Some((scope.channel, 7, true)),
+			Some(scope),
+			true,
+			false
+		));
+		for (active, authorized, online, busy) in [
+			(None, Some(scope), true, false),
+			(Some((scope.channel, 8, true)), Some(scope), true, false),
+			(Some((model::Id(21), 7, true)), Some(scope), true, false),
+			(Some((scope.channel, 7, true)), None, true, false),
+			(
+				Some((scope.channel, 7, true)),
+				Some(Scope {
+					generation: 2,
+					..scope
+				}),
+				true,
+				false,
+			),
+			(Some((scope.channel, 7, true)), Some(scope), false, false),
+			(Some((scope.channel, 7, true)), Some(scope), true, true),
+		] {
+			assert!(!soundboard_dispatch_allowed(
+				request, active, authorized, online, busy
+			));
+		}
+		let mut active = None;
+		assert!(
+			ring_action(
+				client_core::voice::Command::Join {
+					channel: scope.channel,
+					request: 7,
+					ring: false,
+					mute: false,
+					deaf: false
+				},
+				model::Id(1),
+				&mut active,
+				false
+			)
+			.unwrap()
+			.is_none()
+		);
+		assert_eq!(active, Some((scope.channel, 7, true)));
+		assert!(release_taken_over(&mut active, Some((scope.channel, 7))));
+		assert!(!soundboard_dispatch_allowed(
+			request,
+			active,
+			Some(scope),
+			true,
+			false
+		));
+	}
 	#[test]
 	fn takeover_rejects_queued_initial_ringing_but_preserves_new_call_ownership() {
 		use client_core::voice::Command as V;

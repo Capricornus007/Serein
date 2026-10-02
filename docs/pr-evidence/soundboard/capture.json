@@ -1,0 +1,39 @@
+{
+  "baseline_source": "3f96877f553bbe50eab91d31611cd97ad94b64b8",
+  "after_source": "This commit; source matches the complete local full check, with temporary native capture hooks removed byte-for-byte.",
+  "renderer": "Actual native eframe/WGPU Apple M1 Metal framebuffer,2x scale",
+  "method": "Temporary bounded native screenshot callback; no image editing",
+  "fixtures": "Synthetic connected guild voice state before; explicit disabled offline Soundboard preview after; no microphone, sound effect, Discord session or external upload",
+  "commands": {
+    "before": "--demo --demo-voice",
+    "after": "--demo --demo-soundboard",
+    "narrow_light": "add --demo-light and SEREIN_SYNTHETIC_NARROW=1",
+    "settled_modal": "after uses bounded500ms native animation delay"
+  },
+  "verification": {
+    "focused_soundboard_tests": 10,
+    "full_cargo_xtask_check": "passed",
+    "ui_tests_passed": 349,
+    "ui_tests_ignored": 5,
+    "live_account": false,
+    "release_package_and_performance": "pending; no improvement claim"
+  },
+  "files": {
+    "before.png": {
+      "bytes": 377222,
+      "sha256": "883b40df5a9b7ed992b32c8b292d557d85ffca5204821f2f8d093d13ce24afd2"
+    },
+    "after.png": {
+      "bytes": 1382909,
+      "sha256": "2af530774a0f23f86c5f6665b64e013eec267582779b325e7920a5d0caf5eaa0"
+    },
+    "before-light-narrow.png": {
+      "bytes": 341615,
+      "sha256": "9e1f85b5ac3dfddbb726ec56f23f1043291205abc411d179cc0ba0f810449199"
+    },
+    "after-light-narrow.png": {
+      "bytes": 995530,
+      "sha256": "4e49620851b7b657b725ce46f8cd2597eb5c786e75c2a420efb6a2850a97a33c"
+    }
+  }
+}
