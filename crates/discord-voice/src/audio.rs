@@ -846,11 +846,18 @@ fn config(
 			.collect()
 	};
 	if let Some(config) = supported
-		.into_iter()
+		.iter()
+		.copied()
 		.filter(|c| c.channels() >= min_channels && c.channels() <= 8)
 		.filter(|c| supported_format(c.sample_format()))
 		.filter_map(|c| c.try_with_sample_rate(48_000))
 		.min_by_key(|c| c.channels())
+	{
+		return Ok(config);
+	}
+	if input
+		&& min_channels >= 2
+		&& let Some(config) = stereo_config(&supported, min_channels)
 	{
 		return Ok(config);
 	}
@@ -868,6 +875,27 @@ fn config(
 		return Err("Audio device format is unsupported; choose another device");
 	}
 	Ok(config)
+}
+// Stereo resampling supports these native rates even when a device's default is mono.
+fn stereo_config(
+	supported: &[cpal::SupportedStreamConfigRange],
+	min_channels: u16,
+) -> Option<cpal::SupportedStreamConfig> {
+	supported
+		.iter()
+		.copied()
+		.filter(|c| {
+			(min_channels..=8).contains(&c.channels()) && supported_format(c.sample_format())
+		})
+		.filter_map(|c| {
+			let min = c.min_sample_rate().max(8_000);
+			let max = c.max_sample_rate().min(192_000);
+			if min > max {
+				return None;
+			}
+			c.try_with_sample_rate(48_000u32.clamp(min, max))
+		})
+		.min_by_key(|c| (c.channels(), c.sample_rate().abs_diff(48_000)))
 }
 fn supported_format(format: cpal::SampleFormat) -> bool {
 	matches!(
@@ -1401,6 +1429,37 @@ mod tests {
 		assert_eq!(rendered, [0.0; 2]);
 	}
 
+	#[test]
+	fn stereo_format_selection_accepts_native_non_48k_formats_with_a_mono_default() {
+		let range = |channels, rate, format| {
+			cpal::SupportedStreamConfigRange::new(
+				channels,
+				rate,
+				rate,
+				cpal::SupportedBufferSize::Unknown,
+				format,
+			)
+		};
+		for rate in [44_100, 96_000] {
+			let supported = [
+				range(1, 48_000, cpal::SampleFormat::F32),
+				range(2, rate, cpal::SampleFormat::F32),
+			];
+			let selected = stereo_config(&supported, 2).unwrap();
+			assert_eq!((selected.channels(), selected.sample_rate()), (2, rate));
+		}
+		let supported = [
+			range(2, 1_000, cpal::SampleFormat::F32),
+			range(2, 384_000, cpal::SampleFormat::F32),
+			range(9, 48_000, cpal::SampleFormat::F32),
+		];
+		assert!(stereo_config(&supported, 2).is_none());
+		let supported = [
+			range(2, 44_100, cpal::SampleFormat::F32),
+			range(2, 48_000, cpal::SampleFormat::F32),
+		];
+		assert_eq!(stereo_config(&supported, 2).unwrap().sample_rate(), 48_000);
+	}
 	#[test]
 	fn resampling_buffers_and_capture_gate_are_bounded_without_devices() {
 		let gate = Gate::default();
