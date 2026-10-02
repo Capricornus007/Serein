@@ -1,6 +1,6 @@
 {
   "baseline_source": "47a81035047695fe1d81edc4cb7efe46c14d87a8",
-  "after_source": "This commit: reviewed RTL source with process-wide font reconstruction/atlas generation, channel action parity and one classification per formatted paragraph. Temporary hooks removed byte-for-byte.",
+  "after_source": "b5a36218bf7bc9a552994a40d838a8293a1aa9ba",
   "renderer": "Native eframe/WGPU Apple M1 Metal framebuffer at 2x scale",
   "fixture": "Four synthetic Arabic/Hebrew/mixed-script chat messages; no reporter screenshot or live account data",
   "method": "Temporary native WGPU screenshot callback and bounded demo fixture; no image editing",
@@ -28,9 +28,10 @@
   },
   "verification": {
     "cargo_xtask_check": "passed on exact source before temporary native captures; hooks removed byte-for-byte",
-    "ui_tests_passed": 361,
+    "ui_tests_passed": 367,
     "ui_tests_ignored": 6,
     "live_account_tests": false,
     "performance": "Pending release measurements; no improvement claim"
-  }
+  },
+  "after_note": "Normal main 456fdc1f integration, reviewed font/cluster mapping and current-source mapped context-menu Copy. Temporary hooks removed byte-for-byte."
 }
