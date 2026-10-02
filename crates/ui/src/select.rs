@@ -293,9 +293,13 @@ impl Surface {
 					.ctx()
 					.plugin_or_default::<mapped::Selection>()
 					.lock()
-					.run(ui, &response, &layout.source, true, |point| {
-						layout.cursor((point - run.galley_pos).to_pos2())
-					});
+					.run(
+						ui,
+						&response,
+						mapped::Source::Mapped(layout.clone()),
+						true,
+						|point| layout.cursor((point - run.galley_pos).to_pos2()),
+					);
 				if !selected.is_empty() {
 					for cell in &layout.cells {
 						if cell.source.start < selected.end && cell.source.end > selected.start {
@@ -844,9 +848,21 @@ mod tests {
 			crate::fonts::install(&ctx);
 			let text = "مرحبا بالعالم English 123";
 			let changed = std::cell::Cell::new(false);
+			let clipped = std::cell::Cell::new(0_u8);
+			let prepended = std::cell::Cell::new(false);
+			let source_pressure = std::cell::Cell::new(false);
 			let start_pos = std::cell::Cell::new(None);
 			let end_pos = std::cell::Cell::new(None);
 			let mut render = |ui: &mut egui::Ui| {
+				if prepended.get() {
+					let mut prefix = Surface::new(ui, "prepended-row");
+					let (pos, galley, response) = egui::Label::new("unselected prefix")
+						.selectable(false)
+						.layout_in_ui(ui);
+					prefix.run(ui, &response, pos, galley, Vec::new());
+					prefix.finish(ui);
+				}
+				let mut tail_top = None;
 				let mut surface = Surface::new(ui, "rtl-pointer-test");
 				let spans = [crate::rtl::Span {
 					text: if changed.get() {
@@ -883,12 +899,25 @@ mod tests {
 				));
 				surface.mapped_run(ui, &response, rect.min, layout, Vec::new(), Vec::new());
 				if across {
-					let (pos, galley, response) =
+					let (pos, mut galley, response) =
 						egui::Label::new("tail").selectable(false).layout_in_ui(ui);
+					if source_pressure.get() {
+						Arc::make_mut(&mut Arc::make_mut(&mut galley).job)
+							.text
+							.reserve_exact(4 * 1024 * 1024);
+					}
 					end_pos.set(Some(
 						pos + egui::vec2(galley.size().x + 1.0, galley.size().y / 2.0),
 					));
+					tail_top = Some(pos.y + 0.5);
 					surface.run(ui, &response, pos, galley, Vec::new());
+				}
+				if clipped.get() == 1 {
+					ui.set_clip_rect(Rect::NOTHING);
+				} else if clipped.get() == 2 {
+					let mut clip = ui.clip_rect();
+					clip.min.y = tail_top.unwrap();
+					ui.set_clip_rect(clip);
 				}
 				surface.finish(ui);
 			};
@@ -926,6 +955,74 @@ mod tests {
 					"مرحبا".into()
 				})
 			);
+			clipped.set(1);
+			let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+			assert!(
+				!output
+					.platform_output
+					.commands
+					.iter()
+					.any(|command| matches!(command, egui::OutputCommand::CopyText(_))),
+				"an incomplete offscreen selection never copies a partial or retained buffer"
+			);
+			output.drop_without_applying_deltas();
+			clipped.set(0);
+			ctx.run_ui(input(Vec::new()), &mut render)
+				.drop_without_applying_deltas();
+			let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+			assert!(output.platform_output.commands.iter().any(|command|
+				matches!(command, egui::OutputCommand::CopyText(value) if value == copied.as_ref().unwrap())),
+				"scrolling back restores the original logical selection after source revalidation");
+			output.drop_without_applying_deltas();
+			if across {
+				// Only A leaves the viewport: B now has order0 while the retained A
+				// endpoint still has order0. Restoring both must resolve both IDs first.
+				clipped.set(2);
+				ctx.run_ui(input(Vec::new()), &mut render)
+					.drop_without_applying_deltas();
+				let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+				assert!(
+					!output
+						.platform_output
+						.commands
+						.iter()
+						.any(|command| matches!(command, egui::OutputCommand::CopyText(_)))
+				);
+				output.drop_without_applying_deltas();
+				clipped.set(0);
+				// Copy on the first restored pass, before a settling/repaint pass.
+				let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+				assert!(output.platform_output.commands.iter().any(|command|
+					matches!(command, egui::OutputCommand::CopyText(value) if value == &format!("{text}\ntail"))),
+					"a partial viewport cannot truncate A using B's old visible ordinal");
+				output.drop_without_applying_deltas();
+				prepended.set(true);
+				let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+				assert!(output.platform_output.commands.iter().any(|command|
+					matches!(command, egui::OutputCommand::CopyText(value) if value == &format!("{text}\ntail"))),
+					"prepending a visible run cannot truncate either endpoint or copy the prefix");
+				output.drop_without_applying_deltas();
+				prepended.set(false);
+				ctx.run_ui(input(Vec::new()), &mut render)
+					.drop_without_applying_deltas();
+				source_pressure.set(true);
+				let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+				assert!(
+					!output
+						.platform_output
+						.commands
+						.iter()
+						.any(|command| matches!(command, egui::OutputCommand::CopyText(_))),
+					"large spare source capacity rejects clipboard assembly even when visible text is short"
+				);
+				output.drop_without_applying_deltas();
+				source_pressure.set(false);
+				let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
+				assert!(output.platform_output.commands.iter().any(|command|
+					matches!(command, egui::OutputCommand::CopyText(value) if value == &format!("{text}\ntail"))),
+					"a new bounded pass can copy; the prior rejected request is not retried");
+				output.drop_without_applying_deltas();
+			}
 			for events in [
 				press(from, true),
 				press(from, false),

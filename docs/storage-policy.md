@@ -15,11 +15,17 @@ glyph/mesh capacities and row metadata. Layout scratch, the current frame's
 references, shared fonts/atlas/driver allocations and allocator overhead are
 additional; these ceilings are not a process-RSS guarantee. Cache keys include
 visible spans, width, scale and font revisions. Conversation/account/generation
-changes and passes without RTL content release cached source and selection.
+changes release cached source and selection; passes without RTL content release
+cached layouts while keeping only the two bounded logical endpoints.
 
-Mapped selection keeps logical UTF-8 endpoints and admits at most 4,096 rendered
-runs / 4 MiB of allocated copy storage; source changes invalidate endpoints and
-overflow suppresses copying rather than returning partial text. Copying explicitly
+Mapped selection keeps two logical UTF-8 endpoints across virtualization. Copy
+passes admit at most 4,096 shared layout/galley references / 4 MiB, counting actual
+source, row, glyph, mesh and reference-vector capacities. References are released
+at the end of that pass; no extra text is retained between passes. A separate
+4 MiB allocated copy buffer is assembled only after both current endpoint IDs,
+hashes and visible orders resolve. Missing/deleted/changed endpoints and overflow
+suppress copying rather than returning partial text; copy requests never survive
+a pass. Source changes invalidate endpoints. Copying explicitly
 hands text to the OS clipboard, whose retention is outside account cache cleanup.
 No disk record, schema, network request, log or telemetry is added. Existing
 message, draft, edit and persisted content remain in their original logical order.

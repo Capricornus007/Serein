@@ -1761,6 +1761,7 @@ impl Formatted {
 			spoiler: Option<u8>,
 		}
 		let mut actions = Vec::new();
+		let mut action_labels = Vec::new();
 		let mut objects = Vec::new();
 		let mut inputs = Vec::new();
 		let size = crate::emoji::inline_size(ui);
@@ -1794,6 +1795,7 @@ impl Formatted {
 				});
 				let action = actions.len();
 				actions.push(Action::Spoiler);
+				action_labels.push(label.clone());
 				inputs.push(crate::rtl::Span {
 					text: label,
 					format: crate::emoji::inline_format(ui, width, size),
@@ -1849,6 +1851,39 @@ impl Formatted {
 			} else {
 				Action::None
 			});
+			action_labels.push(text.clone());
+			// Bare Discord message links keep the same channel jump pill as ordinary text.
+			if let Some(link) = style.link
+				&& text == &self.links[link]
+				&& let Some(jump) = discord_chat_link(text).filter(|jump| jump.message.is_some())
+			{
+				let label = channel_reference_name(jump.channel, render.channels, render.source)
+					.map_or_else(|| "#unknown-channel".into(), |name| format!("#{name}"));
+				action_labels[action] = label.clone();
+				let mut pill_style = style;
+				pill_style.mass_mention = true;
+				pill_style.strong = true;
+				pill_style.link = None;
+				let mut job = LayoutJob::default();
+				job.append(&label, 0.0, Self::format(ui, &pill_style));
+				let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+				let object = objects.len();
+				inputs.push(crate::rtl::Span {
+					text: text.clone(),
+					format: crate::emoji::inline_format(ui, galley.size().x, galley.size().y),
+					action,
+					object: Some(object),
+					copy: true,
+				});
+				objects.push(Object {
+					text: label,
+					custom: None,
+					image: None,
+					fallback: Some(galley),
+					spoiler: None,
+				});
+				continue;
+			}
 			let format = Self::format(ui, &style);
 			let mut start = 0;
 			let mut offset = 0;
@@ -1915,6 +1950,7 @@ impl Formatted {
 					let emoji_action = if matches!(actions[action], Action::None) {
 						let index = actions.len();
 						actions.push(Action::Emoji);
+						action_labels.push(cluster.into());
 						index
 					} else {
 						action
@@ -1985,6 +2021,13 @@ impl Formatted {
 								egui::Sense::click(),
 							)
 							.on_hover_text(&object.text);
+						hit.widget_info(|| {
+							egui::WidgetInfo::labeled(
+								egui::Role::Button,
+								ui.is_enabled(),
+								format!("Show emoji details: {}", object.text),
+							)
+						});
 						crate::emoji_details::show(ui, &hit, &object.text, image, render.guilds);
 						render.surface.through(&hit);
 					}
@@ -2010,6 +2053,7 @@ impl Formatted {
 			join_target = true;
 		}
 		for (index, (action, target)) in targets.into_iter().enumerate() {
+			let label = &action_labels[action];
 			let action = &actions[action];
 			let hit = ui
 				.interact(
@@ -2018,6 +2062,17 @@ impl Formatted {
 					egui::Sense::click(),
 				)
 				.on_hover_cursor(egui::CursorIcon::PointingHand);
+			hit.widget_info(|| {
+				egui::WidgetInfo::labeled(
+					egui::Role::Link,
+					ui.is_enabled(),
+					match action {
+						Action::User(_) => format!("{label}, user profile"),
+						Action::Channel(_) => format!("{label}, open channel"),
+						_ => label.clone(),
+					},
+				)
+			});
 			render.surface.through(&hit);
 			match action {
 				Action::Link(link) => {
@@ -4811,6 +4866,19 @@ mod tests {
 					.iter()
 					.any(|command| matches!(command, egui::OutputCommand::OpenUrl(_)))
 			);
+			if !pressed {
+				assert!(
+					output.platform_output.events.iter().any(|event| {
+						let info = event.widget_info();
+						info.role == egui::Role::Link
+							&& info
+								.label
+								.as_deref()
+								.is_some_and(|label| label.contains("رابط"))
+					}),
+					"actual link activation retains a descriptive accessibility role and label"
+				);
+			}
 			output.drop_without_applying_deltas();
 		}
 		let emoji_at = layout.source.find('🙂').unwrap();
@@ -4881,5 +4949,144 @@ mod tests {
 		// The existing external-link confirmation owns the result; no URL opens implicitly.
 		assert_eq!(opening.borrow().as_deref(), Some("https://example.com/"));
 		assert_eq!(mask, 1);
+	}
+	#[test]
+	fn rtl_message_jump_pill_and_mentions_keep_native_accessibility_actions() {
+		let ctx = egui::Context::default();
+		crate::fonts::install(&ctx);
+		let url = "https://discord.com/channels/1/2/3";
+		let parsed = Formatted::parse(&format!(
+			"مرحبا {url} <@42> <#2> [masked](https://example.com) ||SECRET_PRIVATE|| نهاية"
+		));
+		let channels = [model::Channel {
+			id: Id(2),
+			kind: 0,
+			guild: Some(Id(1)),
+			name: "synthetic-text".into(),
+			last_message: None,
+			parent_id: None,
+			position: 0,
+			recipients: vec![],
+			member_list_id: None,
+			tags: None,
+			message_count: None,
+			icon: None,
+		}];
+		let users = [model::User {
+			id: Id(42),
+			name: "Synthetic Robin".into(),
+			avatar: None,
+			webhook: false,
+			kind: Default::default(),
+			discriminator: 0,
+			primary_guild: None,
+		}];
+		let opening = std::cell::RefCell::new(None);
+		let channel = std::cell::RefCell::new(None);
+		let profile = std::cell::RefCell::new(crate::profiles::ProfileSession::default());
+		let snapshot = std::cell::RefCell::new(Vec::new());
+		let mut images = crate::avatars::Avatars::default();
+		let mut mask = 0;
+		let mut clock = 0.0;
+		let mut frame = |events| {
+			clock += 0.02;
+			ctx.run_ui(
+				egui::RawInput {
+					screen_rect: Some(egui::Rect::from_min_size(
+						egui::Pos2::ZERO,
+						egui::vec2(600.0, 500.0),
+					)),
+					events,
+					time: Some(clock),
+					..Default::default()
+				},
+				|ui| {
+					let mut surface = crate::select::Surface::new(ui, "rtl-jump-accessibility");
+					parsed.show_search(
+						ui,
+						&mut opening.borrow_mut(),
+						&users,
+						None,
+						&mut profile.borrow_mut(),
+						(&channels, &mut channel.borrow_mut(), &[], &[]),
+						(&mut images, true, &mut mask),
+						&mut surface,
+						"",
+						crate::design::MessageCardSurface::Opaque,
+					);
+					*snapshot.borrow_mut() = surface.mapped_layouts();
+					surface.finish(ui);
+				},
+			)
+		};
+		let output = frame(vec![]);
+		assert!(
+			output.shapes.iter().any(|shape| matches!(&shape.shape,
+			egui::Shape::Text(text) if text.galley.text() == "#synthetic-text")),
+			"the bare message link paints the native channel-labelled jump pill"
+		);
+		output.drop_without_applying_deltas();
+		let (pos, layout) = snapshot.borrow()[0].clone();
+		assert!(layout.source.contains(url));
+		assert!(layout.source.contains("masked"));
+		assert!(!layout.source.contains("SECRET_PRIVATE"));
+		for (source, expected_label) in [
+			(url, "#synthetic-text"),
+			("@Synthetic Robin", "user profile"),
+			("#synthetic-text", "open channel"),
+		] {
+			let start = layout.source.find(source).unwrap();
+			let cell = layout
+				.cells
+				.iter()
+				.find(|cell| cell.source.contains(&start))
+				.unwrap();
+			if source == url {
+				assert_eq!(cell.source, start..start + url.len());
+			}
+			let point = pos + cell.rect.center().to_vec2();
+			for pressed in [true, false] {
+				let output = frame(vec![
+					egui::Event::PointerMoved(point),
+					egui::Event::PointerButton {
+						pos: point,
+						button: egui::PointerButton::Primary,
+						pressed,
+						modifiers: Default::default(),
+					},
+				]);
+				assert!(
+					!output
+						.platform_output
+						.commands
+						.iter()
+						.any(|command| matches!(command, egui::OutputCommand::OpenUrl(_)))
+				);
+				if !pressed {
+					assert!(
+						output.platform_output.events.iter().any(|event| {
+							let info = event.widget_info();
+							info.role == egui::Role::Link
+								&& info
+									.label
+									.as_deref()
+									.is_some_and(|label| label.contains(expected_label))
+						}),
+						"actual activation exposes a descriptive link role: {expected_label}"
+					);
+				}
+				assert!(output.platform_output.events.iter().all(|event| {
+					event
+						.widget_info()
+						.label
+						.as_deref()
+						.is_none_or(|label| !label.contains("SECRET_PRIVATE"))
+				}));
+				output.drop_without_applying_deltas();
+			}
+		}
+		assert_eq!(opening.borrow().as_deref(), Some(url));
+		assert_eq!(*channel.borrow(), Some(Id(2)));
+		assert_eq!(profile.borrow().open_user().unwrap().id, Id(42));
 	}
 }

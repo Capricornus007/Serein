@@ -1,6 +1,6 @@
 //! Logical chat selection across ordinary and bidi-shaped runs.
 use egui::{Event, Id, Pos2, Rect, Response, Stroke};
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 use unicode_segmentation::UnicodeSegmentation;
 
 const COPY_BYTES: usize = 4 * 1024 * 1024;
@@ -12,6 +12,31 @@ struct End {
 	order: usize,
 	byte: usize,
 	hash: u64,
+}
+
+#[derive(Clone)]
+pub(super) enum Source {
+	Mapped(Arc<crate::rtl::Layout>),
+	Native(Arc<egui::epaint::Galley>),
+}
+impl Source {
+	fn text(&self) -> &str {
+		match self {
+			Self::Mapped(layout) => &layout.source,
+			Self::Native(galley) => &galley.job.text,
+		}
+	}
+	fn bytes(&self) -> usize {
+		match self {
+			Self::Mapped(layout) => layout.allocated_bytes(),
+			Self::Native(galley) => crate::rtl::galley_bytes(galley),
+		}
+	}
+}
+struct Observed {
+	order: usize,
+	rect: Rect,
+	source: Source,
 }
 
 #[derive(Default)]
@@ -26,7 +51,8 @@ pub(super) struct Selection {
 	mapped: bool,
 	anchor_seen: bool,
 	focus_seen: bool,
-	previous: Option<Rect>,
+	observed: Vec<Observed>,
+	observed_bytes: usize,
 	overflow: bool,
 	press: bool,
 	claimed: bool,
@@ -77,16 +103,21 @@ impl egui::Plugin for Selection {
 		self.anchor_seen = false;
 		self.focus_seen = false;
 		self.copy.clear();
-		self.previous = None;
+		self.observed.clear();
+		self.observed_bytes = 0;
 		self.overflow = false;
 	}
 	fn on_end_pass(&mut self, ui: &mut egui::Ui) {
-		if (self.press && !self.claimed)
-			|| ((!self.anchor_seen || !self.focus_seen) && !egui::Popup::is_any_open(ui.ctx()))
-		{
+		// Virtualized/offscreen runs may be absent from a pass. Keep only their two
+		// bounded endpoints; copy remains disabled until both matching sources return.
+		if self.press && !self.claimed {
 			self.anchor = None;
 			self.focus = None;
 			self.mapped = false;
+		}
+		let observed = std::mem::take(&mut self.observed);
+		if self.mapped && self.requested && self.anchor_seen && self.focus_seen && !self.overflow {
+			self.assemble_copy(&observed);
 		}
 		if !self.anchor_seen || !self.focus_seen || self.overflow {
 			self.copy.clear();
@@ -117,7 +148,7 @@ impl Selection {
 		&mut self,
 		ui: &egui::Ui,
 		response: &Response,
-		text: &str,
+		source: Source,
 		is_mapped: bool,
 		cursor: impl Fn(Pos2) -> usize,
 	) -> Range<usize> {
@@ -127,6 +158,7 @@ impl Selection {
 			self.overflow = true;
 			return 0..0;
 		}
+		let text = source.text();
 		let hash = egui::epaint::util::hash(text);
 		let pointer = ui.input(|input| input.pointer.hover_pos());
 		let pressed = ui.input(|input| input.pointer.primary_pressed());
@@ -252,7 +284,10 @@ impl Selection {
 			.flatten()
 			.filter(|end| end.id == response.id)
 		{
-			end.order = order;
+			if end.order != order {
+				ui.ctx().request_repaint();
+				end.order = order;
+			}
 		}
 
 		if self.anchor.is_some_and(|end| end.id == response.id) {
@@ -260,6 +295,32 @@ impl Selection {
 		}
 		if self.focus.is_some_and(|end| end.id == response.id) {
 			self.focus_seen = true;
+		}
+		if self.requested {
+			let bytes = source.bytes();
+			if self
+				.observed_bytes
+				.saturating_add(bytes)
+				.saturating_add((self.observed.len() + 1) * std::mem::size_of::<Observed>())
+				> COPY_BYTES
+			{
+				self.overflow = true;
+			} else {
+				self.observed.reserve_exact(1);
+				if self.observed_bytes
+					+ bytes + self.observed.capacity() * std::mem::size_of::<Observed>()
+					> COPY_BYTES
+				{
+					self.overflow = true;
+				} else {
+					self.observed_bytes += bytes;
+					self.observed.push(Observed {
+						order,
+						rect: response.rect,
+						source: source.clone(),
+					});
+				}
+			}
 		}
 		let (Some(a), Some(b)) = (self.anchor, self.focus) else {
 			return 0..0;
@@ -278,35 +339,63 @@ impl Selection {
 		} else {
 			text.len()
 		};
-		let Some(selected) = text.get(from..to) else {
+		let Some(_) = text.get(from..to) else {
 			return 0..0;
 		};
-		if !selected.is_empty() {
+
+		from..to
+	}
+	// Resolve all current-pass endpoint ordinals before constructing any clipboard text.
+	fn assemble_copy(&mut self, observed: &[Observed]) {
+		let (Some(a), Some(b)) = (self.anchor, self.focus) else {
+			return;
+		};
+		let (lo, hi) = if (a.order, a.byte) <= (b.order, b.byte) {
+			(a, b)
+		} else {
+			(b, a)
+		};
+		let mut previous: Option<Rect> = None;
+		for run in observed
+			.iter()
+			.filter(|run| (lo.order..=hi.order).contains(&run.order))
+		{
+			let text = run.source.text();
+			let from = if run.order == lo.order { lo.byte } else { 0 };
+			let to = if run.order == hi.order {
+				hi.byte
+			} else {
+				text.len()
+			};
+			let Some(selected) = text.get(from..to) else {
+				self.overflow = true;
+				return;
+			};
+			if selected.is_empty() {
+				continue;
+			}
 			let newline = !self.copy.ends_with('\n')
 				&& !selected.starts_with('\n')
-				&& self
-					.previous
-					.is_some_and(|previous| response.rect.top() >= previous.bottom() - 1.0);
+				&& previous.is_some_and(|previous| run.rect.top() >= previous.bottom() - 1.0);
 			let needed = self.copy.len() + selected.len() + usize::from(newline);
 			if needed > COPY_BYTES {
 				self.overflow = true;
-			} else {
-				if needed > self.copy.capacity() {
-					self.copy.reserve_exact(needed - self.copy.len());
-				}
-				if self.copy.capacity() > COPY_BYTES {
-					self.copy = String::new();
-					self.overflow = true;
-				} else {
-					if newline {
-						self.copy.push('\n');
-					}
-					self.copy.push_str(selected);
-					self.previous = Some(response.rect);
-				}
+				return;
 			}
+			if needed > self.copy.capacity() {
+				self.copy.reserve_exact(needed - self.copy.len());
+			}
+			if self.copy.capacity() > COPY_BYTES {
+				self.copy = String::new();
+				self.overflow = true;
+				return;
+			}
+			if newline {
+				self.copy.push('\n');
+			}
+			self.copy.push_str(selected);
+			previous = Some(run.rect);
 		}
-		from..to
 	}
 }
 
@@ -324,11 +413,13 @@ pub(super) fn native(
 			.nth(index)
 			.map_or(text.len(), |(byte, _)| byte)
 	};
-	let selected = ui
-		.ctx()
-		.plugin_or_default::<Selection>()
-		.lock()
-		.run(ui, response, text, false, bytes);
+	let selected = ui.ctx().plugin_or_default::<Selection>().lock().run(
+		ui,
+		response,
+		Source::Native(galley.clone()),
+		false,
+		bytes,
+	);
 	if !ui.ctx().plugin_or_default::<Selection>().lock().mapped {
 		egui::text_selection::LabelSelectionState::label_text_selection(
 			ui,

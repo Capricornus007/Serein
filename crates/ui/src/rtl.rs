@@ -45,6 +45,39 @@ pub(crate) struct Layout {
 	pub size: Vec2,
 }
 
+impl Layout {
+	pub(crate) fn allocated_bytes(&self) -> usize {
+		std::mem::size_of::<Self>()
+			+ self.source.capacity()
+			+ self.cells.capacity() * std::mem::size_of::<Cell>()
+			+ self.lines.capacity() * std::mem::size_of::<Line>()
+			+ self
+				.lines
+				.iter()
+				.map(|line| galley_bytes(&line.galley))
+				.sum::<usize>()
+	}
+}
+
+pub(crate) fn galley_bytes(galley: &Galley) -> usize {
+	std::mem::size_of::<Galley>()
+		+ std::mem::size_of::<LayoutJob>()
+		+ galley.job.text.capacity()
+		+ galley.job.sections.capacity() * std::mem::size_of::<LayoutSection>()
+		+ galley.rows.capacity() * std::mem::size_of::<egui::epaint::text::PlacedRow>()
+		+ galley
+			.rows
+			.iter()
+			.map(|row| {
+				std::mem::size_of::<egui::epaint::text::Row>()
+					+ row.glyphs.capacity() * std::mem::size_of::<egui::epaint::text::Glyph>()
+					+ row.visuals.mesh.vertices.capacity()
+						* std::mem::size_of::<egui::epaint::Vertex>()
+					+ row.visuals.mesh.indices.capacity() * std::mem::size_of::<u32>()
+			})
+			.sum::<usize>()
+}
+
 struct Unit {
 	logical: Range<usize>,
 	source: Range<usize>,
@@ -458,24 +491,7 @@ pub(crate) fn layout(ctx: &egui::Context, spans: &[Span], width: f32) -> Option<
 			.map(|span| span.text.capacity())
 			.sum::<usize>()
 		+ std::mem::size_of::<Entry>();
-	let mut bytes = span_bytes
-		+ value.source.capacity()
-		+ value.cells.capacity() * std::mem::size_of::<Cell>()
-		+ value.lines.capacity() * std::mem::size_of::<Line>();
-	for line in &value.lines {
-		let galley = &line.galley;
-		bytes += std::mem::size_of::<Galley>()
-			+ galley.job.text.capacity()
-			+ galley.job.sections.capacity() * std::mem::size_of::<LayoutSection>()
-			+ galley.rows.capacity() * std::mem::size_of::<egui::epaint::text::PlacedRow>();
-		for row in &galley.rows {
-			bytes += std::mem::size_of::<egui::epaint::text::Row>()
-				+ row.glyphs.capacity() * std::mem::size_of::<egui::epaint::text::Glyph>()
-				+ row.visuals.mesh.vertices.capacity()
-					* std::mem::size_of::<egui::epaint::Vertex>()
-				+ row.visuals.mesh.indices.capacity() * std::mem::size_of::<u32>();
-		}
-	}
+	let bytes = span_bytes + value.allocated_bytes();
 	if bytes > ENTRY_BYTES {
 		return None;
 	}
