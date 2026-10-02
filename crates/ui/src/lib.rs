@@ -4796,6 +4796,7 @@ impl MessagingUi {
 				None => {}
 			}
 		}
+		select::show_menu(&ctx);
 		self.show_call_switch(&ctx, state, &mut commands);
 		self.verification.show(&ctx, state);
 		self.onboarding.show(&ctx, state, &mut commands);

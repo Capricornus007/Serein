@@ -3,7 +3,7 @@ use egui::{Event, Id, Pos2, Rect, Response, Stroke};
 use std::{ops::Range, sync::Arc};
 use unicode_segmentation::UnicodeSegmentation;
 
-const COPY_BYTES: usize = 4 * 1024 * 1024;
+pub(super) const COPY_BYTES: usize = 4 * 1024 * 1024;
 const RUNS: usize = 4096;
 
 #[derive(Clone, Copy)]
@@ -62,7 +62,7 @@ impl egui::Plugin for Selection {
 	fn debug_name(&self) -> &'static str {
 		"Logical chat selection"
 	}
-	fn input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+	fn input_hook(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
 		if input.events.iter().any(|event| {
 			matches!(
 				event,
@@ -78,16 +78,17 @@ impl egui::Plugin for Selection {
 			self.mapped = false;
 			self.dragging = false;
 		}
-		self.press = input.events.iter().any(|event| {
-			matches!(
-				event,
-				Event::PointerButton {
-					button: egui::PointerButton::Primary,
-					pressed: true,
-					..
-				}
-			)
-		});
+		self.press = !egui::Popup::is_any_open(ctx)
+			&& input.events.iter().any(|event| {
+				matches!(
+					event,
+					Event::PointerButton {
+						button: egui::PointerButton::Primary,
+						pressed: true,
+						..
+					}
+				)
+			});
 		self.select_all = input.events.iter().any(|event| {
 			matches!(event,
 			Event::Key { key: egui::Key::A, pressed: true, modifiers, .. } if modifiers.command)
@@ -161,8 +162,10 @@ impl Selection {
 		let text = source.text();
 		let hash = egui::epaint::util::hash(text);
 		let pointer = ui.input(|input| input.pointer.hover_pos());
-		let pressed = ui.input(|input| input.pointer.primary_pressed());
-		let down = ui.input(|input| input.pointer.primary_down());
+		let pressed = !egui::Popup::is_any_open(ui.ctx())
+			&& ui.input(|input| input.pointer.primary_pressed());
+		let down =
+			!egui::Popup::is_any_open(ui.ctx()) && ui.input(|input| input.pointer.primary_down());
 		let shift = ui.input(|input| input.modifiers.shift);
 		if pressed
 			&& response.contains_pointer()
@@ -296,7 +299,7 @@ impl Selection {
 		if self.focus.is_some_and(|end| end.id == response.id) {
 			self.focus_seen = true;
 		}
-		if self.requested {
+		if self.requested || (self.mapped && egui::Popup::is_any_open(ui.ctx())) {
 			let bytes = source.bytes();
 			if self
 				.observed_bytes
@@ -397,6 +400,28 @@ impl Selection {
 			previous = Some(run.rect);
 		}
 	}
+}
+
+// Revalidate visible source hashes/order under an open menu without pointer handling.
+pub(super) fn observe(ui: &mut egui::Ui, id: Id, rect: Rect, source: Source) {
+	let response = ui.interact(rect, id, egui::Sense::hover());
+	ui.ctx()
+		.plugin_or_default::<Selection>()
+		.lock()
+		.run(ui, &response, source, false, |_| 0);
+}
+
+pub(super) fn request_copy(ctx: &egui::Context) -> bool {
+	let Some(plugin) = ctx.plugin_opt::<Selection>() else {
+		return false;
+	};
+	let mut selection = plugin.lock();
+	if !selection.mapped {
+		return false;
+	}
+	// An invalidated mapped range must never fall back to a previous native copy.
+	selection.requested = true;
+	true
 }
 
 pub(super) fn native(

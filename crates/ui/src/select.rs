@@ -238,6 +238,13 @@ impl Surface {
 			}
 			if menu_open {
 				if let Some(layout) = &run.mapping {
+					mapped::observe(
+						ui,
+						run.band,
+						run.rect,
+						mapped::Source::Mapped(layout.clone()),
+					);
+
 					for rect in &run.highlights {
 						ui.painter().rect_filled(
 							*rect,
@@ -251,6 +258,12 @@ impl Surface {
 					}
 				}
 				if !run.galley.job.text.is_empty() {
+					mapped::observe(
+						ui,
+						run.band,
+						run.rect,
+						mapped::Source::Native(run.galley.clone()),
+					);
 					let color = if run.painted {
 						Color32::TRANSPARENT
 					} else {
@@ -351,6 +364,37 @@ struct Pointer {
 	menu: bool,
 	silent: bool,
 	cached: String,
+	selection_secondary: bool,
+	#[cfg(target_os = "macos")]
+	control_primary: bool,
+}
+
+/// Remember the button chosen on press: Control may be released before the mouse button.
+#[cfg(any(target_os = "macos", test))]
+fn normalize_control_click(input: &mut RawInput, control_primary: &mut bool) {
+	for event in &mut input.events {
+		if let Event::PointerButton {
+			button,
+			pressed,
+			modifiers,
+			..
+		} = event && *button == PointerButton::Primary
+		{
+			if *pressed {
+				*control_primary = modifiers.ctrl;
+			}
+			if *control_primary {
+				*button = PointerButton::Secondary;
+			}
+			if !*pressed {
+				*control_primary = false;
+			}
+		}
+	}
+	// Process a delivered release before abandoning an interrupted gesture.
+	if !input.focused {
+		*control_primary = false;
+	}
 }
 
 impl egui::Plugin for Pointer {
@@ -359,6 +403,8 @@ impl egui::Plugin for Pointer {
 	}
 
 	fn input_hook(&mut self, ctx: &egui::Context, input: &mut RawInput) {
+		#[cfg(target_os = "macos")]
+		normalize_control_click(input, &mut self.control_primary);
 		let selecting = has_selection(ctx);
 		let secondary = input.events.iter().any(|event| {
 			matches!(
@@ -370,7 +416,21 @@ impl egui::Plugin for Pointer {
 				}
 			)
 		});
-		if selecting && secondary {
+		let secondary_release = input.events.iter().any(|event| {
+			matches!(
+				event,
+				Event::PointerButton {
+					button: PointerButton::Secondary,
+					pressed: false,
+					..
+				}
+			)
+		});
+		if self.selection_secondary || (selecting && secondary) {
+			self.selection_secondary |= secondary;
+			if secondary {
+				self.cached = String::new();
+			}
 			input.events.retain(|event| {
 				!matches!(
 					event,
@@ -380,42 +440,22 @@ impl egui::Plugin for Pointer {
 					}
 				)
 			});
-			if !input
-				.events
-				.iter()
-				.any(|event| matches!(event, Event::Copy))
+			if secondary
+				&& !input
+					.events
+					.iter()
+					.any(|event| matches!(event, Event::Copy))
 			{
 				input.events.push(Event::Copy);
 				self.silent = true;
 			}
-			self.menu = true;
+			self.menu = secondary;
 		} else {
 			self.menu = false;
 		}
-	}
-
-	fn on_end_pass(&mut self, ui: &mut egui::Ui) {
-		if !self.menu || Popup::is_any_open(ui.ctx()) {
-			return;
+		if secondary_release || !input.focused {
+			self.selection_secondary = false;
 		}
-		let id = Id::unique("chat-selection-copy");
-		Popup::new(
-			id,
-			ui.ctx().clone(),
-			PopupAnchor::PointerFixed,
-			LayerId::new(Order::Foreground, id),
-		)
-		.open_memory(Some(egui::SetOpenCommand::Bool(true)))
-		.kind(egui::PopupKind::Menu)
-		.show(|ui| {
-			if ui
-				.button(crate::i18n::translate("select-on-end-pass-copy"))
-				.clicked()
-			{
-				request_copy(ui.ctx());
-				ui.close();
-			}
-		});
 	}
 
 	fn output_hook(&mut self, ctx: &egui::Context, output: &mut FullOutput) {
@@ -424,22 +464,58 @@ impl egui::Plugin for Pointer {
 			.commands
 			.iter()
 			.find_map(|command| match command {
-				egui::OutputCommand::CopyText(text) => Some(text.clone()),
+				egui::OutputCommand::CopyText(text) => Some(text),
 				_ => None,
 			}) {
-			self.cached = text;
-			if self.silent {
-				output
-					.platform_output
-					.commands
-					.retain(|command| !matches!(command, egui::OutputCommand::CopyText(_)));
+			self.cached = if text.len() <= mapped::COPY_BYTES {
+				text.clone()
+			} else {
+				String::new()
+			};
+			if self.cached.capacity() > mapped::COPY_BYTES {
+				self.cached = String::new();
 			}
+		}
+		if self.silent {
+			output
+				.platform_output
+				.commands
+				.retain(|command| !matches!(command, egui::OutputCommand::CopyText(_)));
 		}
 		self.silent = false;
 		if output.platform_output.cursor_icon == CursorIcon::Text && !hovering_edit(ctx) {
 			output.platform_output.cursor_icon = CursorIcon::Default;
 		}
 	}
+}
+
+/// Draw outside a Plugin hook: egui notifies plugins when a popup widget is under
+/// the pointer, so creating it while holding Pointer's plugin mutex would reenter it.
+pub(crate) fn show_menu(ctx: &egui::Context) {
+	let requested = ctx
+		.plugin_opt::<Pointer>()
+		.is_some_and(|plugin| plugin.lock().menu);
+	let id = Id::unique("chat-selection-copy");
+	if !Popup::is_id_open(ctx, id) && (!requested || Popup::is_any_open(ctx)) {
+		return;
+	}
+	Popup::new(
+		id,
+		ctx.clone(),
+		PopupAnchor::PointerFixed,
+		LayerId::new(Order::Foreground, id),
+	)
+	.open_memory(requested.then_some(egui::SetOpenCommand::Bool(true)))
+	.kind(egui::PopupKind::Menu)
+	.show(|ui| {
+		if ui
+			.button(crate::i18n::translate("select-on-end-pass-copy"))
+			.clicked()
+		{
+			request_copy(ui.ctx());
+			ui.close();
+		}
+	});
 }
 
 fn hovering_edit(ctx: &egui::Context) -> bool {
@@ -478,6 +554,9 @@ pub fn open_menu(ctx: &egui::Context) -> bool {
 
 /// Copy the text cached from the last selected range.
 pub fn request_copy(ctx: &egui::Context) {
+	if mapped::request_copy(ctx) {
+		return;
+	}
 	let text = ctx
 		.plugin_opt::<Pointer>()
 		.map(|plugin| plugin.lock().cached.clone())
@@ -499,6 +578,12 @@ fn show_embed(ui: &mut egui::Ui, embed: &Embed, menu_open: bool) {
 	// The galley carries its own per-token colours; the fallback only covers unstyled glyphs.
 	let color = ui.visuals().text_color();
 	if menu_open {
+		mapped::observe(
+			ui,
+			embed.response.id,
+			embed.response.rect,
+			mapped::Source::Native(embed.galley.clone()),
+		);
 		ui.painter().add(TextShape::new(
 			embed.galley_pos,
 			embed.galley.clone(),
@@ -732,6 +817,80 @@ fn paint_artwork(ui: &egui::Ui, art: &Artwork) {
 mod tests {
 	use super::*;
 
+	#[test]
+	fn control_click_keeps_secondary_release_after_control_is_released() {
+		let mut held = false;
+		let button = |pressed, ctrl| Event::PointerButton {
+			pos: egui::pos2(10.0, 10.0),
+			button: PointerButton::Primary,
+			pressed,
+			modifiers: egui::Modifiers {
+				ctrl,
+				..Default::default()
+			},
+		};
+		for (pressed, ctrl, expected) in [
+			(true, true, PointerButton::Secondary),
+			(false, false, PointerButton::Secondary),
+			(true, false, PointerButton::Primary),
+			(false, true, PointerButton::Primary),
+		] {
+			let mut input = RawInput {
+				focused: true,
+				events: vec![button(pressed, ctrl)],
+				..Default::default()
+			};
+			normalize_control_click(&mut input, &mut held);
+			assert!(
+				matches!(input.events[0], Event::PointerButton { button, .. } if button == expected)
+			);
+		}
+		assert!(!held);
+	}
+
+	#[test]
+	fn control_click_release_matches_press_in_an_unfocused_frame() {
+		let event = |pressed| Event::PointerButton {
+			pos: egui::pos2(10.0, 10.0),
+			button: PointerButton::Primary,
+			pressed,
+			modifiers: egui::Modifiers {
+				ctrl: pressed,
+				..Default::default()
+			},
+		};
+		let mut held = false;
+		let mut press = RawInput {
+			focused: true,
+			events: vec![event(true)],
+			..Default::default()
+		};
+		normalize_control_click(&mut press, &mut held);
+		assert!(held);
+		let mut release = RawInput {
+			focused: false,
+			events: vec![event(false)],
+			..Default::default()
+		};
+		normalize_control_click(&mut release, &mut held);
+		assert!(matches!(
+			release.events[0],
+			Event::PointerButton {
+				button: PointerButton::Secondary,
+				pressed: false,
+				..
+			}
+		));
+		assert!(!held);
+		let mut focus_loss = RawInput {
+			focused: false,
+			..Default::default()
+		};
+		held = true;
+		normalize_control_click(&mut focus_loss, &mut held);
+		assert!(!held);
+	}
+
 	const WIDTH: f32 = 220.0;
 
 	/// A body like `text …link` where the leading run wraps across several rows.
@@ -782,6 +941,125 @@ mod tests {
 				modifiers: Default::default(),
 			},
 		]
+	}
+
+	#[cfg(target_os = "macos")]
+	fn menu_copy(
+		ctx: &egui::Context,
+		render: &mut dyn FnMut(&mut egui::Ui),
+		from: Pos2,
+		prepare: impl FnOnce(),
+	) -> Option<String> {
+		fn label(shape: &egui::Shape) -> Option<Pos2> {
+			match shape {
+				egui::Shape::Text(text)
+					if text.galley.job.text
+						== crate::i18n::translate("select-on-end-pass-copy") =>
+				{
+					Some(text.pos + text.galley.size() / 2.0)
+				}
+				egui::Shape::Vec(shapes) => shapes.iter().find_map(label),
+				_ => None,
+			}
+		}
+		for pressed in [true, false] {
+			let output = ctx.run_ui(
+				input(vec![
+					Event::PointerMoved(from),
+					Event::PointerButton {
+						pos: from,
+						button: PointerButton::Primary,
+						pressed,
+						modifiers: egui::Modifiers {
+							ctrl: pressed,
+							..Default::default()
+						},
+					},
+				]),
+				&mut *render,
+			);
+			if pressed {
+				assert!(
+					has_selection(ctx),
+					"Control-click press cannot clear the selected range"
+				);
+			}
+			assert!(
+				!output
+					.platform_output
+					.commands
+					.iter()
+					.any(|command| matches!(command, egui::OutputCommand::CopyText(_))),
+				"opening a menu does not write the clipboard"
+			);
+			output.drop_without_applying_deltas();
+		}
+		assert!(
+			Popup::is_id_open(ctx, Id::unique("chat-selection-copy")),
+			"the release keeps the selection menu open"
+		);
+		prepare();
+		let mut copy_pos = None;
+		for _ in 0..3 {
+			let output = ctx.run_ui(input(Vec::new()), &mut *render);
+			copy_pos = output
+				.shapes
+				.iter()
+				.find_map(|shape| label(&shape.shape))
+				.or(copy_pos);
+			output.drop_without_applying_deltas();
+		}
+		let copy_pos = copy_pos.expect("the native Copy menu is actually painted");
+		let mut copied = None;
+		for pressed in [true, false] {
+			let output = ctx.run_ui(input(press(copy_pos, pressed)), &mut *render);
+			copied = copied.or_else(|| {
+				output
+					.platform_output
+					.commands
+					.iter()
+					.find_map(|command| match command {
+						egui::OutputCommand::CopyText(value) => Some(value.clone()),
+						_ => None,
+					})
+			});
+			output.drop_without_applying_deltas();
+		}
+		Popup::close_all(ctx);
+		copied
+	}
+
+	#[cfg(target_os = "macos")]
+	#[test]
+	fn native_selection_control_click_copies_after_releasing_control_first() {
+		let ctx = egui::Context::default();
+		install(&ctx);
+		let positions = std::cell::Cell::new((Pos2::ZERO, Pos2::ZERO));
+		let text = "ordinary Latin selection";
+		let mut render = |ui: &mut egui::Ui| {
+			let mut surface = Surface::new(ui, "native-menu-selection");
+			let (pos, galley, response) = egui::Label::new(text).selectable(false).layout_in_ui(ui);
+			positions.set((
+				pos + egui::vec2(0.1, galley.size().y / 2.0),
+				pos + egui::vec2(galley.size().x + 1.0, galley.size().y / 2.0),
+			));
+			surface.run(ui, &response, pos, galley, Vec::new());
+			surface.finish(ui);
+			show_menu(ui.ctx());
+		};
+		ctx.run_ui(input(Vec::new()), &mut render)
+			.drop_without_applying_deltas();
+		let (from, to) = positions.get();
+		for events in [
+			press(from, true),
+			vec![Event::PointerMoved(to)],
+			press(to, false),
+			vec![],
+		] {
+			ctx.run_ui(input(events), &mut render)
+				.drop_without_applying_deltas();
+		}
+		assert_eq!(menu_copy(&ctx, &mut render, from, || {}), Some(text.into()));
 	}
 
 	/// Drag from `from` to `to` and return what a copy would yield.
@@ -846,11 +1124,13 @@ mod tests {
 		for across in [false, true] {
 			let ctx = egui::Context::default();
 			crate::fonts::install(&ctx);
+			install(&ctx);
 			let text = "مرحبا بالعالم English 123";
 			let changed = std::cell::Cell::new(false);
 			let clipped = std::cell::Cell::new(0_u8);
 			let prepended = std::cell::Cell::new(false);
 			let source_pressure = std::cell::Cell::new(false);
+			let external_copy = std::cell::Cell::new(false);
 			let start_pos = std::cell::Cell::new(None);
 			let end_pos = std::cell::Cell::new(None);
 			let mut render = |ui: &mut egui::Ui| {
@@ -920,6 +1200,10 @@ mod tests {
 					ui.set_clip_rect(clip);
 				}
 				surface.finish(ui);
+				if external_copy.replace(false) {
+					request_copy(ui.ctx());
+				}
+				show_menu(ui.ctx());
 			};
 			ctx.run_ui(input(Vec::new()), &mut render)
 				.drop_without_applying_deltas();
@@ -955,6 +1239,21 @@ mod tests {
 					"مرحبا".into()
 				})
 			);
+			#[cfg(target_os = "macos")]
+			assert_eq!(menu_copy(&ctx, &mut render, from, || {}), copied);
+
+			// The app's ordinary message menu owns a different popup ID and uses
+			// this same explicit Copy action after body rendering.
+			Popup::open_id(&ctx, Id::unique("message-context-copy"));
+			assert!(
+				has_selection(&ctx),
+				"the valid mapped range remains active before message-menu Copy"
+			);
+			external_copy.set(true);
+			let output = ctx.run_ui(input(Vec::new()), &mut render);
+			assert!(output.platform_output.commands.iter().any(|command| matches!(command, egui::OutputCommand::CopyText(value) if Some(value) == copied.as_ref())), "other message menus also copy current logical source");
+			output.drop_without_applying_deltas();
+			Popup::close_all(&ctx);
 			clipped.set(1);
 			let output = ctx.run_ui(input(vec![Event::Copy]), &mut render);
 			assert!(
@@ -1023,6 +1322,11 @@ mod tests {
 					"a new bounded pass can copy; the prior rejected request is not retried");
 				output.drop_without_applying_deltas();
 			}
+			// The menu click is a separate gesture from the word double-click below.
+			let mut settled = input(Vec::new());
+			settled.time = Some(10.0);
+			ctx.run_ui(settled, &mut render)
+				.drop_without_applying_deltas();
 			for events in [
 				press(from, true),
 				press(from, false),
@@ -1090,6 +1394,42 @@ mod tests {
 				"Escape and edited source retire mapped selection rather than copy old text"
 			);
 			output.drop_without_applying_deltas();
+			#[cfg(target_os = "macos")]
+			{
+				for invalidation in 0..3 {
+					changed.set(false);
+					clipped.set(0);
+					source_pressure.set(false);
+					let mut restored = input(Vec::new());
+					restored.time = Some(20.0 + f64::from(invalidation) * 2.0);
+					ctx.run_ui(restored, &mut render)
+						.drop_without_applying_deltas();
+					for events in [
+						press(from, true),
+						vec![Event::PointerMoved(to)],
+						press(to, false),
+						vec![],
+						vec![Event::Copy],
+					] {
+						ctx.run_ui(input(events), &mut render)
+							.drop_without_applying_deltas();
+					}
+					assert!(
+						has_selection(&ctx),
+						"invalidation {invalidation} begins with an actual selected range"
+					);
+					assert_eq!(
+						menu_copy(&ctx, &mut render, from, || match invalidation {
+							0 => clipped.set(1),
+							1 => changed.set(true),
+							_ if across => source_pressure.set(true),
+							_ => clipped.set(1),
+						}),
+						None,
+						"menu Copy cannot reuse earlier text after clipping, editing, or retained-source overflow"
+					);
+				}
+			}
 		}
 	}
 }

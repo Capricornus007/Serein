@@ -2113,7 +2113,10 @@ selection/copy, and offscreen runs do not request the image;
 copy, drafts, edits and stored service content keep logical text. No protocol
 capability or service endpoint changes. The vendored epaint patch exposes only
 opt-in direction and cluster metadata; ordinary native labels keep their default
-layout/selection behavior.
+layout/selection behavior. macOS Control-click keeps logical RTL selection, and
+mapped context-menu Copy resolves current visible source before emitting text.
+Selection-popup drawing runs outside plugin locks; its button release keeps the
+menu open and its Copy action cannot reenter the rendering plugin.
 
 This slice covers rendered message text and search previews, not bidirectional
 TextEdit/IME, complete application RTL mirroring or screen-reader parity. An

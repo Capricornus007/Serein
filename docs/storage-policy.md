@@ -25,7 +25,12 @@ at the end of that pass; no extra text is retained between passes. A separate
 4 MiB allocated copy buffer is assembled only after both current endpoint IDs,
 hashes and visible orders resolve. Missing/deleted/changed endpoints and overflow
 suppress copying rather than returning partial text; copy requests never survive
-a pass. Source changes invalidate endpoints. Copying explicitly
+a pass. Source changes invalidate endpoints. An open context menu revalidates
+current visible sources before an explicit mapped Copy; clipped, edited or
+oversized selections cannot reuse a previous copied value. The existing native
+context-menu copy cache is separately capped at 4 MiB of allocated string
+capacity, clears on a new selection-menu request and on scope changes, and is
+never a fallback for mapped text. Copying explicitly
 hands text to the OS clipboard, whose retention is outside account cache cleanup.
 No disk record, schema, network request, log or telemetry is added. Existing
 message, draft, edit and persisted content remain in their original logical order.
