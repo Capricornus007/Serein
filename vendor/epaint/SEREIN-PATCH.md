@@ -13,6 +13,8 @@ their exact native advances, plus explicit per-section direction on that API. Ex
 retain upstream behavior. Serein performs bounded logical line breaking and per-line Unicode
 bidi ordering, then uses the native cluster map for painting, hit testing and logical copy.
 The single-line path avoids upstream's ascending-only continuation-glyph bookkeeping for RTL.
+An opt-in process-wide read-only layout generation identifies font reconstruction and native
+galley invalidation (including atlas resets), so Serein's bounded external cache cannot reuse meshes with stale atlas UVs.
 
 Remove this fork when upstream exposes equivalent direction and cluster mapping APIs with
 correct wrapped bidi layout. This patch does not establish bidirectional TextEdit, IME or

@@ -1216,6 +1216,9 @@ impl Formatted {
 					}
 				};
 				let mut start = 0;
+				// A formatted LTR paragraph is classified once, rather than rescanning
+				// its remaining suffix for every inline style or action.
+				let mut ltr_until = 0;
 				while start < spans.len() {
 					// Discord's quote rail spans the whole block: a nested run keeps every
 					// wrapped line inside the indent, and the rail is painted around it.
@@ -1264,7 +1267,10 @@ impl Formatted {
 						start += count;
 						continue;
 					}
-					if spans[start].1.block.is_none() && (quoted || !spans[start].1.quote) {
+					if start >= ltr_until
+						&& spans[start].1.block.is_none()
+						&& (quoted || !spans[start].1.quote)
+					{
 						let count = spans[start..]
 							.iter()
 							.take_while(|(_, style)| {
@@ -1292,6 +1298,7 @@ impl Formatted {
 							start += count;
 							continue;
 						}
+						ltr_until = start + count;
 					}
 					let spoiler = spans[start].1.spoiler;
 					if let Some(region) = spoiler
@@ -1813,10 +1820,19 @@ impl Formatted {
 				style.mass_mention = true;
 				&resolved
 			} else if let Some(id) = style.channel {
-				resolved = channel_reference_name(id, render.channels, render.source)
-					.map_or_else(|| "#unknown-channel".into(), |name| format!("#{name}"));
-				style.mass_mention = true;
-				&resolved
+				if let Some(name) = channel_reference_name(id, render.channels, render.source) {
+					resolved = format!("#{name}");
+					style.mass_mention = true;
+					&resolved
+				} else if render.channels.iter().all(|channel| channel.id != id) {
+					resolved = "#unknown-channel".into();
+					style.mass_mention = true;
+					&resolved
+				} else {
+					// Known unsupported channel kinds retain their literal, inert token.
+					style.channel = None;
+					text
+				}
 			} else if let Some(id) = style.role {
 				resolved = format!(
 					"@{}",
@@ -4554,6 +4570,7 @@ mod tests {
 				),
 				Formatted::parse("שלום עולם mixed English 123 סוף השורה"),
 				Formatted::parse("لَا لَإِ بَ بِ بُ\nEnglish prefix: العربية 123 ثم النهاية"),
+				Formatted::parse(&"**Bold** plain *italic* `code` ".repeat(40)),
 			];
 			let mut images = crate::avatars::Avatars::default();
 			let mut profile = crate::profiles::ProfileSession::default();
@@ -4600,7 +4617,7 @@ mod tests {
 				samples.push(start.elapsed().as_secs_f64() * 1000.0);
 			}
 			println!(
-				"RTL_MESSAGE_LAYOUT_BENCH {{\"width\":{width},\"warmup_frames\":10,\"frames_per_sample\":200,\"messages_per_frame\":4,\"samples_ms\":{samples:?}}}"
+				"RTL_MESSAGE_LAYOUT_BENCH {{\"width\":{width},\"warmup_frames\":10,\"frames_per_sample\":200,\"messages_per_frame\":5,\"samples_ms\":{samples:?}}}"
 			);
 		}
 	}
@@ -4949,6 +4966,161 @@ mod tests {
 		// The existing external-link confirmation owns the result; no URL opens implicitly.
 		assert_eq!(opening.borrow().as_deref(), Some("https://example.com/"));
 		assert_eq!(mask, 1);
+	}
+	#[test]
+	fn rtl_channel_references_preserve_unsupported_tokens_and_native_activation() {
+		for id in [2, 3] {
+			for keyboard in [false, true] {
+				let ctx = egui::Context::default();
+				crate::fonts::install(&ctx);
+				let channels = [model::Channel {
+					id: Id(2),
+					kind: 2,
+					guild: Some(Id(1)),
+					name: "synthetic-voice".into(),
+					last_message: None,
+					parent_id: None,
+					position: 0,
+					recipients: vec![],
+					member_list_id: None,
+					tags: None,
+					message_count: None,
+					icon: None,
+				}];
+				let parsed = Formatted::parse(&format!("مرحبا <#{id}> نهاية"));
+				let channel = std::cell::RefCell::new(None);
+				let snapshot = std::cell::RefCell::new(Vec::new());
+				let mut images = crate::avatars::Avatars::default();
+				let mut profile = crate::profiles::ProfileSession::default();
+				let mut clock = 0.0;
+				let mut frame = |events| {
+					clock += 0.02;
+					ctx.run_ui(
+						egui::RawInput {
+							screen_rect: Some(egui::Rect::from_min_size(
+								egui::Pos2::ZERO,
+								egui::vec2(600.0, 200.0),
+							)),
+							events,
+							time: Some(clock),
+							..Default::default()
+						},
+						|ui| {
+							let mut surface = crate::select::Surface::new(ui, "rtl-channel-parity");
+							parsed.show_references(
+								ui,
+								&mut None,
+								&[],
+								None,
+								&mut profile,
+								(&channels, &mut channel.borrow_mut(), &[], &[]),
+								(&mut images, true, &mut 0),
+								&mut surface,
+								crate::design::MessageCardSurface::Opaque,
+							);
+							*snapshot.borrow_mut() = surface.mapped_layouts();
+							surface.finish(ui);
+						},
+					)
+				};
+				frame(vec![]).drop_without_applying_deltas();
+				let (pos, layout) = snapshot.borrow()[0].clone();
+				let expected = if id == 2 { "<#2>" } else { "#unknown-channel" };
+				let at = layout
+					.source
+					.find(expected)
+					.expect("channel display parity");
+				let point = pos
+					+ layout
+						.cells
+						.iter()
+						.find(|cell| cell.source.contains(&at))
+						.unwrap()
+						.rect
+						.center()
+						.to_vec2();
+				if keyboard {
+					for key in [egui::Key::Tab, egui::Key::Enter] {
+						frame(vec![egui::Event::Key {
+							key,
+							physical_key: None,
+							pressed: true,
+							repeat: false,
+							modifiers: Default::default(),
+						}])
+						.drop_without_applying_deltas();
+					}
+				} else {
+					for pressed in [true, false] {
+						frame(vec![
+							egui::Event::PointerMoved(point),
+							egui::Event::PointerButton {
+								pos: point,
+								button: egui::PointerButton::Primary,
+								pressed,
+								modifiers: Default::default(),
+							},
+						])
+						.drop_without_applying_deltas();
+					}
+				}
+				assert_eq!(
+					*channel.borrow(),
+					(id == 3).then_some(Id(id)),
+					"unsupported channels are inert for pointer and keyboard activation"
+				);
+			}
+		}
+	}
+	#[test]
+	fn formatted_ltr_paragraphs_keep_all_native_spans_and_nested_rtl() {
+		let ctx = egui::Context::default();
+		crate::fonts::install(&ctx);
+		let body = "**Bold** plain *italic* `code` ".repeat(40);
+		let parsed = Formatted::parse(&format!("{body}\n\n> مرحبا بالعالم\n\nTail final"));
+		assert!(!parsed.limited);
+		assert!(parsed.spans.len() > 150);
+		let mut images = crate::avatars::Avatars::default();
+		let mut profile = crate::profiles::ProfileSession::default();
+		let output = ctx.run_ui(
+			egui::RawInput {
+				screen_rect: Some(egui::Rect::from_min_size(
+					egui::Pos2::ZERO,
+					egui::vec2(900.0, 4000.0),
+				)),
+				..Default::default()
+			},
+			|ui| {
+				let mut surface = crate::select::Surface::new(ui, "formatted-ltr");
+				parsed.show_references(
+					ui,
+					&mut None,
+					&[],
+					None,
+					&mut profile,
+					(&[], &mut None, &[], &[]),
+					(&mut images, true, &mut 0),
+					&mut surface,
+					crate::design::MessageCardSurface::Opaque,
+				);
+				let mapped = surface.mapped_layouts();
+				assert_eq!(mapped.len(), 1);
+				assert_eq!(mapped[0].1.source, "مرحبا بالعالم");
+				surface.finish(ui);
+			},
+		);
+		let text: String = output
+			.shapes
+			.iter()
+			.filter_map(|shape| match &shape.shape {
+				egui::Shape::Text(text) => Some(text.galley.text()),
+				_ => None,
+			})
+			.collect();
+		assert_eq!(text.matches("Bold").count(), 40);
+		assert_eq!(text.matches("italic").count(), 40);
+		assert!(text.contains("Tail final"));
+		output.drop_without_applying_deltas();
 	}
 	#[test]
 	fn rtl_message_jump_pill_and_mentions_keep_native_accessibility_actions() {

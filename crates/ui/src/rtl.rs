@@ -436,6 +436,7 @@ struct Entry {
 	scale: u32,
 	fonts: (usize, usize),
 	discovered: usize,
+	atlas_generation: usize,
 	value: Arc<Layout>,
 	bytes: usize,
 }
@@ -460,7 +461,8 @@ pub(crate) fn layout(ctx: &egui::Context, spans: &[Span], width: f32) -> Option<
 	}
 	let scale = ctx.pixels_per_point().to_bits();
 	let fonts = crate::fonts::revision(ctx);
-	let discovered = ctx.fonts(|fonts| fonts.discovered_fonts().len());
+	let (discovered, atlas_generation) =
+		ctx.fonts(|fonts| (fonts.discovered_fonts().len(), fonts.layout_generation()));
 	{
 		let mut cache = cache.lock().expect("RTL cache lock");
 		if let Some(index) = cache.entries.iter().position(|entry| {
@@ -468,6 +470,7 @@ pub(crate) fn layout(ctx: &egui::Context, spans: &[Span], width: f32) -> Option<
 				&& entry.scale == scale
 				&& entry.fonts == fonts
 				&& entry.discovered == discovered
+				&& entry.atlas_generation == atlas_generation
 				&& entry.spans == spans
 		}) {
 			let entry = cache.entries.remove(index).expect("known cache entry");
@@ -507,6 +510,7 @@ pub(crate) fn layout(ctx: &egui::Context, spans: &[Span], width: f32) -> Option<
 		scale,
 		fonts,
 		discovered,
+		atlas_generation,
 		value: value.clone(),
 		bytes,
 	});
@@ -651,6 +655,76 @@ mod tests {
 					assert!(!cell.rtl);
 				}
 			}
+		}
+	}
+	#[test]
+	fn rtl_cache_rebuilds_native_meshes_after_font_atlas_reset() {
+		let ctx = egui::Context::default();
+		crate::fonts::install(&ctx);
+		let mut previous = None;
+		let mut generation = None;
+		for reset in [false, true, false] {
+			if reset {
+				ctx.global_style_mut(|style| {
+					style.visuals.text_options.font_hinting =
+						!style.visuals.text_options.font_hinting;
+				});
+			}
+			ctx.run_ui(egui::RawInput::default(), |ui| {
+				let current_generation = ui.fonts(|fonts| fonts.layout_generation());
+				let value = layout(ui.ctx(), &[span("مرحبا English")], 180.0).unwrap();
+				if let Some(previous) = &previous {
+					assert_eq!(Arc::ptr_eq(previous, &value), !reset);
+					assert_eq!(generation == Some(current_generation), !reset);
+				}
+				assert!(value.lines.iter().any(|line| {
+					line.galley
+						.rows
+						.iter()
+						.any(|row| !row.visuals.mesh.vertices.is_empty())
+				}));
+				previous = Some(value);
+				generation = Some(current_generation);
+			})
+			.drop_without_applying_deltas();
+		}
+	}
+	#[test]
+	fn rtl_cache_rebuilds_after_same_count_font_definitions_are_replaced() {
+		let ctx = egui::Context::default();
+		crate::fonts::install(&ctx);
+		let mut previous = None;
+		let mut generation = None;
+		let mut revision = None;
+		for replace in [false, true] {
+			if replace {
+				let mut definitions = ctx.fonts(|fonts| fonts.definitions().clone());
+				let family = definitions
+					.families
+					.get_mut(&egui::FontFamily::Proportional)
+					.unwrap();
+				assert!(family.len() > 1);
+				family.reverse();
+				ctx.set_fonts(definitions);
+			}
+			ctx.run_ui(egui::RawInput::default(), |ui| {
+				let value = layout(ui.ctx(), &[span("مرحبا English")], 180.0).unwrap();
+				let current_generation = ui.fonts(|fonts| fonts.layout_generation());
+				let current_revision = crate::fonts::revision(ui.ctx());
+				if let Some(previous) = &previous {
+					assert_eq!(
+						revision,
+						Some(current_revision),
+						"same-count non-custom replacement must exercise the old key collision"
+					);
+					assert_ne!(generation, Some(current_generation));
+					assert!(!Arc::ptr_eq(previous, &value));
+				}
+				previous = Some(value);
+				generation = Some(current_generation);
+				revision = Some(current_revision);
+			})
+			.drop_without_applying_deltas();
 		}
 	}
 	#[test]

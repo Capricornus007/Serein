@@ -88,7 +88,7 @@ egui_system_fonts/fontique and platform font discovery; see docs/dependency-vers
 for the exact added dependency versions and declared licenses. OS emoji fonts
 remain installed system resources and are not bundled or redistributed.
 The exact pinned epaint sources are vendored under `vendor/epaint`, with a small
-opt-in native direction/cluster metadata patch for logical RTL message layout.
+opt-in native direction/cluster metadata and layout-generation patch for logical RTL message layout.
 Its MIT/Apache texts and upstream copyright remain intact; `SEREIN-PATCH.md`
 records the changes. The same license texts and patch notice ship under
 `licenses/dependencies`; no shaping library or font is added or replaced.

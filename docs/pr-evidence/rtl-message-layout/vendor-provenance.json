@@ -222,7 +222,7 @@
     {
       "path": "text/fonts.rs",
       "upstream_sha256": "a1264f372487ece8f1183170a17efd478564669b9f769d6876cedca2e3828d69",
-      "task_sha256": "477993987e3b7c28b01d80acfeb91e56fab7295a60e33b7b5143f7abb88327b9",
+      "task_sha256": "33edfbc5edb8af50157dc4c004d480baf7d036a6763643db4a91f346c3b3c544",
       "changed": true
     },
     {

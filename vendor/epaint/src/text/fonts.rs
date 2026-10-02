@@ -119,6 +119,7 @@ impl Fonts {
     pub fn add_glyph_rasterizer(&mut self, glyph_rasterizer: GlyphRasterizer) -> bool {
         let changed = self.fonts.add_glyph_rasterizer(glyph_rasterizer);
         if changed {
+            self.fonts.layout_generation = next_layout_generation();
             self.galley_caches.clear();
         }
         changed
@@ -129,6 +130,7 @@ impl Fonts {
     /// Pass an empty list to only use the installed fonts.
     pub fn set_glyph_rasterizers(&mut self, glyph_rasterizers: Vec<GlyphRasterizer>) {
         self.fonts.set_glyph_rasterizers(glyph_rasterizers);
+        self.fonts.layout_generation = next_layout_generation();
         self.galley_caches.clear();
     }
 
@@ -159,6 +161,7 @@ impl Fonts {
     pub fn set_missing_glyph_policy(&mut self, policy: MissingGlyphPolicy) {
         if self.fonts.missing_glyph_policy != policy {
             self.fonts.missing_glyph_policy = policy;
+            self.fonts.layout_generation = next_layout_generation();
             self.galley_caches.clear(); // Cached galleys may contain tofu.
         }
     }
@@ -178,10 +181,12 @@ impl Fonts {
     pub fn begin_pass(&mut self, options: TextOptions, viewport_key: ViewportKey) {
         if self.fonts.options() != &options {
             self.fonts.set_options(options);
+            self.fonts.layout_generation = next_layout_generation();
             self.galley_caches.clear(); // Galleys point into the old atlas.
         } else if 0.8 < self.fonts.glyphs.fill_ratio() {
             // The parsed faces are still fine; only the bitmaps need to go.
             self.fonts.glyphs.clear();
+            self.fonts.layout_generation = next_layout_generation();
             self.galley_caches.clear(); // Galleys point into the old atlas.
         }
 
@@ -328,6 +333,13 @@ pub struct FontsView<'a> {
 }
 
 impl FontsView<'_> {
+    /// Process-wide identity changes on font reconstruction and native galley invalidation.
+    /// External layout caches must compare this before reusing atlas-backed meshes.
+    #[inline]
+    pub fn layout_generation(&self) -> usize {
+        self.fonts.layout_generation
+    }
+
     #[inline]
     pub fn options(&self) -> &TextOptions {
         self.fonts.options()
@@ -531,6 +543,7 @@ impl FontsView<'_> {
 ///
 /// Required in order to paint text.
 pub(crate) struct FontsImpl {
+    layout_generation: usize,
     definitions: Arc<FontDefinitions>,
     glyphs: GlyphAtlas,
     faces: FaceStore,
@@ -554,11 +567,19 @@ pub(crate) struct FontsImpl {
     synthetic_tofu: GlyphRasterizer,
 }
 
+// Like FontFaceKey, this uses a process-wide counter so replacing Fonts cannot
+// collide with an external cache still holding meshes from the previous instance.
+fn next_layout_generation() -> usize {
+    static GENERATION: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(1);
+    GENERATION.fetch_add(1, core::sync::atomic::Ordering::Relaxed)
+}
+
 impl FontsImpl {
     /// Create a new [`FontsImpl`] for text layout.
     /// This call is expensive, so only create one [`FontsImpl`] and then reuse it.
     pub fn new(options: TextOptions, definitions: FontDefinitions) -> Self {
         let mut slf = Self {
+            layout_generation: next_layout_generation(),
             definitions: Arc::new(definitions),
             glyphs: GlyphAtlas::new(options),
             faces: FaceStore::new(options),
