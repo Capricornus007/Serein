@@ -4406,3 +4406,13 @@ public-upload-error-selection = Výběr se změnil; před veřejným nahráním 
 public-upload-error-missing = Před veřejným nahráním znovu vyberte soubor
 
 message-preview-limit = Tato zpráva překračuje limit nativního rozvržení textu.
+
+# Synchronizované oblíbené GIFy (neoficiální nastavení účtu).
+gif-favorites-sync-loading = Synchronizuji oblíbené…
+gif-favorites-sync-ready = Oblíbené z Discordu a místní
+gif-favorites-sync-local = Místní oblíbené
+gif-favorites-sync-refresh = Obnovit z Discordu
+gif-favorites-sync-help = Místní oblíbené zůstávají místní, dokud nezměníte jejich hvězdičku. Nové změny se po načtení synchronizují. Video GIFy mají náhradní náhled. Zobrazí se nejvýše 100 oblíbených; ostatní se při ukládání zachovají.
+gif-favorites-sync-failed = Synchronizace selhala; místní oblíbené zůstávají. Před další změnou obnovte seznam.
+gif-favorites-sync-unsupported = Oblíbené na Discordu nejsou podporované nebo překračují bezpečný limit.
+gif-favorites-sync-unconfirmed = Změna nebyla potvrzena. Před opakováním obnovte seznam.
