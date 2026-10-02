@@ -3858,3 +3858,38 @@ The additional regular file is the epaint patch notice (207 versus 206). Existin
 license texts are unchanged; PROVENANCE.md gains the intentional minimal-vendor
 source/patch entry. Raw hashes, source proof and integration size records are
 included separately in the linked measurement JSON.
+
+
+### Current RTL and scalable-emoji integration (October 2, 2026)
+
+Fresh integrated source `4a7e92ef7fab758a6550b14826629ef567d76e81` includes
+main e74d's scalable-emoji SVG worker, dependencies and bundled licenses. The
+comparison below uses exact main71 and measures this aggregate package, rather
+than isolated RTL cost. Earlier source 73/c36 shipping sizes, source 5eb native
+samples and source 73 CPU component measurements retain their original pins.
+
+| Current aggregate shipping metric | Exact main71 | Source 4a7 | Delta |
+| --- | ---: | ---: | ---: |
+| Executable | 62,269,488 B | 67,212,176 B | +4,942,688 B / +7.9376% |
+| Installed package | 68,279,917 B | 73,298,357 B | +5,018,440 B / +7.3498% |
+| Distribution ZIP | 43,363,423 B | 47,633,110 B | +4,269,687 B / +9.8463% |
+
+The standard voice-enabled package uses the repository default FAT-LTO profile;
+xtask omits development data with its internal `--no-default-features`. All twelve
+runtime workspace crates compiled fresh after inspected workspace-name release
+cache invalidation across worktree IDs. Packaging finished in 11m42s and passed
+deep/strict local ad-hoc signature verification. The 221 regular files versus
+206 before include incoming SVG dependencies/licenses and the epaint patch
+notice; existing license texts remain unchanged. Installed bytes sum regular
+files and both archives use `ditto -c -k --sequesterRsrc` over complete contents.
+
+Current source passes 15 RTL, seven selection and the actual high-DPI inline
+emoji regression, plus the full check (385 UI / 170 desktop), formatting, strict
+Clippy and policy. Arabic/Hebrew mixed messages keep the inline atlas and queue
+no vector requests, while standalone jumbo emoji retains the incoming vector
+path. All seven RTL/shaper/selection/font files and the complete `show_rtl`
+method are byte-identical to historical source 73. No new native, GPU or CPU component
+measurement is inferred from this integration; the historical measurements
+remain explicitly source-pinned. Current hashes, inventory, build provenance
+and source equivalence are recorded separately in
+[`rtl-message-layout/measurements.json`](pr-evidence/rtl-message-layout/measurements.json).
