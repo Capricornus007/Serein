@@ -1800,7 +1800,6 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.36.2"
-source = "git+https://github.com/emilk/egui?rev=fe6d63efa4a4df6f56ceab814d4f3a6efab69b88#fe6d63efa4a4df6f56ceab814d4f3a6efab69b88"
 dependencies = [
  "accesskit",
  "ahash",
@@ -1959,7 +1958,6 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.36.2"
-source = "git+https://github.com/emilk/egui?rev=fe6d63efa4a4df6f56ceab814d4f3a6efab69b88#fe6d63efa4a4df6f56ceab814d4f3a6efab69b88"
 dependencies = [
  "ahash",
  "bytemuck",
@@ -1975,6 +1973,7 @@ dependencies = [
  "self_cell",
  "skrifa",
  "smallvec",
+ "unicode-bidi",
  "unicode-general-category",
  "unicode-properties",
  "unicode-segmentation",

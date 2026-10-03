@@ -2214,3 +2214,15 @@ whose original compression request is not implemented. Synthetic localhost tests
 `--features demo -- --demo --demo-chat --demo-attachment=file --demo-external-upload`
 verify local behavior without any real hosted upload or Discord session. Live service
 acceptance, link embedding and other-platform native interaction remain unverified.
+
+## Bidirectional local text rendering
+
+Persian, Arabic, Urdu and Kurdish automatic message/composer wrapping keeps the
+sentence's beginning on the first line. Native labels share the patched renderer;
+stored, copied and sent strings remain logical. Synthetic tests cover four-language
+line ordering, marks/expansions, mixed Latin/digits, explicit newlines, elision, inline
+artwork, arrows/selection and native TextEdit copy/paste/delete/IME events. Linux native
+WGPU screenshots use offline fixtures. This is local rendering evidence, with no new
+Discord protocol capability or live-account validation. OS IME routing and screen readers
+remain unverified; cluster caret spacing and forced intra-word shaping limits are
+listed in `vendor/egui/SEREIN-PATCH.md`.

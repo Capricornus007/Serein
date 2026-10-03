@@ -1,0 +1,3 @@
+   Compiling serein v0.1.0 (<worktree>/apps/desktop)
+    Checking ui v0.1.0 (<worktree>/crates/ui)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.78s

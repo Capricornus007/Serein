@@ -30,6 +30,8 @@ mod components;
 mod composer_text;
 #[cfg(any(test, all(debug_assertions, feature = "demo")))]
 mod recovery_demo;
+#[cfg(test)]
+mod rtl_tests;
 #[cfg(all(debug_assertions, feature = "demo"))]
 pub use recovery_demo::check as debug_resume_send_check;
 pub mod design;

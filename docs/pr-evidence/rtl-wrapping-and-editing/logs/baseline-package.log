@@ -1,0 +1,28 @@
+   Compiling model v0.1.0 (<worktree>/crates/model)
+   Compiling session-cache v0.1.0 (<worktree>/crates/session-cache)
+   Compiling client-core v0.1.0 (<worktree>/crates/client-core)
+   Compiling test-support v0.1.0 (<worktree>/crates/test-support)
+   Compiling xtask v0.1.0 (<worktree>/tools/xtask)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.66s
+     Running `<original-workspace>/target/debug/xtask package`
+   Compiling model v0.1.0 (<worktree>/crates/model)
+   Compiling hpke-rs v0.6.1 (<worktree>/vendor/hpke-rs)
+   Compiling discord-voice v0.1.0 (<worktree>/crates/discord-voice)
+   Compiling extensions v0.1.0 (<worktree>/crates/extensions)
+   Compiling serein v0.1.0 (<worktree>/apps/desktop)
+   Compiling openmls_rust_crypto v0.5.1
+   Compiling davey v0.1.4 (<worktree>/vendor/davey)
+   Compiling session-cache v0.1.0 (<worktree>/crates/session-cache)
+   Compiling discord-protocol v0.1.0 (<worktree>/crates/discord-protocol)
+   Compiling local-store v0.1.0 (<worktree>/crates/local-store)
+   Compiling client-core v0.1.0 (<worktree>/crates/client-core)
+   Compiling platform v0.1.0 (<worktree>/crates/platform)
+   Compiling ui v0.1.0 (<worktree>/crates/ui)
+   Compiling discord-api v0.1.0 (<worktree>/crates/discord-api)
+   Compiling discord-gateway v0.1.0 (<worktree>/crates/discord-gateway)
+    Finished `release` profile [optimized + debuginfo] target(s) in 8m 46s
+dpkg-deb: building package 'serein' in '/tmp/serein-debian-package-c05n36xu/serein_0.1.0-1_amd64.deb'.
+Debian package smoke passed: 225 files; executable, desktop entry, metadata, ownership, content and host shared-library closure verified.
+Unsigned Debian package: <worktree>/dist/serein_0.1.0-1_amd64.deb (44193536 bytes; Installed-Size 87947 KiB).
+Runtime dependencies: libasound2t64 (>= 1.1.0), libc6 (>= 2.43), libgcc-s1 (>= 4.2), libglib2.0-0t64 (>= 2.54.0), libgstreamer-plugins-base1.0-0 (>= 1.10.0), libgstreamer1.0-0 (>= 1.14.0), libgtk-4-1 (>= 4.0.0), libjavascriptcoregtk-6.0-1, libpulse0 (>= 0.99.1), libsoup-3.0-0 (>= 3.0.3), libstdc++6 (>= 5), libwebkitgtk-6.0-4 (>= 2.39.90), libvulkan1, libegl1, libxkbcommon0, libxkbcommon-x11-0, libwayland-client0, libx11-6, libx11-xcb1, libxcursor1, libxi6, libxrandr2, dbus-user-session | dbus-x11, xdg-desktop-portal, gstreamer1.0-plugins-good, gstreamer1.0-plugins-base, gstreamer1.0-pipewire; recommends a Secret Service provider (gnome-keyring) and GStreamer plugins for inline attachment video.
+Unsigned package executable: dist/serein (85350320 bytes)

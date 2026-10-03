@@ -1,0 +1,174 @@
+   Compiling epaint v0.36.2 (<worktree>/vendor/egui/crates/epaint)
+   Compiling egui v0.36.2 (<worktree>/vendor/egui/crates/egui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.95s
+     Running unittests src/lib.rs (<original-workspace>/target/debug/deps/egui-66b68ea7d39efb2d)
+
+running 67 tests
+test atomics::atoms::tests::collect_atoms ... ok
+test class::has_classes::tests::adding_a_class_twice_moves_it_to_end ... ok
+test class::has_classes::tests::setting_a_class_moves_it_to_end ... ok
+test animation_manager::tests::zero_duration_value_animation_reaches_target_immediately ... ok
+test containers::frame::frame_size ... ok
+test context::context_impl_send_sync ... ok
+test data::input::keyboard_shortcut::format_kb_shortcut ... ok
+test hit_test::tests::buttons_on_window ... ok
+test data::key::test_key_from_name ... ok
+test id::debug_format_tests::nested_id_as_source ... ok
+test id::debug_format_tests::null_as_parent ... ok
+test id::debug_format_tests::null_prints_as_null ... ok
+test context::test::test_root_ui_while_borrowed_panics - should panic ... ok
+test id::debug_format_tests::root_id_salt ... ok
+test id::debug_format_tests::root_integer ... ok
+test id::debug_format_tests::root_string ... ok
+test id::debug_format_tests::with_chain ... ok
+test id::debug_format_tests::with_one_child ... ok
+test hit_test::tests::thin_resize_handle_next_to_label ... ok
+test id::debug_format_tests::with_salt_matches_with ... ok
+test id::id_size ... ok
+test context::test::test_root_ui_with_run_pass ... ok
+test containers::aligned::tests::contents_end_up_aligned ... ok
+test id_salt::tests::debug_format_integer_source ... ok
+test context::test::test_font_providers_changed_mid_pass ... ok
+test id_salt::tests::debug_format_nested_salt ... ok
+test context::test::test_single_pass ... ok
+test id_salt::tests::debug_format_string_source ... ok
+test context::test::test_multi_pass ... ok
+test context::test::test_dual_pass ... ok
+test id_salt::tests::debug_format_triple_nested_salt ... ok
+test context::test::test_root_ui_with_begin_and_end_pass ... ok
+test id_salt::tests::debug_format_tuple_source ... ok
+test load::test_has_extension ... ok
+test memory::lost_focus_fires_after_mid_frame_focus_transfer ... ok
+test memory::memory_impl_send_sync ... ok
+test response::test_response_size ... ok
+test memory::order_map_total_ordering ... ok
+test style::style_impl_send_sync ... ok
+test text_selection::text_cursor_state::test::test_index_conversion_roundtrip ... ok
+test text_selection::text_cursor_state::test::test_next_word ... ok
+test text_selection::text_cursor_state::test::test_next_word_boundary_char_index ... ok
+test text_selection::text_cursor_state::test::test_previous_word ... ok
+test text_selection::text_cursor_state::test::test_select_word_at ... ok
+test ui::ui_impl_send_sync ... ok
+test text_selection::text_cursor_state::tests::test_previous_word_graphemes ... ok
+test util::id_type_map::test_mix ... ok
+test util::id_type_map::test_one_id_two_types ... ok
+test util::id_type_map::test_two_id_two_type ... ok
+test util::id_type_map::test_two_id_x_two_types ... ok
+test widget_text::tests::ensure_small_widget_text ... ok
+test widgets::drag_value::tests::test_default_parser ... ok
+test widgets::drag_value::tests::test_total_cmp_clamp_value_to_range ... ok
+test widgets::range_slider::tests::a_rail_may_run_high_to_low ... ok
+test widgets::range_slider::tests::handles_keep_their_separation ... ok
+test widgets::range_slider::tests::handles_meet_but_never_cross ... ok
+test widgets::range_slider::tests::separation_never_pushes_past_the_rail ... ok
+test widgets::range_slider::tests::without_clamping_only_the_neighbor_bounds_a_handle ... ok
+test widgets::slider_core::tests::rail_ends_map_to_range_ends ... ok
+test widgets::slider_core::tests::value_position_round_trip ... ok
+test widgets::text_edit::completion::tests::word_range_before_cursor_works ... ok
+test widgets::text_edit::text_buffer::tests::test_txt_n_sel ... ok
+test widgets::text_edit::text_buffer::tests::test_delete_surrounding_chars ... ok
+test widgets::widgets_can_be_boxed ... ok
+test id::debug_format_tests::salting_with_self_is_truncated ... ok
+test text_selection::label_text_selection::tests::viewport_passes_only_clean_up_their_own_label_selection ... ok
+test text_selection::text_cursor_state::test::test_word_boundary_large_text_performance ... ok
+
+test result: ok. 67 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running unittests src/lib.rs (<original-workspace>/target/debug/deps/epaint-8019bb8152e5d3ea)
+
+running 93 tests
+test corner_radius_f32::tests::add_and_sub_saturate_at_zero ... ok
+test mutex::tests_rwlock::lock_two_different_rwlocks_single_thread ... ok
+test mutex::tests::lock_two_different_mutexes_single_thread ... ok
+test rounded_rect::tests::clamp_pos ... ok
+test rounded_rect::tests::expand ... ok
+test rounded_rect::tests::oversized_radius_is_clamped ... ok
+test shadow::shadow_size ... ok
+test shapes::band_shape::tests::band_point_from_pos_and_width ... ok
+test shapes::band_shape::tests::band_point_is_finite ... ok
+test shapes::band_shape::tests::transform_before_with_angle_and_pivot_rotates_around_translated_origin ... ok
+test mutex::tests_rwlock::rwlock_read_read_reentrancy ... ok
+test shapes::band_shape::tests::with_angle_and_pivot_is_relative_to_the_previous_angle ... ok
+test mutex::tests_rwlock::rwlock_short_read_foreign_read_write_reentrancy ... ok
+test shapes::band_shape::tests::with_angle_and_pivot_preserves_pivot ... ok
+test shapes::bezier_shape::tests::test_cubic_bounding_box ... ok
+test shapes::band_shape::tests::transform_preserves_rotation ... ok
+test shapes::bezier_shape::tests::test_quadratic_bounding_box ... ok
+test shapes::bezier_shape::tests::test_cubic_different_tolerance_flattening ... ok
+test shapes::bezier_shape::tests::test_cubic_different_shape_flattening ... ok
+test shapes::bezier_shape::tests::test_quadratic_different_tolerance ... ok
+test shapes::bezier_shape::tests::test_quadratic_flattening ... ok
+test shapes::rect_shape::rect_shape_size ... ok
+test shapes::shape::shape_impl_send_sync ... ok
+test shapes::shape::shape_size ... ok
+test stroke::test_is_nearest_integer_odd ... ok
+test tessellator::tessellate_band_connects_spans ... ok
+test tessellator::tessellate_band_fades_out_at_a_pinch ... ok
+test tessellator::tessellate_band_fill ... ok
+test tessellator::tessellate_band_fill_is_feathered ... ok
+test tessellator::tessellate_band_rotates_around_the_origin ... ok
+test tessellator::tessellate_band_skips_invalid_spans ... ok
+test tessellator::tessellate_band_splits_at_invalid_points ... ok
+test tessellator::tessellate_band_stroke_kind ... ok
+test tessellator::tessellate_band_stroke_only ... ok
+test tessellator::test_tessellator ... ok
+test tessellator::transform_before_and_after_rounding ... ok
+test tessellator::path_bounding_box ... ok
+test text::font_provider::tests::provider_is_not_asked_for_control_chars_and_combining_marks ... ok
+test text::font_provider::tests::discovered_font_beats_the_rasterizer ... ok
+test shapes::text_shape::tests::text_bounding_box_under_rotation ... ok
+test text::font_provider::tests::discovered_fonts_and_misses_survive_an_options_change ... ok
+test text::font_provider::tests::provider_miss_is_remembered_per_family ... ok
+test text::font_provider::tests::rasterizer_is_used_when_the_provider_misses ... ok
+test text::fonts::tests::test_fallback_glyph_width ... ok
+test shapes::paint_callback::test_viewport_rounding ... ok
+test text::glyph_rasterizer::has_emoji_presentation_tests::emoji_presentation ... ok
+test text::glyph_rasterizer::has_emoji_presentation_tests::text_presentation ... ok
+test text::fonts::tests::viewport_passes_do_not_evict_each_others_galleys ... ok
+test text::index::tests::arithmetic ... ok
+test text::font_provider::tests::provider_hit_installs_the_font_once ... ok
+test text::fonts::tests::special_emojis_come_from_the_bundled_icon_font ... ok
+test text::text_layout::tests::color_raster_glyph_keeps_color_in_atlas ... ok
+test text::text_layout::tests::color_raster_glyph_is_not_tinted ... ok
+test text::text_layout::tests::missing_glyph_policy_panic_ignores_tab_with_fonts ... ok
+test text::text_layout::tests::missing_glyph_policy_panic_is_satisfied_by_a_fallback_rasterizer ... ok
+test text::text_layout::tests::missing_glyph_policy_panic_without_fonts - should panic ... ok
+test text::text_layout::tests::missing_glyph_policy_panic_without_fonts_includes_whitespace - should panic ... ok
+test text::text_layout::tests::missing_glyph_policy_panic_with_fonts - should panic ... ok
+test text::text_layout::tests::no_font_newline_still_breaks_rows ... ok
+test text::text_layout::tests::no_font_still_gives_one_glyph_per_char ... ok
+test text::text_layout::tests::no_font_tofu_is_cached_across_layouts ... ok
+test text::text_layout::tests::priority_rasterizer_keeps_one_glyph_per_char ... ok
+test text::text_layout::tests::overflow_character_uses_priority_rasterizer ... ok
+test text::text_layout::tests::priority_rasterizer_miss_falls_through_to_font_before_fallback ... ok
+test text::text_layout::tests::priority_rasterizer_overrides_installed_glyph ... ok
+test text::text_layout::tests::raster_glyph_cache_is_keyed_by_family ... ok
+test text::text_layout::tests::raster_glyph_failure_is_cached_and_falls_back_to_replacement ... ok
+test text::text_layout::tests::rasterizers_are_asked_in_order_until_one_succeeds ... ok
+test text::text_layout::tests::rasterized_sequence_keeps_one_glyph_per_char ... ok
+test text::text_layout::tests::test_combining_diacritics ... ok
+test text::text_layout::tests::test_empty_row ... ok
+test text::text_layout::tests::test_cjk ... ok
+test text::text_layout::tests::test_end_with_newline ... ok
+test text::text_layout::tests::test_grapheme_cluster_cursor_roundtrip ... ok
+test text::text_layout::tests::test_gpos_kerning ... ok
+test text::text_layout::tests::test_grapheme_cluster_glyph_count ... ok
+test text::text_layout::tests::test_pre_cjk ... ok
+test text::text_layout::tests::test_shaping_empty_string ... ok
+test text::text_layout::tests::test_shaping_basic_latin ... ok
+test text::text_layout::tests::test_shaping_mixed_font_fallback ... ok
+test text::text_layout::tests::test_shaping_multiple_newlines ... ok
+test text::text_layout::tests::test_truncate_width ... ok
+test text::text_layout::tests::test_zero_max_width ... ok
+test text::text_layout::tests::test_truncate_with_newline ... ok
+test text::text_layout::tests::test_truncate_with_pixels_per_point ... ok
+test text::galley_cache::tests::test_intrinsic_size ... ok
+test mutex::tests::lock_multiple_threads ... ok
+test mutex::tests_rwlock::rwlock_multiple_threads ... ok
+test text::galley_cache::tests::test_split_paragraphs ... ok
+test mutex::tests_rwlock::rwlock_read_write_reentrancy - should panic ... ok
+test mutex::tests_rwlock::rwlock_write_read_reentrancy - should panic ... ok
+test mutex::tests_rwlock::rwlock_write_write_reentrancy - should panic ... ok
+test mutex::tests_rwlock::rwlock_read_foreign_read_write_reentrancy - should panic ... ok
+
+test result: ok. 93 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.00s

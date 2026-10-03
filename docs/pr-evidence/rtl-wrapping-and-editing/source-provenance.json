@@ -1,0 +1,107 @@
+{
+  "upstream_commit": "fe6d63efa4a4df6f56ceab814d4f3a6efab69b88",
+  "version": "0.36.2",
+  "license": "MIT OR Apache-2.0",
+  "modified": [
+    {
+      "path": ".gitignore",
+      "sha256": "f41d5aded6551937773c8f83a2593afe2003fc28bd10040d00aee433ee200273",
+      "upstream_sha256": "6dc197c435680a5b6043fcf20ce2c793f4990b2b4a2a89e03969c29e7acda183"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "09bb6dea45595a2072a38f8b50b972a726cdd85e675dd77cc4b1ff55e6b6315f",
+      "upstream_sha256": "aa4c60c8f8bb6a83dea86338d6a765989ad15b2d6033181f0d5657f8127e01ee"
+    },
+    {
+      "path": "crates/egui/Cargo.toml",
+      "sha256": "51adfc740e2c22983f5ce1caf37978ce4cb8e1987f73c6585fe9e58e399f6b05",
+      "upstream_sha256": "e1d726656b6c05acde400a0faf63da8446383b9eaa3b2e5fb620a95d73e2da62"
+    },
+    {
+      "path": "crates/egui/src/text_selection/accesskit_text.rs",
+      "sha256": "cc216a78e422c84c145784caf54a19518e414615d9778cf3481037ff951e4bf9",
+      "upstream_sha256": "5db002bb770ebeda54b5062c822e9126081e89abf26eb267980ac5a4946eb43c"
+    },
+    {
+      "path": "crates/egui/src/text_selection/cursor_range.rs",
+      "sha256": "72f280c588883527dc1b34086d04a047d18d7d08828cd9a7020bd7a60a3bb475",
+      "upstream_sha256": "213d256aaf861f1beb1564bf0d8870ecb1cd0e857d8d80568f8344417061bf28"
+    },
+    {
+      "path": "crates/egui/src/text_selection/visuals.rs",
+      "sha256": "e9d72d48ffe377c996b8dae3ad5d7a17a60b267ae988f0b6654c159aa4594e0d",
+      "upstream_sha256": "cc953477e129f311c3e63f6ae770a2668a5aa9f2b3df5e00ff49918915bbc83e"
+    },
+    {
+      "path": "crates/egui/src/util/id_type_map.rs",
+      "sha256": "86c44e7d02a60038c51d5a4e1476a8e26e5595d396a6a555d3bc2a7171fd5ff3",
+      "upstream_sha256": "c6b879ccb3ae5c644bfc0bc909105f2dcabfb73a9ef322be37f4dce2bcaf33c1"
+    },
+    {
+      "path": "crates/epaint/Cargo.toml",
+      "sha256": "3d4f34b58c11347a9e0c7c9136c220ce5e7af30a9cb0bb7f0276c46d02557f25",
+      "upstream_sha256": "89668b5ae113991ad13f57962ae3ba0319121e47269c4b86c02f304ed68b06d7"
+    },
+    {
+      "path": "crates/epaint/src/image.rs",
+      "sha256": "5ec9c21390251e1cca537da626348257f11ff2ed1586b67ced792b0bc56499e1",
+      "upstream_sha256": "cfc3f543acd155530c6a18b291666615083c345abcf09edfc038351f08337246"
+    },
+    {
+      "path": "crates/epaint/src/mesh.rs",
+      "sha256": "1541bd2cb930318893dea6810b49bb832699981ef486ae93d40c7e97f1ac6441",
+      "upstream_sha256": "c2d6f86a759bd2157b5b787ab03e8eae981b243988ecf4e19c45312c8d9ee3ef"
+    },
+    {
+      "path": "crates/epaint/src/shapes/text_shape.rs",
+      "sha256": "b34ee9a20a5d662771211099d72fa3f4f9c3a15f61ff4bde7def207353c4c22a",
+      "upstream_sha256": "fe342c549db9a589c0ddd9446ffd24b63a23377798b312bd8ef88e0972151047"
+    },
+    {
+      "path": "crates/epaint/src/text/cursor.rs",
+      "sha256": "6e248bd85f28b019634c192e9e09de844beb912ab5b5456028efcbb26d351e9d",
+      "upstream_sha256": "67e6493c382cde5657cec4d4f9b93971d9ea410a50a4e74cdc0d7c0f8d9b2a2c"
+    },
+    {
+      "path": "crates/epaint/src/text/font_face.rs",
+      "sha256": "f595559439be028e9e56c1c3987ab6c6fdd9b96931fb60f46f2a817e682b270c",
+      "upstream_sha256": "a1cba3ceea3e39de7be0db1b1ab14c59915634890e5bbf2d61b20dcc72e2c316"
+    },
+    {
+      "path": "crates/epaint/src/text/font_provider.rs",
+      "sha256": "03d8015fc8563cae511e97dbeb0211a0631a81bf2c79d215253b765e4495d7a3",
+      "upstream_sha256": "b6b9e4e38e6a1692b00174631be31a009a5eb7f691e693760a26b4164d5f482b"
+    },
+    {
+      "path": "crates/epaint/src/text/text_layout.rs",
+      "sha256": "cffeceafcdca39b1389045d62f9003f33fd8d6b541562c5fd9a3c8a47a821ff0",
+      "upstream_sha256": "22f6a7ef545e23e175605e3e38e6944758553709e01481aae15db050ca6b3f9f"
+    },
+    {
+      "path": "crates/epaint/src/text/text_layout_types.rs",
+      "sha256": "f8f161495411abedc9604e4c910840815359938977b157663a9020d7d95dda0e",
+      "upstream_sha256": "71e9e87ca7bcdf143288963bf56bb1166d54159b01c9b36cccd8620e846383d1"
+    }
+  ],
+  "added": [
+    {
+      "path": "SEREIN-PATCH.md",
+      "sha256": "57af26feab7df144b04130563091ef38655cb59ac603e332cd54833fcd177d52"
+    },
+    {
+      "path": "crates/epaint/src/text/text_layout/bidi.rs",
+      "sha256": "d07e182e89e62142f26b967b680bfadb45bae98bd29fcbe86f82dfda8bdc6472"
+    },
+    {
+      "path": "crates/epaint/src/text/text_layout/cluster.rs",
+      "sha256": "bbf4ddf77ff47d7b2c826d567ff9280fe1c039506916976ddd27fa5723ef42fb"
+    },
+    {
+      "path": "rustfmt.toml",
+      "sha256": "80eba31b620a2485d878b60136c5857d20dbfc60d156bb0375ee8c990aff5a3b"
+    }
+  ],
+  "unmodified_file_count": 178,
+  "unmodified_path_sha256_manifest_hash": "11c264d47ce11df3c871ec2567ca3775175de4cc8b52dd66029441fddef0b7bc"
+}

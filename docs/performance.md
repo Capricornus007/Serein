@@ -4124,3 +4124,42 @@ macOS host. No Rust runtime or voice dependency changed. The standard host
 voice-inclusive package passes; full workspace tests remain blocked by unchanged
 UI failures. Antivirus acceptance and Windows signing are separate, unverified
 release concerns.
+
+## RTL wrapping and editing (October 4, 2026)
+
+Baseline `ca1956d6d41700409d38a00dbae1a1999f30218a` is compared with the
+source identities in
+[`rtl-wrapping-and-editing/measurements.json`](pr-evidence/rtl-wrapping-and-editing/measurements.json).
+Host: Ubuntu 26.04.1 x86_64, AMD Ryzen 5 7535U (12 threads), 15,369,359,360 B
+RAM, pinned Rust 1.98.1. Both fresh standard `cargo xtask package` builds use
+normal release fat LTO, the locked dependencies and voice, without development
+features. Installed bytes sum regular files extracted from the complete Debian
+package, excluding symlinks; both package smoke checks pass.
+
+| Metric | Baseline | After | Delta |
+| --- | ---: | ---: | ---: |
+| Executable | 85,350,320 B | 85,388,208 B | +37,888 B (+0.0444%) |
+| Installed files | 89,864,441 B | 89,919,109 B | +54,668 B (+0.0608%) |
+| Compressed Debian package | 44,193,536 B | 44,204,972 B | +11,436 B (+0.0259%) |
+| Installed file count | 225 | 228 | +3 license/patch notices |
+| Native idle CPU, median / mean | 0.0% / 0.35% | 0.0% / 0.35% | 0 percentage points |
+| Native sampled peak RSS | 122,068,992 B | 93,126,656 B | −28,942,336 B (−23.71%) |
+| Native settled RSS | 122,064,896 B | 93,118,464 B | −28,946,432 B (−23.71%) |
+
+The optimized native preview opens the same synthetic RTL conversation at
+1120 × 760, dark mode, scale 1.0, through GNOME XWayland. Both previews compile
+with `--features demo` and disable LTO only on the final example crate. Rendering
+uses Vulkan, AMD Radeon Graphics (RADV REMBRANDT), Mesa 26.0.8-1ubuntu0.3.
+After eight seconds warmup and three seconds settling, psutil takes twenty
+one-second process samples. CPU is one-core percentage; settled RSS is the median
+of the last five samples. Neither run spawned helper children, and Cargo work was
+stopped during sampling. The baseline adds only the synthetic fixture harness to
+the unchanged renderer/UI. Reproduction commands and inspected native dark/light,
+wide/minimum-width captures are in the [evidence README](pr-evidence/rtl-wrapping-and-editing/README.md).
+
+This single idle pair gives no confidence interval or performance improvement
+claim, including for the lower RSS observation. GPU memory, active frame/startup
+latency, native OS IME/event routing and live account workloads remain unmeasured.
+The production crate versions are unchanged; egui/epaint use the documented local
+patch at their exact pinned revision. The full workspace check, 16 focused RTL
+regressions, 160 supplemental renderer/editor tests and strict lint checks pass.

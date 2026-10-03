@@ -184,3 +184,13 @@ an incomplete spec gate. New unlisted missing notices still stop packaging.
 | `objc2-web-kit-0.3.2.crate` | objc2-web-kit 0.3.2 | [source](https://static.crates.io/crates/objc2-web-kit/objc2-web-kit-0.3.2.crate) | `b2e5aaab980c433cf470df9d7af96a7b46a9d892d521a2cbbb2f8a4c16751e7f` |
 | `realfft-3.5.0.crate` | realfft 3.5.0 | [source](https://static.crates.io/crates/realfft/realfft-3.5.0.crate) | `f821338fddb99d089116342c46e9f1fbf3828dba077674613e734e01d6ea8677` |
 | `realfft-3.5.0-license-declaration.toml` | realfft 3.5.0 | [source](https://docs.rs/crate/realfft/3.5.0/source/Cargo.toml.orig) | `d72ddbadf9bb55ed21ae973ac97f0bb4e8df2064af628c54b802b2c7d764c8de` |
+
+## Bidirectional renderer patch (October 3, 2026)
+
+`egui-SEREIN-PATCH.md` describes the local egui/epaint source delta from exact upstream
+revision `fe6d63efa4a4df6f56ceab814d4f3a6efab69b88`. Existing workspace license texts
+are byte-identical to that revision. The following are unmodified registry license texts
+for the already-locked unicode-bidi 0.3.18, including the adapted L1 routine:
+
+- `unicode-bidi-0.3.18-LICENSE-MIT`: SHA-256 `7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0`.
+- `unicode-bidi-0.3.18-LICENSE-APACHE`: SHA-256 `a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2`.

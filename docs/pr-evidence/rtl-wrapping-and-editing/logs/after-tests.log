@@ -1,0 +1,25 @@
+   Compiling epaint v0.36.2 (<worktree>/vendor/egui/crates/epaint)
+   Compiling egui v0.36.2 (<worktree>/vendor/egui/crates/egui)
+   Compiling ui v0.1.0 (<worktree>/crates/ui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.65s
+     Running unittests src/lib.rs (<original-workspace>/target/debug/deps/ui-ac72bed7cdf706fa)
+
+running 16 tests
+test rtl_tests::rtl_mixed_selection_paints_disjoint_visual_spans_without_selecting_the_gap ... ok
+test rtl_tests::rtl_native_arrows_and_selection_collapse_follow_visual_edges ... ok
+test rtl_tests::rtl_combining_clusters_do_not_split_across_automatic_lines ... ok
+test rtl_tests::rtl_digit_only_soft_rows_continue_at_the_next_visual_line_edge ... ok
+test rtl_tests::rtl_wrapped_carets_and_digit_only_rows_follow_paragraph_reading_order ... ok
+test rtl_tests::rtl_elision_retains_original_styles_and_base_direction ... ok
+test rtl_tests::rtl_elision_preserves_leading_indent_and_a_numeric_paragraph_base ... ok
+test rtl_tests::rtl_native_copy_paste_delete_and_ime_preserve_logical_buffer_order ... ok
+test rtl_tests::rtl_elision_orders_the_visible_neutral_ellipsis_and_removes_complete_mark_clusters ... ok
+test rtl_tests::rtl_multiline_selection_collapses_in_paragraph_reading_order ... ok
+test rtl_tests::rtl_plain_labels_and_explicit_newlines_keep_logical_text_and_visual_direction ... ok
+test rtl_tests::rtl_controls_expansions_alignment_and_truncation_do_not_corrupt_source_indices ... ok
+test rtl_tests::rtl_elision_reshapes_brackets_when_visible_context_changes_their_direction ... ok
+test rtl_tests::rtl_wrapping_preserves_logical_lines_in_persian_arabic_urdu_and_kurdish ... ok
+test rtl_tests::rtl_composer_inline_objects_keep_wire_indices_and_caret_geometry ... ok
+test rtl_tests::rtl_formatted_messages_wrap_after_shaping_with_styles_and_emoji ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 387 filtered out; finished in 0.29s

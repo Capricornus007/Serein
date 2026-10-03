@@ -197,15 +197,20 @@ impl Layout {
 				if let Some(inline) = self.inlines.get(next).filter(|i| i.projected == projected) {
 					let count = inline.source.len();
 					for (index, chr) in chars[inline.source.clone()].iter().enumerate() {
-						let mut slot = *glyph;
+						let mut slot = glyph.clone();
 						slot.chr = *chr;
-						slot.pos.x = glyph.pos.x + inline.width * index as f32 / count as f32;
+						let visual = if glyph.is_rtl {
+							count - index - 1
+						} else {
+							index
+						};
+						slot.pos.x = glyph.pos.x + inline.width * visual as f32 / count as f32;
 						slot.advance_width = inline.width / count as f32;
 						glyphs.push(slot);
 					}
 					next += 1;
 				} else {
-					glyphs.push(*glyph);
+					glyphs.push(glyph.clone());
 				}
 				projected += 1;
 			}
@@ -231,10 +236,14 @@ impl Layout {
 		for inline in &self.inlines {
 			let mut cursor = CCursor::new(inline.source.start);
 			cursor.prefer_next_row = true;
-			let position = output
-				.galley
-				.pos_from_cursor(cursor)
-				.translate(output.galley_pos.to_vec2());
+			let location = output.galley.layout_from_cursor(cursor);
+			let row = &output.galley.rows[location.row];
+			let glyphs = &row.glyphs[location.column.0..location.column.0 + inline.source.len()];
+			let left = glyphs.iter().map(|g| g.pos.x).fold(f32::INFINITY, f32::min);
+			let position = egui::Rect::from_min_size(
+				output.galley_pos + row.pos.to_vec2() + egui::vec2(left, 0.0),
+				egui::vec2(0.0, row.height()),
+			);
 			let rect = egui::Rect::from_min_size(
 				position.min,
 				egui::vec2(inline.width, position.height()),

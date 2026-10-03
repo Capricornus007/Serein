@@ -1,0 +1,48 @@
+   Compiling model v0.1.0 (<worktree>/crates/model)
+   Compiling extensions v0.1.0 (<worktree>/crates/extensions)
+   Compiling session-cache v0.1.0 (<worktree>/crates/session-cache)
+   Compiling client-core v0.1.0 (<worktree>/crates/client-core)
+   Compiling test-support v0.1.0 (<worktree>/crates/test-support)
+   Compiling ui v0.1.0 (<worktree>/crates/ui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 29.35s
+     Running unittests src/lib.rs (<original-workspace>/target/debug/deps/ui-cc311968b11b7b1e)
+
+running 5 tests
+
+thread 'rtl_tests::rtl_combining_clusters_do_not_split_across_automatic_lines' (116552) panicked at crates/ui/src/rtl_tests.rs:163:13:
+assertion `left == right` failed
+  left: "ببب"
+ right: "ب\u{64e}"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test rtl_tests::rtl_combining_clusters_do_not_split_across_automatic_lines ... FAILED
+
+thread 'rtl_tests::rtl_native_arrows_and_selection_collapse_follow_visual_edges' (116553) panicked at crates/ui/src/rtl_tests.rs:266:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+test rtl_tests::rtl_native_arrows_and_selection_collapse_follow_visual_edges ... FAILED
+
+thread 'rtl_tests::rtl_plain_labels_and_explicit_newlines_keep_logical_text_and_visual_direction' (116555) panicked at crates/ui/src/rtl_tests.rs:142:17:
+assertion `left == right` failed
+  left: "یوگگو\u{200c}تتففگگت\u{200c}وگوی یسراففرسی"
+ right: "گفت\u{200c}وگوی فارسی"
+test rtl_tests::rtl_plain_labels_and_explicit_newlines_keep_logical_text_and_visual_direction ... FAILED
+test rtl_tests::rtl_native_copy_paste_delete_and_ime_preserve_logical_buffer_order ... ok
+
+thread 'rtl_tests::rtl_wrapping_preserves_logical_lines_in_persian_arabic_urdu_and_kurdish' (116556) panicked at crates/ui/src/rtl_tests.rs:95:17:
+assertion `left == right` failed: wrapped rows must retain the sentence's beginning first
+  left: "ننییاین کیی ماییپپام یششییامززآآمایشی یارببای یسررببرسی ببییتترتتتیب اه\u{200c}هژژاواژه\u{200c}ها ردر Serein تتساست. ززاغغآآاز هلمججله دییاببید ردر طخخ لواول دننامبباند و ههمادادامه\u{654} ننآآ ردر یاه\u{200c}طخخ\u{200c}های یدعببدی رارققار درییگگببیرد."
+ right: "این یک پیام آزمایشی برای بررسی ترتیب واژه\u{200c}ها در Serein است. آغاز جمله باید در خط اول بماند و ادامه\u{654} آن در خط\u{200c}های بعدی قرار بگیرد."
+test rtl_tests::rtl_wrapping_preserves_logical_lines_in_persian_arabic_urdu_and_kurdish ... FAILED
+
+failures:
+
+failures:
+    rtl_tests::rtl_combining_clusters_do_not_split_across_automatic_lines
+    rtl_tests::rtl_native_arrows_and_selection_collapse_follow_visual_edges
+    rtl_tests::rtl_plain_labels_and_explicit_newlines_keep_logical_text_and_visual_direction
+    rtl_tests::rtl_wrapping_preserves_logical_lines_in_persian_arabic_urdu_and_kurdish
+
+test result: FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 389 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p ui --lib`

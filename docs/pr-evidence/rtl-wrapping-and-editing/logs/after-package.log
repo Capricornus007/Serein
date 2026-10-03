@@ -1,0 +1,10 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running `<original-workspace>/target/debug/xtask package`
+   Compiling ui v0.1.0 (<worktree>/crates/ui)
+   Compiling serein v0.1.0 (<worktree>/apps/desktop)
+    Finished `release` profile [optimized + debuginfo] target(s) in 8m 14s
+dpkg-deb: building package 'serein' in '/tmp/serein-debian-package-0yxeyjse/serein_0.1.0-1_amd64.deb'.
+Debian package smoke passed: 228 files; executable, desktop entry, metadata, ownership, content and host shared-library closure verified.
+Unsigned Debian package: <worktree>/dist/serein_0.1.0-1_amd64.deb (44204972 bytes; Installed-Size 88001 KiB).
+Runtime dependencies: libasound2t64 (>= 1.1.0), libc6 (>= 2.43), libgcc-s1 (>= 4.2), libglib2.0-0t64 (>= 2.54.0), libgstreamer-plugins-base1.0-0 (>= 1.10.0), libgstreamer1.0-0 (>= 1.14.0), libgtk-4-1 (>= 4.0.0), libjavascriptcoregtk-6.0-1, libpulse0 (>= 0.99.1), libsoup-3.0-0 (>= 3.0.3), libstdc++6 (>= 5), libwebkitgtk-6.0-4 (>= 2.39.90), libvulkan1, libegl1, libxkbcommon0, libxkbcommon-x11-0, libwayland-client0, libx11-6, libx11-xcb1, libxcursor1, libxi6, libxrandr2, dbus-user-session | dbus-x11, xdg-desktop-portal, gstreamer1.0-plugins-good, gstreamer1.0-plugins-base, gstreamer1.0-pipewire; recommends a Secret Service provider (gnome-keyring) and GStreamer plugins for inline attachment video.
+Unsigned package executable: dist/serein (85388208 bytes)

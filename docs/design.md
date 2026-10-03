@@ -71,6 +71,11 @@ binning on. Dark mode remaps coverage with `FontColorTransferFunction::Gamma(0.5
 mode leaves the transfer function off. Inter faces set `FontTweak.hinting` to `Some(false)`.
 The bundled faces remain upstream's hinted TrueType builds. See `assets/README.md`.
 
+RTL text stays in logical source order through shaping and wrapping; each finished line
+then receives Unicode visual ordering. The shared egui/epaint patch covers labels and
+native TextEdit as well as messages. Selection/copy retain logical indices and text.
+See `vendor/egui/SEREIN-PATCH.md` for caret, rich-text and native platform limitations.
+
 ## Layout
 
 - 36px title strip (`base`): hidden native title bar on macOS with traffic lights inline, centred

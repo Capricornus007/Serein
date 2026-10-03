@@ -277,6 +277,51 @@ fn prime_extension_chat(state: &mut client_core::State) {
 		.expect("valid synthetic conversation");
 }
 
+/// Synthetic Arabic-script paragraphs exercise native wrapping, labels and the composer.
+fn prime_rtl_chat(state: &mut client_core::State) {
+	let channel = state.selected.expect("selected fixture channel");
+	for (id, name) in [
+		(20, "گفت‌وگوی فارسی"),
+		(21, "المحادثة العربية"),
+		(25, "اردو گفتگو"),
+		(26, "گفتوگۆی کوردی"),
+	] {
+		if let Some(value) = state
+			.channels
+			.iter_mut()
+			.find(|value| value.id == model::Id(id))
+		{
+			value.name = name.into();
+		}
+	}
+	state.invalidate_navigation();
+	let messages = [
+		("Persian · automatic wrap", "این یک پیام آزمایشی برای بررسی ترتیب واژه‌ها در Serein است. وقتی متن به صورت خودکار در چند خط نمایش داده می‌شود، آغاز جمله باید در خط اول بماند و ادامهٔ آن در خط‌های بعدی قرار بگیرد."),
+		("Arabic · automatic wrap", "هذه رسالة تجريبية للتحقق من ترتيب الكلمات في Serein. عندما يلتف النص تلقائيًا إلى عدة أسطر، يجب أن تبقى بداية الجملة في السطر الأول ثم تظهر بقية الكلمات بالترتيب الصحيح."),
+		("Urdu · automatic wrap", "یہ ایک آزمائشی پیغام ہے جس سے Serein میں الفاظ کی ترتیب دیکھی جا سکتی ہے۔ جب عبارت خود بخود اگلی سطر میں جاتی ہے تو جملے کا آغاز پہلی سطر میں رہنا چاہیے اور باقی الفاظ درست ترتیب میں آنے چاہییں۔"),
+		("Kurdish · automatic wrap", "ئەمە پەیامێکی تاقیکردنەوەیە بۆ پشکنینی ڕیزبەندی وشەکان لە Serein. کاتێک دەقەکە بە خۆکار دەچێتە دێڕی دواتر، دەستپێکی ڕستەکە دەبێت لە دێڕی یەکەم بمێنێتەوە."),
+		("Persian · explicit newline", "این یک پیام آزمایشی برای بررسی ترتیب واژه‌ها در Serein است.\nآغاز جمله در خط اول و ادامهٔ آن در خط بعدی قرار می‌گیرد."),
+	]
+	.into_iter()
+	.enumerate()
+	.map(|(index, (name, content))| {
+		let mut message = test_support::message(700 + index as u64, channel);
+		message.author.name = name.into();
+		message.content = content.into();
+		message.attachments.clear();
+		message.embeds.clear();
+		message.reactions = Some(vec![]);
+		message
+	})
+	.collect();
+	state.timeline.clear();
+	state
+		.timeline
+		.seed_cache(messages)
+		.expect("valid synthetic RTL conversation");
+	state.drafts.insert(channel, "این یک متن آزمایشی برای نوشتن در Serein است و باید با حفظ ترتیب واژه‌ها به خط بعدی برود. مرحبًا 123 😀".into());
+}
+
 // Fixture packages are checked-in inputs; execution never calls desktop adapters.
 fn extension_fixture(
 	id: &str,
@@ -498,7 +543,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let args: Vec<_> = std::env::args().skip(1).collect();
 	let value = |prefix: &str| args.iter().find_map(|arg| arg.strip_prefix(prefix));
 	if !args.iter().any(|arg| arg == "--demo") {
-		return Err("Usage: profile_preview --demo [--output=PATH.png | --smoke | --interactive] [--page=stickers|slash-commands|slash-command-search|slash-command-options|profile|profile-card|member-tags|dm-tags|account|appearance|general|keybinds|extensions|server|server-engagement|server-safety|server-emoji|server-stickers|server-members|server-roles|server-invites|server-integrations|server-audit-log] [--command=help|weather] [--themes] [--extension=ID] [--thumbnail] [--width=1120] [--height=760] [--scroll=PIXELS] [--light]".into());
+		return Err("Usage: profile_preview --demo [--output=PATH.png | --smoke | --interactive] [--page=rtl|stickers|slash-commands|slash-command-search|slash-command-options|profile|profile-card|member-tags|dm-tags|account|appearance|general|keybinds|extensions|server|server-engagement|server-safety|server-emoji|server-stickers|server-members|server-roles|server-invites|server-integrations|server-audit-log] [--command=help|weather] [--themes] [--extension=ID] [--thumbnail] [--width=1120] [--height=760] [--scroll=PIXELS] [--light]".into());
 	}
 	let smoke = args.iter().any(|arg| arg == "--smoke");
 	let interactive = args.iter().any(|arg| arg == "--interactive");
@@ -511,7 +556,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	if !matches!(
 		page.as_str(),
 		"profile"
-			| "stickers"
+			| "rtl" | "stickers"
 			| "slash-commands"
 			| "slash-command-search"
 			| "slash-command-options"
@@ -538,7 +583,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			| "forum-settings"
 			| "friends"
 	) {
-		return Err("Page must be profile, profile-card, member-tags, dm-tags, account, appearance, general, keybinds, extensions, slash-commands, slash-command-search, slash-command-options, server, server-engagement, server-safety, server-emoji, server-stickers, server-members, server-roles, server-invites, server-integrations or server-audit-log".into());
+		return Err("Page must be rtl, profile, profile-card, member-tags, dm-tags, account, appearance, general, keybinds, extensions, slash-commands, slash-command-search, slash-command-options, server, server-engagement, server-safety, server-emoji, server-stickers, server-members, server-roles, server-invites, server-integrations or server-audit-log".into());
 	}
 	let slash_command = value("--command=").unwrap_or("help").to_owned();
 	if !matches!(slash_command.as_str(), "help" | "weather") {
@@ -590,6 +635,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			} else {
 				egui::ThemePreference::Dark
 			});
+			if page == "rtl"
+				&& let Some(render) = &cc.wgpu_render_state
+			{
+				eprintln!(
+					"Synthetic RTL preview adapter: {:?}",
+					render.adapter.get_info()
+				);
+			}
 			let mut state = if matches!(
 				page.as_str(),
 				"slash-commands" | "slash-command-search" | "slash-command-options"
@@ -605,6 +658,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			}
 			if page == "profile" {
 				prime_profile(&mut state);
+			} else if page == "rtl" {
+				prime_rtl_chat(&mut state);
 			}
 			if page == "member-tags" {
 				let user = test_support::message(1, model::Id(20)).author;
@@ -658,7 +713,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					&[model::Id(2603)],
 					Some("Faster startup on older phones"),
 				);
-			} else if matches!(page.as_str(), "member-tags" | "dm-tags") {
+			} else if matches!(page.as_str(), "rtl" | "member-tags" | "dm-tags") {
 				// State is primed above; the normal offline messaging surface renders the list.
 			} else if page == "slash-commands" {
 				messaging.preview_slash_commands();

@@ -80,13 +80,21 @@ The native attachment video adapter also uses **symphonia-codec-aac 0.6.1**
 the other Symphonia codecs, and ship through the same package copy step.
 
 The egui main experiment pins the egui/eframe ecosystem to upstream commit
-`99df44a801749aee958295ed96fccad8dfecb289` (version 0.36.2, MIT OR Apache-2.0).
+`fe6d63efa4a4df6f56ceab814d4f3a6efab69b88` (version 0.36.2, MIT OR Apache-2.0).
 It adds unicode-properties 0.1.4 (MIT/Apache-2.0) and updates glifo to 0.3.0 and
 vello_common/vello_cpu to 0.2.0 (Apache-2.0 OR MIT). Epaint bundled fonts and
 their separate license obligations are unchanged. Native font fallback uses
 egui_system_fonts/fontique and platform font discovery; see docs/dependency-versions.md
 for the exact added dependency versions and declared licenses. OS emoji fonts
 remain installed system resources and are not bundled or redistributed.
+
+The `egui` and `epaint` 0.36.2 source crates are vendored at that same revision with
+Serein's logical-indexed bidirectional wrapping/editing patch. Provenance and modified
+paths are documented in `vendor/egui/SEREIN-PATCH.md`, also bundled as
+`licenses/dependencies/egui-SEREIN-PATCH.md`. The patch uses the already-locked
+unicode-bidi 0.3.18 (MIT OR Apache-2.0); its adapted L1 routine retains the Servo
+copyright notice. Exact-version MIT/Apache texts ship alongside the patch notice.
+Other egui ecosystem dependencies and bundled font licenses are unchanged.
 
 Linux login uses gtk4 0.11.4, webkit6 0.6.1, javascriptcore6 0.6.0, glib 0.22.9 and soup3
 0.9.0 Rust bindings (MIT). Windows/macOS retain Wry 0.57.0 (MIT OR Apache-2.0) via a documented
