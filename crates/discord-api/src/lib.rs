@@ -1562,10 +1562,15 @@ impl DiscordApi {
 				);
 				let categories =
 					decode::<gifs::TrendingReply>(&categories?).map_err(|_| Failure::Protocol)?;
-				let grid = decode::<gifs::SearchReply>(&grid?).map_err(|_| Failure::Protocol)?;
-				categories
-					.into_page_with(grid)
-					.map_err(|_| Failure::Protocol)
+				// A failed grid keeps the categories and their sample GIF usable.
+				match grid
+					.ok()
+					.and_then(|bytes| decode::<gifs::SearchReply>(&bytes).ok())
+				{
+					Some(grid) => categories.into_page_with(grid),
+					None => categories.into_page(),
+				}
+				.map_err(|_| Failure::Protocol)
 			}
 		}
 	}
