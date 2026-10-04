@@ -53,6 +53,7 @@ pub enum Action {
 	OpenDm(Id),
 	CloseDm(Id),
 	Block { user: Id, blocked: bool },
+	Ignore { user: Id, ignored: bool },
 	Mute { channel: Id, muted: bool },
 }
 impl std::fmt::Debug for Action {
@@ -78,6 +79,8 @@ impl Action {
 			Self::CloseDm(_) => "DM closed · messages and drafts were not deleted",
 			Self::Block { blocked: true, .. } => "User blocked",
 			Self::Block { blocked: false, .. } => "User unblocked",
+			Self::Ignore { ignored: true, .. } => "User ignored",
+			Self::Ignore { ignored: false, .. } => "User unignored",
 			Self::Mute { muted: true, .. } => {
 				"Conversation notifications muted until you turn them back on"
 			}
@@ -129,6 +132,11 @@ pub enum Event {
 		result: Result<String, Failure>,
 	},
 	Nicknames(Vec<(Id, String)>),
+	/// Friendship start times in Unix seconds; `replace` drops every earlier entry first.
+	FriendsSince {
+		entries: Vec<(Id, i64)>,
+		replace: bool,
+	},
 	Nickname {
 		user: Id,
 		text: String,
@@ -187,6 +195,7 @@ pub enum Event {
 pub struct Actions {
 	note: Option<(Id, String)>,
 	nicknames: BTreeMap<Id, String>,
+	friends_since: BTreeMap<Id, i64>,
 	requests: BTreeMap<Id, (model::User, String, bool)>,
 	requests_known: bool,
 	last_requested: Option<String>,
@@ -234,6 +243,11 @@ impl State {
 	}
 	pub fn friend_nickname(&self, user: Id) -> Option<&str> {
 		self.user_actions.nicknames.get(&user).map(String::as_str)
+	}
+	/// When the friendship began, if the service reported it for a current friend.
+	pub fn friend_since(&self, user: Id) -> Option<i64> {
+		self.friend(user)?;
+		self.user_actions.friends_since.get(&user).copied()
 	}
 	pub fn user_display_name<'a>(&'a self, user: &'a model::User) -> &'a str {
 		self.friend_nickname(user.id).unwrap_or(&user.name)
@@ -622,6 +636,25 @@ impl State {
 			.copied()
 			.or_else(|| (self.demo || self.user_actions.known).then_some(false))
 	}
+	/// Whether the user is ignored, including an optimistic pending toggle; `None` while unknown.
+	pub fn user_ignored(&self, user: Id) -> Option<bool> {
+		if let Some((
+			Action::Ignore {
+				user: target,
+				ignored,
+			},
+			_,
+			false,
+		)) = &self.user_actions.pending
+			&& *target == user
+		{
+			return Some(*ignored);
+		}
+		if let Some((_, _, ignored)) = self.user_actions.restricted.get(&user) {
+			return Some(*ignored);
+		}
+		(self.demo || self.user_actions.restricted_known).then_some(false)
+	}
 	pub(crate) fn pending_dm_muted(&self, channel: Id) -> Option<bool> {
 		match &self.user_actions.pending {
 			Some((
@@ -743,6 +776,16 @@ impl State {
 			return None;
 		}
 		self.request_user_action(Action::Block { user, blocked })
+	}
+	pub fn set_user_ignored(&mut self, user: Id, ignored: bool) -> Option<Command> {
+		if user.0 == 0
+			|| self.user.as_ref().is_none_or(|owner| owner.id == user)
+			|| self.user_blocked(user) != Some(false)
+			|| self.user_ignored(user) != Some(!ignored)
+		{
+			return None;
+		}
+		self.request_user_action(Action::Ignore { user, ignored })
 	}
 	pub fn set_dm_muted(&mut self, channel: Id, muted: bool) -> Option<Command> {
 		if !self.is_one_to_one_dm(channel) && !self.is_group_dm(channel) {
@@ -931,6 +974,20 @@ impl State {
 							request,
 							result: Err(result.err().unwrap_or(Failure::Protocol)),
 						});
+					}
+				}
+			}
+			Event::FriendsSince { entries, replace } => {
+				if entries.len() > MAX_RELATIONSHIPS || entries.iter().any(|(id, _)| id.0 == 0) {
+					return Err("Invalid friendship dates");
+				}
+				if replace {
+					self.user_actions.friends_since.clear();
+				}
+				for (user, since) in entries {
+					let known = &mut self.user_actions.friends_since;
+					if known.contains_key(&user) || known.len() < MAX_RELATIONSHIPS {
+						known.insert(user, since);
 					}
 				}
 			}
@@ -1151,6 +1208,7 @@ impl State {
 					}
 					self.user_actions.friends.remove(&user);
 					self.user_actions.nicknames.remove(&user);
+					self.user_actions.friends_since.remove(&user);
 				} else if let Some((record, name)) = profile {
 					let entries = &mut self.user_actions.friends;
 					if user != record.id || !valid_friend(&record, &name) {
@@ -1211,6 +1269,12 @@ impl State {
 				ignored,
 				profile,
 			} => {
+				if let Some((Action::Ignore { user: target, .. }, _, observed)) =
+					&mut self.user_actions.pending
+					&& *target == user
+				{
+					*observed = true;
+				}
 				let Some(ignored) = ignored else {
 					self.user_actions.restricted.remove(&user);
 					return Ok(());
@@ -1414,6 +1478,20 @@ impl State {
 						}
 						Action::Block { user, blocked } => {
 							self.store_relationship(user, blocked)?
+						}
+						Action::Ignore { user, ignored } => {
+							let profile =
+								self.user_actions.friends.get(&user).cloned().or_else(|| {
+									self.user_actions
+										.requests
+										.get(&user)
+										.map(|(u, n, _)| (u.clone(), n.clone()))
+								});
+							self.apply_user_action(Event::Restriction {
+								user,
+								ignored: ignored.then_some(true),
+								profile,
+							})?;
 						}
 						Action::Mute { channel, muted } => self.confirm_dm_muted(channel, muted)?,
 					}

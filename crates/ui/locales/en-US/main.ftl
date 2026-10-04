@@ -2061,6 +2061,20 @@ profiles-more-menu-add-friend-nickname = Add Friend Nickname
 profiles-more-menu-add-note = Add Note
 # Context: more_menu
 profiles-more-menu-block = Block
+profiles-view-full-profile = View Full Profile
+profiles-copy-username = Copy Username
+profiles-username-unavailable = Open this profile to load the username
+profiles-ignore = Ignore
+profiles-unignore = Unignore
+profiles-ignore-hint = Uses Discord's Ignore setting without blocking. They are not notified.
+profiles-report-user-profile = Report User Profile
+profiles-report-hint = Opens Discord's support form in your browser and copies the user ID for it
+profiles-show-activity = ACTIVITY
+profiles-show-connections = CONNECTIONS
+profiles-show-friends-since = FRIENDS SINCE
+profiles-show-note = NOTE
+profiles-show-note-hint = Click to add a note
+profiles-show-note-only-you = Only visible to you
 # Context: more_menu
 profiles-more-menu-copy-webhook-id = Copy webhook ID
 # Context: more_menu

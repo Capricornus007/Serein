@@ -2058,6 +2058,20 @@ profiles-more-menu-add-friend-nickname = Arkadaş Takma Adını Ekle
 profiles-more-menu-add-note = Not Ekle
 # Context: more_menu
 profiles-more-menu-block = Engellemek
+profiles-view-full-profile = Tam Profili Görüntüle
+profiles-copy-username = Kullanıcı Adını Kopyala
+profiles-username-unavailable = Kullanıcı adını yüklemek için profili açın
+profiles-ignore = Yok Say
+profiles-unignore = Yok Saymayı Kaldır
+profiles-ignore-hint = Engellemeden Discord'un Yok Say ayarını kullanır. Kullanıcıya bildirilmez.
+profiles-report-user-profile = Kullanıcı Profilini Bildir
+profiles-report-hint = Discord destek formunu tarayıcıda açar ve kullanıcı kimliğini kopyalar
+profiles-show-activity = ETKİNLİK
+profiles-show-connections = BAĞLANTILAR
+profiles-show-friends-since = ŞU TARİHTEN BERİ ARKADAŞ
+profiles-show-note = NOT
+profiles-show-note-hint = Not eklemek için tıklayın
+profiles-show-note-only-you = Yalnızca sana görünür
 # Context: more_menu
 profiles-more-menu-copy-webhook-id = Web kancası kimliğini kopyala
 # Context: more_menu

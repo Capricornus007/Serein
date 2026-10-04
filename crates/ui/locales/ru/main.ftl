@@ -2058,6 +2058,20 @@ profiles-more-menu-add-friend-nickname = Добавить псевдоним д�
 profiles-more-menu-add-note = Добавить примечание
 # Context: more_menu
 profiles-more-menu-block = Блокировать
+profiles-view-full-profile = Открыть полный профиль
+profiles-copy-username = Копировать имя пользователя
+profiles-username-unavailable = Откройте профиль, чтобы загрузить имя пользователя
+profiles-ignore = Игнорировать
+profiles-unignore = Перестать игнорировать
+profiles-ignore-hint = Использует настройку «Игнорировать» Discord без блокировки. Пользователь не получит уведомления.
+profiles-report-user-profile = Пожаловаться на профиль
+profiles-report-hint = Открывает форму поддержки Discord в браузере и копирует ID пользователя
+profiles-show-activity = АКТИВНОСТЬ
+profiles-show-connections = ИНТЕГРАЦИИ
+profiles-show-friends-since = ДРУЗЬЯ С
+profiles-show-note = ЗАМЕТКА
+profiles-show-note-hint = Нажмите, чтобы добавить заметку
+profiles-show-note-only-you = Видно только вам
 # Context: more_menu
 profiles-more-menu-copy-webhook-id = Скопировать идентификатор вебхука
 # Context: more_menu

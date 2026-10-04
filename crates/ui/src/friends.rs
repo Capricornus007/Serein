@@ -307,11 +307,24 @@ impl MessagingUi {
 					.show_rows(ui, ROW, rows.len(), |ui, range| {
 						for (user, name, incoming) in &rows[range] {
 							ui.push_id(user.id.0, |ui| {
-								// The friends surfaces keep their own row actions; the profile
-								// stays behind the context menu instead of every click.
-								let (rect, _, hot) =
-									person_row(ui, after_hot, egui::Sense::hover());
+								// Requests have no conversation to open, so the row opens the
+								// profile like member lists; the round buttons stay on top.
+								let (rect, response, hot) =
+									person_row(ui, after_hot, egui::Sense::click());
 								after_hot = hot;
+								let response =
+									response.on_hover_cursor(egui::CursorIcon::PointingHand);
+								response.widget_info(|| {
+									egui::WidgetInfo::labeled(egui::Role::Button, true, &user.name)
+								});
+								self.profile.person_click(ui, &response, None, user);
+								user_menu::show(
+									&response,
+									state,
+									user,
+									&mut self.profile,
+									&mut self.user_action,
+								);
 								let actions = if *incoming { 2 } else { 1 };
 								let layout = RowLayout::new(rect, actions);
 								self.avatars.show_plain(

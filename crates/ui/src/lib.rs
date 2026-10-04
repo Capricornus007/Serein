@@ -4909,6 +4909,19 @@ impl MessagingUi {
 					.and_then(|channel| channel.guild)
 			});
 			self.sync_profile(state, &mut commands, &user, profile_guild);
+			// The card ends with the private note; read it once while no other write is pending.
+			if !user.webhook
+				&& state.user.as_ref().is_some_and(|own| own.id != user.id)
+				&& state.user_note(user.id).is_none()
+				&& !state.user_action_pending()
+				&& (state.demo
+					|| (state.gateway_connected
+						&& state.auth == client_core::auth::AuthState::Authenticated))
+				&& self.profile.note_wanted(state.generation, user.id)
+				&& let Some(command) = state.load_user_note(user.id)
+			{
+				commands.push(command);
+			}
 			let anchor = self.profile.anchor_or_place(&ctx, user.id);
 			self.profile.ingest_opener_rect(&ctx);
 			match profiles::show_with_session(
@@ -7429,6 +7442,19 @@ mod composer_tests {
 			error: None,
 			data: Some(profiles::synthetic(&user, Some(guild))),
 		});
+		// The card's one private-note read is outside this presence-only scenario.
+		let Some(Command::UserAction { request, .. }) = state.load_user_note(user.id) else {
+			panic!("The synthetic profile note loads");
+		};
+		state.apply(client_core::Envelope {
+			generation: state.generation,
+			event: client_core::Event::UserAction(client_core::user_actions::Event::NoteLoaded {
+				user: user.id,
+				request,
+				result: Ok(String::new()),
+			}),
+		});
+		assert_eq!(state.user_note(user.id), Some(""));
 		state
 			.drafts
 			.insert(channel, "Keep this unsent draft".into());

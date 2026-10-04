@@ -2057,6 +2057,20 @@ profiles-more-menu-add-friend-nickname = Agregar apodo de amigo
 profiles-more-menu-add-note = Agregar nota
 # Context: more_menu
 profiles-more-menu-block = Bloquear
+profiles-view-full-profile = Ver perfil completo
+profiles-copy-username = Copiar nombre de usuario
+profiles-username-unavailable = Abre este perfil para cargar el nombre de usuario
+profiles-ignore = Ignorar
+profiles-unignore = Dejar de ignorar
+profiles-ignore-hint = Usa el ajuste Ignorar de Discord sin bloquear. No se le notifica.
+profiles-report-user-profile = Denunciar perfil de usuario
+profiles-report-hint = Abre el formulario de soporte de Discord en tu navegador y copia el ID de usuario
+profiles-show-activity = ACTIVIDAD
+profiles-show-connections = CONEXIONES
+profiles-show-friends-since = AMIGOS DESDE
+profiles-show-note = NOTA
+profiles-show-note-hint = Haz clic para añadir una nota
+profiles-show-note-only-you = Solo visible para ti
 # Context: more_menu
 profiles-more-menu-copy-webhook-id = Copiar el ID del webhook
 # Context: more_menu

@@ -2060,6 +2060,20 @@ profiles-more-menu-add-friend-nickname = Přidat přezdívku přítele
 profiles-more-menu-add-note = Přidat poznámku
 # Context: more_menu
 profiles-more-menu-block = Blok
+profiles-view-full-profile = Zobrazit celý profil
+profiles-copy-username = Kopírovat uživatelské jméno
+profiles-username-unavailable = Uživatelské jméno se načte po otevření profilu
+profiles-ignore = Ignorovat
+profiles-unignore = Přestat ignorovat
+profiles-ignore-hint = Použije nastavení Ignorovat na Discordu bez blokování. Uživatel nebude upozorněn.
+profiles-report-user-profile = Nahlásit profil uživatele
+profiles-report-hint = Otevře formulář podpory Discordu v prohlížeči a zkopíruje do schránky ID uživatele
+profiles-show-activity = AKTIVITA
+profiles-show-connections = PROPOJENÍ
+profiles-show-friends-since = PŘÁTELÉ OD
+profiles-show-note = POZNÁMKA
+profiles-show-note-hint = Kliknutím přidáte poznámku
+profiles-show-note-only-you = Vidíte jen vy
 # Context: more_menu
 profiles-more-menu-copy-webhook-id = Zkopírujte ID webhooku
 # Context: more_menu

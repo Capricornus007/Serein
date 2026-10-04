@@ -2058,6 +2058,20 @@ profiles-more-menu-add-friend-nickname = 友達のニックネームを追加
 profiles-more-menu-add-note = メモを追加
 # Context: more_menu
 profiles-more-menu-block = ブロック
+profiles-view-full-profile = プロフィール全体を表示
+profiles-copy-username = ユーザー名をコピー
+profiles-username-unavailable = プロフィールを開くとユーザー名を読み込みます
+profiles-ignore = 無視する
+profiles-unignore = 無視を解除
+profiles-ignore-hint = ブロックせずにDiscordの無視設定を使います。相手には通知されません。
+profiles-report-user-profile = ユーザープロフィールを報告
+profiles-report-hint = ブラウザでDiscordのサポートフォームを開き、ユーザーIDをコピーします
+profiles-show-activity = アクティビティ
+profiles-show-connections = 接続
+profiles-show-friends-since = フレンドになった日
+profiles-show-note = メモ
+profiles-show-note-hint = クリックしてメモを追加
+profiles-show-note-only-you = あなただけに表示されます
 # Context: more_menu
 profiles-more-menu-copy-webhook-id = Webhook ID をコピーする
 # Context: more_menu
