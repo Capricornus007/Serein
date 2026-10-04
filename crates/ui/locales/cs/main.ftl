@@ -298,6 +298,7 @@ attachments-media-menu-unavailable-for-synthetic-attachments = Nedostupné pro s
 attachments-open-original-open-original = Otevřít originál…
 # Context: pending_card
 attachments-pending-card-remove-attachment = Odstraňte přílohu
+attachments-loading-card-preparing = Připravuje se…
 # Context: show_status
 attachments-show-status-cancel-download = Zrušit stahování
 # Context: show_status

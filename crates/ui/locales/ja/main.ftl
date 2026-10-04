@@ -299,6 +299,7 @@ attachments-media-menu-unavailable-for-synthetic-attachments = 合成アタッ�
 attachments-open-original-open-original = オリジナルを開く…
 # Context: pending_card
 attachments-pending-card-remove-attachment = 添付ファイルを削除する
+attachments-loading-card-preparing = 準備中…
 # Context: show_status
 attachments-show-status-cancel-download = ダウンロードをキャンセルする
 # Context: show_status

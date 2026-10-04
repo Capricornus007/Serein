@@ -6345,6 +6345,8 @@ impl eframe::App for Desktop {
 			self.messaging.external_upload.complete(result);
 		}
 		self.messaging.upload_busy = self.uploads.busy() || self.clipboard.is_some();
+		self.messaging.attach_busy = !self.uploads.accepting();
+		self.messaging.attachment_loading = self.uploads.loading();
 		if let Some(notice) = self.uploads.take_notice() {
 			self.messaging.toasts.push(ui::design::Level::Error, notice);
 		}
@@ -6714,7 +6716,8 @@ impl eframe::App for Desktop {
 				self.messaging.attachment_previews.clear();
 			}
 			if std::mem::take(&mut self.messaging.cancel_upload_requested) {
-				self.uploads.cancel();
+				// The timeline row cancels its own upload, not files loading for the next message.
+				self.uploads.cancel_transfer();
 			}
 			if let Some(asset) = self.messaging.image_share_requested.take()
 				&& self.messaging.image_sharing_enabled

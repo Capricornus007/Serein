@@ -356,6 +356,11 @@ pub struct MessagingUi {
 	pub remove_attachment_requested: bool,
 	pub cancel_upload_requested: bool,
 	pub upload_busy: bool,
+	/// New attachments cannot be selected right now. Loading files and an upload in flight
+	/// do not set this: further files join the composer and sending waits instead.
+	pub attach_busy: bool,
+	/// Selected files still being inspected; shown as loading tiles in the upload tray.
+	pub attachment_loading: usize,
 	pub external_upload: external_upload::ExternalUpload,
 	/// Transient problem and progress notices. Nothing here outlives its deadline.
 	pub toasts: toasts::Toasts,
@@ -2626,7 +2631,7 @@ impl MessagingUi {
 		}
 		let mut cancel_edit = false;
 		if ctx.input(|input| !input.raw.hovered_files.is_empty()) {
-			let available = state.can_attach(channel) && !self.upload_busy && !editing_here;
+			let available = state.can_attach(channel) && !self.attach_busy && !editing_here;
 			egui::Frame::new()
 				.fill(colors.accent.gamma_multiply(0.12))
 				.stroke(egui::Stroke::new(1.5, colors.accent))
@@ -3050,8 +3055,8 @@ impl MessagingUi {
 		let can_attach = !editing_here
 			&& self.slash_commands.active.is_none()
 			&& state.can_attach(channel)
-			&& !self.upload_busy
-			&& self.attachment_files.len() < 10;
+			&& !self.attach_busy
+			&& self.attachment_files.len() + self.attachment_loading < 10;
 		let can_create_poll =
 			!editing_here && self.slash_commands.active.is_none() && state.can_create_poll(channel);
 		let application_command = !editing_here && self.slash_commands.active.is_some();
@@ -3086,7 +3091,7 @@ impl MessagingUi {
                     egui::pos2(ui.max_rect().left() - 10.0, cap_top.unwrap_or(ui.max_rect().top() - 6.0)),
                     egui::pos2(ui.max_rect().right() + 10.0, ui.max_rect().top()),
                 );
-                if !editing_here && self.attachment.is_some() {
+                if !editing_here && (self.attachment.is_some() || self.attachment_loading > 0) {
                     self.attachment_tray(ui, state.can_send(channel), upload_limit);
                 }
                 // Tall drafts stack the actions in bottom-aligned columns so the text keeps the
@@ -3606,6 +3611,9 @@ impl MessagingUi {
 								}
 							});
 						});
+					}
+					for index in 0..self.attachment_loading.min(10) {
+						ui.push_id(("loading", index), attachments::loading_card);
 					}
 				});
 			});

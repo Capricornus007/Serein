@@ -299,6 +299,7 @@ attachments-media-menu-unavailable-for-synthetic-attachments = Sentetik ataşman
 attachments-open-original-open-original = Orijinali aç…
 # Context: pending_card
 attachments-pending-card-remove-attachment = Eki kaldır
+attachments-loading-card-preparing = Hazırlanıyor…
 # Context: show_status
 attachments-show-status-cancel-download = İndirmeyi iptal et
 # Context: show_status

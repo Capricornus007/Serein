@@ -298,6 +298,7 @@ attachments-media-menu-unavailable-for-synthetic-attachments = No disponible par
 attachments-open-original-open-original = Abrir original…
 # Context: pending_card
 attachments-pending-card-remove-attachment = Quitar archivo adjunto
+attachments-loading-card-preparing = Preparando…
 # Context: show_status
 attachments-show-status-cancel-download = Cancelar descarga
 # Context: show_status
