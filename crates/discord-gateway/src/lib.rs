@@ -1425,6 +1425,9 @@ async fn run_recoverable(
 						&& !matches!(timeout(Duration::from_secs(5),socket.send(packet)).await,Ok(Ok(()))) {break;}
 				}
 
+				_=tokio::time::sleep_until(calls.state_deadline.unwrap_or(ready_deadline)), if calls.state_deadline.is_some() && ready_at.is_some() => {
+					if let Some(packet)=calls.flush_state() && !matches!(timeout(Duration::from_secs(5),socket.send(packet)).await,Ok(Ok(()))) {break;}
+				}
 				_=tokio::time::sleep_until(calls.departure_deadline.unwrap_or(ready_deadline)), if calls.departure_deadline.is_some() => {
 					if let Some(event)=calls.departure_expired() {emit(event)?;}
 				}
