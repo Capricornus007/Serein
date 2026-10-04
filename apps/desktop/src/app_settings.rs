@@ -48,6 +48,7 @@ impl Settings {
 			update_nightly: ui.updates.nightly,
 			notification_options: ui.notification_options,
 			show_hidden_channels: ui.show_hidden_channels,
+			hide_nitro_emojis: ui.hide_nitro_emojis,
 			hide_title_bar: ui.hide_title_bar,
 			hide_window_decorations: ui.hide_window_decorations,
 			gpu_preference: ui.gpu_preference,
@@ -88,6 +89,7 @@ impl Settings {
 		ui.updates.nightly = value.update_nightly;
 		ui.notification_options = value.notification_options;
 		ui.show_hidden_channels = value.show_hidden_channels;
+		ui.hide_nitro_emojis = value.hide_nitro_emojis;
 		ui.hide_title_bar = value.hide_title_bar;
 		ui.hide_window_decorations = value.hide_window_decorations;
 		ui.gpu_preference = value.gpu_preference;

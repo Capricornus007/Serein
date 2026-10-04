@@ -811,6 +811,10 @@ emoji-picker-gif-body-searching-klipy = KLIPY aranıyor…
 # Context: gif_body
 emoji-picker-gif-body-trending-gifs = Trend olan GIF'ler
 # Context: gif_body
+emoji-picker-gif-body-retry = Yeniden dene
+# Context: gif_body
+emoji-picker-gif-body-no-trending-gifs-right-now = Bir GIF ara veya daha sonra tekrar dene.
+# Context: gif_body
 emoji-picker-gif-body-try-a-different-search-term = Farklı bir arama terimi deneyin.
 # Context: gif_grid
 emoji-picker-gif-grid-favorite = Favori
@@ -836,6 +840,8 @@ emoji-picker-popup-hover-an-emoji-to-preview-it = Önizlemek için bir emojinin 
 emoji-picker-popup-no-matching-emoji = Eşleşen emoji yok.
 # Context: popup
 emoji-picker-popup-retry-sticker-packs = Çıkartma paketlerini yeniden dene
+# Context: popup
+emoji-picker-popup-requires-nitro = Burada kullanmak için Nitro gerekir
 # Context: popup
 emoji-picker-popup-search-results = Arama sonuçları
 # Context: popup
@@ -3441,6 +3447,12 @@ settings-chat-settings-channel-list = Kanal listesi
 settings-chat-settings-show-channels-you-cannot-currently-access = Şu anda erişemediğiniz kanalları gösterin.
 # Context: chat_settings
 settings-chat-settings-show-hidden-channels = Gizli kanalları göster
+# Context: chat_settings
+settings-chat-settings-emoji = Emoji
+# Context: chat_settings
+settings-chat-settings-suggest-nitro-emojis = Nitro gerektiren emojileri öner
+# Context: chat_settings
+settings-chat-settings-suggest-nitro-emojis-description = Nitro olmadan da animasyonlu ve diğer sunuculardaki emojileri : önerilerinde ve seçicide göster. Kapalıyken önerilerde gizlenir ve seçicide kilitlenir.
 # Context: close_control
 settings-close-control-close-settings-esc = Ayarları kapat (Esc)
 # Context: colour_preset_settings

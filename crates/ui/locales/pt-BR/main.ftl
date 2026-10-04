@@ -810,6 +810,10 @@ emoji-picker-gif-body-searching-klipy = Pesquisando KLIPY…
 # Context: gif_body
 emoji-picker-gif-body-trending-gifs = Tendências de GIFs
 # Context: gif_body
+emoji-picker-gif-body-retry = Tentar novamente
+# Context: gif_body
+emoji-picker-gif-body-no-trending-gifs-right-now = Pesquise um GIF ou tente novamente mais tarde.
+# Context: gif_body
 emoji-picker-gif-body-try-a-different-search-term = Experimente um termo de pesquisa diferente.
 # Context: gif_grid
 emoji-picker-gif-grid-favorite = Favorito
@@ -835,6 +839,8 @@ emoji-picker-popup-hover-an-emoji-to-preview-it = Passe o mouse sobre um emoji p
 emoji-picker-popup-no-matching-emoji = Nenhum emoji correspondente.
 # Context: popup
 emoji-picker-popup-retry-sticker-packs = Tentar novamente pacotes de adesivos
+# Context: popup
+emoji-picker-popup-requires-nitro = Requer Nitro para usar aqui
 # Context: popup
 emoji-picker-popup-search-results = Resultados da pesquisa
 # Context: popup
@@ -3440,6 +3446,12 @@ settings-chat-settings-channel-list = Lista de canais
 settings-chat-settings-show-channels-you-cannot-currently-access = Mostrar canais que você não pode acessar no momento.
 # Context: chat_settings
 settings-chat-settings-show-hidden-channels = Mostrar canais ocultos
+# Context: chat_settings
+settings-chat-settings-emoji = Emojis
+# Context: chat_settings
+settings-chat-settings-suggest-nitro-emojis = Sugerir emojis que exigem Nitro
+# Context: chat_settings
+settings-chat-settings-suggest-nitro-emojis-description = Oferecer emojis animados e de outros servidores nas sugestões de : e no seletor sem Nitro. Quando desativado, eles ficam ocultos nas sugestões e bloqueados no seletor.
 # Context: close_control
 settings-close-control-close-settings-esc = Fechar configurações (Esc)
 # Context: colour_preset_settings

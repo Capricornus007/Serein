@@ -132,7 +132,7 @@ impl Page {
 				"appearance customization font typography import ttf otf primary accent hex window effects transparency blur theme dark light system mode zoom scale layout sidebar width people members member list reset colour color preset"
 			}
 			Self::Chat => {
-				"chat messages media reading animate animated gifs autoplay hide image links confirm confirmation external browser smooth scrolling scroll speed motion trackpad wheel hidden channels channel list reset"
+				"chat messages media reading animate animated gifs autoplay hide image links confirm confirmation external browser smooth scrolling scroll speed motion trackpad wheel hidden channels channel list reset emoji emojis nitro fake suggestions autocomplete locked"
 			}
 			Self::MessagingPermissions => {
 				"messaging permissions spam filters direct messages dm friend requests personalized connected games"
@@ -1053,6 +1053,20 @@ impl MessagingUi {
 					Some("settings-chat-settings-show-channels-you-cannot-currently-access"),
 					&mut self.show_hidden_channels,
 				);
+			},
+		);
+		design::group(
+			ui,
+			&crate::i18n::translate("settings-chat-settings-emoji"),
+			|ui| {
+				let mut suggest = !self.hide_nitro_emojis;
+				design::switch(
+					ui,
+					"settings-chat-settings-suggest-nitro-emojis",
+					Some("settings-chat-settings-suggest-nitro-emojis-description"),
+					&mut suggest,
+				);
+				self.hide_nitro_emojis = !suggest;
 			},
 		);
 	}

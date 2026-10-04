@@ -810,6 +810,10 @@ emoji-picker-gif-body-searching-klipy = Vyhledávání KLIPY…
 # Context: gif_body
 emoji-picker-gif-body-trending-gifs = Populární GIFy
 # Context: gif_body
+emoji-picker-gif-body-retry = Zkusit znovu
+# Context: gif_body
+emoji-picker-gif-body-no-trending-gifs-right-now = Vyhledejte GIF nebo to zkuste později.
+# Context: gif_body
 emoji-picker-gif-body-try-a-different-search-term = Zkuste jiný hledaný výraz.
 # Context: gif_grid
 emoji-picker-gif-grid-favorite = Oblíbený
@@ -835,6 +839,8 @@ emoji-picker-popup-hover-an-emoji-to-preview-it = Umístěním kurzoru na emotik
 emoji-picker-popup-no-matching-emoji = Žádné odpovídající emotikony.
 # Context: popup
 emoji-picker-popup-retry-sticker-packs = Zkuste znovu balíčky nálepek
+# Context: popup
+emoji-picker-popup-requires-nitro = Zde vyžaduje Nitro
 # Context: popup
 emoji-picker-popup-search-results = Výsledky vyhledávání
 # Context: popup
@@ -3443,6 +3449,12 @@ settings-chat-settings-channel-list = Seznam kanálů
 settings-chat-settings-show-channels-you-cannot-currently-access = Zobrazit kanály, ke kterým momentálně nemáte přístup.
 # Context: chat_settings
 settings-chat-settings-show-hidden-channels = Zobrazit skryté kanály
+# Context: chat_settings
+settings-chat-settings-emoji = Emoji
+# Context: chat_settings
+settings-chat-settings-suggest-nitro-emojis = Navrhovat emoji vyžadující Nitro
+# Context: chat_settings
+settings-chat-settings-suggest-nitro-emojis-description = Nabízet animované emoji a emoji z jiných serverů v návrzích : a ve výběru i bez Nitra. Když je vypnuto, jsou skryté v návrzích a zamčené ve výběru.
 # Context: close_control
 settings-close-control-close-settings-esc = Zavřít nastavení (Esc)
 # Context: colour_preset_settings

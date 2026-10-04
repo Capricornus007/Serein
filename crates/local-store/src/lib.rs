@@ -44,6 +44,8 @@ pub struct AppPreferences {
 	pub update_nightly: bool,
 	pub notification_options: model::notification_preferences::Device,
 	pub show_hidden_channels: bool,
+	/// Keep custom emoji that need Nitro out of suggestions and lock them in the picker.
+	pub hide_nitro_emojis: bool,
 	pub hide_title_bar: bool,
 	pub hide_window_decorations: bool,
 	pub primary_color: Option<[u8; 3]>,
@@ -83,6 +85,7 @@ impl Default for AppPreferences {
 			update_nightly: true,
 			notification_options: Default::default(),
 			show_hidden_channels: false,
+			hide_nitro_emojis: false,
 			hide_title_bar: false,
 			hide_window_decorations: false,
 			primary_color: None,

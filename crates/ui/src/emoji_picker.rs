@@ -183,6 +183,8 @@ enum Target {
 
 enum GifAction {
 	Refresh,
+	/// Explicitly retry a failed trending (`None`) or search request.
+	Retry(Option<String>),
 	Toggle(model::Gif),
 	Send(String),
 }
@@ -310,6 +312,8 @@ impl CustomMatches {
 
 pub(crate) struct Picker {
 	pub image_sharing_enabled: bool,
+	/// Lock custom emoji that need Nitro instead of offering them through image sharing.
+	pub hide_nitro_emojis: bool,
 	stickers: crate::stickers::Browser,
 	reaction: Option<(Target, egui::Rect, egui::Id)>,
 	// ponytail: session-only Unicode usage; persist if cross-launch favorites are needed.
@@ -338,6 +342,7 @@ impl Default for Picker {
 		// Initialize the static catalog during application creation, outside rendering.
 		Self {
 			image_sharing_enabled: false,
+			hide_nitro_emojis: false,
 			stickers: crate::stickers::Browser::default(),
 			reaction: None,
 			frequent: Vec::with_capacity(32),
@@ -762,12 +767,29 @@ impl Picker {
 		}
 	}
 
+	/// The user opted out of emoji they cannot use natively without Nitro.
+	fn nitro_locked(
+		&self,
+		state: &State,
+		custom: Option<(&model::Guild, &model::CustomEmoji)>,
+	) -> bool {
+		self.hide_nitro_emojis
+			&& custom.is_some_and(|(guild, emoji)| {
+				self.channel.is_some_and(|channel| {
+					state.custom_emoji_requires_nitro(channel, guild.id, emoji)
+				})
+			})
+	}
+
 	fn can_pick(
 		&self,
 		state: &State,
 		emoji: &model::ReactionEmoji,
 		custom: Option<(&model::Guild, &model::CustomEmoji)>,
 	) -> bool {
+		if self.nitro_locked(state, custom) {
+			return false;
+		}
 		if self.shares_emoji(state, emoji, custom) {
 			return self
 				.channel
@@ -933,8 +955,14 @@ impl Picker {
 		{
 			commands.push(command);
 		}
+		// A failed request stays failed until the user retries; never re-request every frame.
 		if gifs_tab
 			&& let Some(query) = gif_mode.wanted()
+			&& !state
+				.gifs
+				.view
+				.as_ref()
+				.is_some_and(|view| view.error.is_some() && view.query.as_deref() == query)
 			&& let Some(command) = state.request_gifs(query)
 		{
 			commands.push(command);
@@ -1496,6 +1524,18 @@ impl Picker {
 																			channel, guild.id,
 																			custom,
 																		)
+																		.map(str::to_owned)
+																})
+																.or_else(|| {
+																	self.nitro_locked(
+																		state,
+																		custom_emoji,
+																	)
+																	.then(|| {
+																		crate::i18n::translate(
+																			"emoji-picker-popup-requires-nitro",
+																		)
+																	})
 																});
 															let enabled = self.can_pick(
 																state,
@@ -1522,13 +1562,13 @@ impl Picker {
 																.inner;
 															let response = if !enabled {
 																response.on_hover_text(
-																	unavailable
-																		.map(str::to_owned)
-																		.unwrap_or_else(|| {
+																	unavailable.unwrap_or_else(
+																		|| {
 																			crate::i18n::translate(
 																				"emoji-picker-popup-cannot-add-this-reaction-right-now",
 																			)
-																		}),
+																		},
+																	),
 																)
 															} else {
 																response
@@ -1714,6 +1754,11 @@ impl Picker {
 					commands.push(command);
 				}
 			}
+			Some(GifAction::Retry(query)) => {
+				if let Some(command) = state.request_gifs(query.as_deref()) {
+					commands.push(command);
+				}
+			}
 			Some(GifAction::Toggle(gif)) => {
 				state.toggle_gif_favorite(&gif);
 			}
@@ -1833,11 +1878,11 @@ impl Picker {
 					ui.add_space(4.0);
 				}
 				match mode {
-					GifMode::Home => {
-						if let Some(section) = gif_home(ui, state, avatars, colors, demo) {
-							self.gif_section = section;
-						}
-					}
+					GifMode::Home => match gif_home(ui, state, avatars, colors, demo) {
+						Some(Ok(section)) => self.gif_section = section,
+						Some(Err(retry)) => action = Some(retry),
+						None => {}
+					},
 					GifMode::Favorites => {
 						if state.gifs.favorites.is_empty() {
 							crate::design::empty_state(
@@ -1875,6 +1920,10 @@ impl Picker {
 							}
 							Some(view) if view.error.is_some() => {
 								status_row(ui, colors, false, view.error.unwrap_or_default());
+								ui.add_space(8.0);
+								if retry_button(ui, state) {
+									action = Some(GifAction::Retry(query.clone()));
+								}
 							}
 							Some(view) => {
 								let gifs = view
@@ -1889,9 +1938,11 @@ impl Picker {
 										&crate::i18n::translate(
 											"emoji-picker-gif-body-no-gifs-found",
 										),
-										&crate::i18n::translate(
-											"emoji-picker-gif-body-try-a-different-search-term",
-										),
+										&crate::i18n::translate(if query.is_none() {
+											"emoji-picker-gif-body-no-trending-gifs-right-now"
+										} else {
+											"emoji-picker-gif-body-try-a-different-search-term"
+										}),
 									);
 								} else {
 									action = gif_grid(
@@ -1927,6 +1978,18 @@ const WIDTH: f32 = 424.0;
 const HEIGHT: f32 = 476.0;
 const TILE_GAP: f32 = 8.0;
 const TILE_HEIGHT: f32 = 92.0;
+
+/// Centered retry control under a failed GIF status row.
+fn retry_button(ui: &mut egui::Ui, state: &State) -> bool {
+	ui.vertical_centered(|ui| {
+		ui.add_enabled(
+			state.can_browse_gifs(),
+			egui::Button::new(crate::i18n::translate("emoji-picker-gif-body-retry")),
+		)
+		.clicked()
+	})
+	.inner
+}
 
 fn status_row(ui: &mut egui::Ui, colors: &crate::design::Palette, spinner: bool, text: &str) {
 	let text = crate::i18n::translate_if_key(text);
@@ -2040,13 +2103,14 @@ fn tile(
 }
 
 /// Home: Favorites and Trending tiles, then one tile per trending category.
+/// `Err` carries a retry of the failed trending request.
 fn gif_home(
 	ui: &mut egui::Ui,
 	state: &State,
 	avatars: &mut Avatars,
 	colors: &crate::design::Palette,
 	demo: bool,
-) -> Option<GifSection> {
+) -> Option<Result<GifSection, GifAction>> {
 	let trending = state.gifs.view.as_ref().filter(|view| view.query.is_none());
 	let page = trending.and_then(|view| view.page.as_ref());
 	let categories: &[model::GifCategory] = page.map_or(&[], |page| &page.categories);
@@ -2060,6 +2124,7 @@ fn gif_home(
 		.and_then(|page| page.gifs.first())
 		.and_then(|gif| avatars.gif_texture(ui.ctx(), gif, demo));
 	let mut chosen = None;
+	let mut retry = false;
 	let rows = 1 + categories.len().div_ceil(2);
 	let total = rows as f32 * TILE_HEIGHT + (rows.saturating_sub(1)) as f32 * TILE_GAP + 8.0;
 	egui::ScrollArea::vertical()
@@ -2117,6 +2182,40 @@ fn gif_home(
 					chosen = Some(GifSection::Category(category.name.clone()));
 				}
 			}
+			let failed = trending
+				.filter(|view| !view.loading)
+				.and_then(|view| view.error);
+			if categories.is_empty()
+				&& let Some(error) = failed
+			{
+				let below = egui::Rect::from_min_size(
+					egui::pos2(area.left(), cell(2).top()),
+					egui::vec2(width, 40.0),
+				);
+				ui.scope_builder(
+					egui::UiBuilder::new()
+						.max_rect(below)
+						.layout(egui::Layout::left_to_right(egui::Align::Center)),
+					|ui| {
+						ui.spacing_mut().item_spacing.x = 8.0;
+						ui.add(
+							egui::Label::new(
+								egui::RichText::new(crate::i18n::translate_if_key(error))
+									.color(colors.muted),
+							)
+							.truncate(),
+						);
+						retry = ui
+							.add_enabled(
+								state.can_browse_gifs(),
+								egui::Button::new(crate::i18n::translate(
+									"emoji-picker-gif-body-retry",
+								)),
+							)
+							.clicked();
+					},
+				);
+			}
 			if categories.is_empty() && trending.is_some_and(|view| view.loading) {
 				let below = egui::Rect::from_min_size(
 					egui::pos2(area.left(), cell(2).top()),
@@ -2139,7 +2238,10 @@ fn gif_home(
 				);
 			}
 		});
-	chosen
+	if retry {
+		return Some(Err(GifAction::Retry(None)));
+	}
+	chosen.map(Ok)
 }
 
 /// Two-column masonry of static previews; the star toggles a favorite, a click sends.
@@ -2854,6 +2956,41 @@ mod tests {
 		state.permissions.clear_cache();
 		let (source, custom) = matches.get(&state, 0).unwrap();
 		assert!(!picker.can_pick(&state, &emoji, Some((source, &unavailable))));
+		assert!(picker.can_pick(&state, &emoji, Some((source, custom))));
+	}
+
+	#[test]
+	fn nitro_opt_out_locks_animated_and_external_emoji_without_nitro() {
+		let mut state = test_support::demo_state();
+		state.premium_type = 0;
+		let mut picker = Picker {
+			channel: state.selected,
+			image_sharing_enabled: true,
+			..Default::default()
+		};
+		let guild = state.guilds[0].id;
+		let mut matches = CustomMatches::default();
+		matches.update(&state, Some(guild), "serein_party");
+		let (source, custom) = matches.get(&state, 0).unwrap();
+		assert!(custom.animated);
+		let emoji = model::ReactionEmoji {
+			id: Some(custom.id),
+			name: Some(custom.name.clone()),
+		};
+		// Default: offered, shared as an image by the plugin.
+		assert!(picker.can_pick(&state, &emoji, Some((source, custom))));
+		picker.hide_nitro_emojis = true;
+		assert!(picker.nitro_locked(&state, Some((source, custom))));
+		assert!(!picker.can_pick(&state, &emoji, Some((source, custom))));
+		let still = model::CustomEmoji {
+			animated: false,
+			..custom.clone()
+		};
+		assert!(!picker.nitro_locked(&state, Some((source, &still))));
+		assert!(picker.can_pick(&state, &emoji, Some((source, &still))));
+		state.premium_type = 2;
+		let (source, custom) = matches.get(&state, 0).unwrap();
+		assert!(!picker.nitro_locked(&state, Some((source, custom))));
 		assert!(picker.can_pick(&state, &emoji, Some((source, custom))));
 	}
 

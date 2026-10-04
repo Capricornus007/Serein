@@ -811,6 +811,10 @@ emoji-picker-gif-body-searching-klipy = KLIPYを検索中…
 # Context: gif_body
 emoji-picker-gif-body-trending-gifs = トレンドのGIF
 # Context: gif_body
+emoji-picker-gif-body-retry = 再試行
+# Context: gif_body
+emoji-picker-gif-body-no-trending-gifs-right-now = GIFを検索するか、後でもう一度お試しください。
+# Context: gif_body
 emoji-picker-gif-body-try-a-different-search-term = 別の検索語を試してください。
 # Context: gif_grid
 emoji-picker-gif-grid-favorite = お気に入り
@@ -836,6 +840,8 @@ emoji-picker-popup-hover-an-emoji-to-preview-it = 絵文字にカーソルを合
 emoji-picker-popup-no-matching-emoji = 一致する絵文字がありません。
 # Context: popup
 emoji-picker-popup-retry-sticker-packs = リトライステッカーパック
+# Context: popup
+emoji-picker-popup-requires-nitro = ここで使うにはNitroが必要です
 # Context: popup
 emoji-picker-popup-search-results = 検索結果
 # Context: popup
@@ -3441,6 +3447,12 @@ settings-chat-settings-channel-list = チャンネルリスト
 settings-chat-settings-show-channels-you-cannot-currently-access = 現在アクセスできないチャンネルを表示します。
 # Context: chat_settings
 settings-chat-settings-show-hidden-channels = 隠しチャンネルを表示する
+# Context: chat_settings
+settings-chat-settings-emoji = 絵文字
+# Context: chat_settings
+settings-chat-settings-suggest-nitro-emojis = Nitroが必要な絵文字を候補に表示
+# Context: chat_settings
+settings-chat-settings-suggest-nitro-emojis-description = Nitroがなくても、アニメーション絵文字や他のサーバーの絵文字を : の候補とピッカーに表示します。オフにすると候補から隠され、ピッカーではロックされます。
 # Context: close_control
 settings-close-control-close-settings-esc = 設定を閉じる (Esc)
 # Context: colour_preset_settings

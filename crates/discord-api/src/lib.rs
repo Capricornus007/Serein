@@ -1524,6 +1524,8 @@ impl DiscordApi {
 	}
 	/// Unofficial normal-client relay of KLIPY search/trending. Only the query text is encoded
 	/// into a fixed route; previews stay static and are loaded by the credential-free worker.
+	/// Trending needs two routes: `/gifs/trending` returns the categories with a single sample
+	/// GIF, while the Trending GIFs grid is `/gifs/trending-gifs`.
 	async fn gifs(&self, query: Option<&str>) -> Result<model::GifPage, Failure> {
 		const OPTIONS: &str = "media_format=tinygif&provider=klipy&locale=en-US";
 		match query {
@@ -1549,17 +1551,20 @@ impl DiscordApi {
 					.map_err(|_| Failure::Protocol)
 			}
 			None => {
-				let bytes = self
-					.request_limited(
-						Method::GET,
-						&format!("/gifs/trending?limit={}&{OPTIONS}", model::GIF_PAGE_SIZE),
-						None,
-						gifs::MAX_WIRE,
-					)
-					.await?;
-				decode::<gifs::TrendingReply>(&bytes)
-					.map_err(|_| Failure::Protocol)?
-					.into_page()
+				let categories_path = format!("/gifs/trending?{OPTIONS}");
+				let grid_path = format!(
+					"/gifs/trending-gifs?limit={}&{OPTIONS}",
+					model::GIF_PAGE_SIZE
+				);
+				let (categories, grid) = tokio::join!(
+					self.request_limited(Method::GET, &categories_path, None, gifs::MAX_WIRE),
+					self.request_limited(Method::GET, &grid_path, None, gifs::MAX_WIRE),
+				);
+				let categories =
+					decode::<gifs::TrendingReply>(&categories?).map_err(|_| Failure::Protocol)?;
+				let grid = decode::<gifs::SearchReply>(&grid?).map_err(|_| Failure::Protocol)?;
+				categories
+					.into_page_with(grid)
 					.map_err(|_| Failure::Protocol)
 			}
 		}
@@ -2063,6 +2068,82 @@ mod tests {
 		io::{AsyncReadExt, AsyncWriteExt},
 		net::TcpListener,
 	};
+	/// Trending merges both unofficial routes; synthetic replies only, no live service.
+	#[tokio::test]
+	async fn trending_gifs_load_categories_and_the_full_grid() {
+		tokio::time::timeout(Duration::from_secs(10), async {
+			let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+			let mut api = DiscordApi::new(Arc::new(
+				SessionSecret::from_owner_input("SYNTHETIC_GIF_TOKEN".into()).unwrap(),
+			))
+			.unwrap();
+			api.base = format!("http://{}", listener.local_addr().unwrap());
+			let gif = |id: &str| {
+				format!(
+					r#"{{"id":"{id}","title":"Synthetic","url":"https://klipy.com/gifs/synthetic-{id}","gif_src":"https://static.klipy.com/s/{id}.webp","width":320,"height":240,"preview":"https://static.klipy.com/s/{id}.gif"}}"#
+				)
+			};
+			let categories = format!(
+				r#"{{"categories":[{{"name":"happy","src":"https://static.klipy.com/c/happy.gif"}}],"gifs":[{}]}}"#,
+				gif("sample")
+			);
+			let grid = format!("[{},{},{}]", gif("t1"), gif("t2"), gif("t3"));
+			let server = tokio::spawn(async move {
+				let mut paths = Vec::new();
+				for _ in 0..2 {
+					let (mut socket, _) = listener.accept().await.unwrap();
+					let mut request = Vec::new();
+					while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+						let mut bytes = [0; 1024];
+						let n = socket.read(&mut bytes).await.unwrap();
+						assert!(n > 0 && request.len() < 4096);
+						request.extend_from_slice(&bytes[..n]);
+					}
+					let request = String::from_utf8(request).unwrap();
+					let path = request.split(' ').nth(1).unwrap().to_owned();
+					assert!(
+						path.contains("provider=klipy")
+							&& path.contains("locale=en-US")
+							&& path.contains("media_format=tinygif"),
+						"{path}"
+					);
+					let body = if path.starts_with("/gifs/trending-gifs?") {
+						&grid
+					} else {
+						assert!(path.starts_with("/gifs/trending?"), "{path}");
+						&categories
+					};
+					socket
+						.write_all(
+							format!(
+								"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+								body.len()
+							)
+							.as_bytes(),
+						)
+						.await
+						.unwrap();
+					paths.push(path);
+				}
+				paths
+			});
+			let page = api.gifs(None).await.unwrap();
+			assert_eq!(
+				page.gifs
+					.iter()
+					.map(|gif| gif.id.as_str())
+					.collect::<Vec<_>>(),
+				["t1", "t2", "t3"]
+			);
+			assert_eq!(page.categories.len(), 1);
+			let mut paths = server.await.unwrap();
+			paths.sort();
+			assert!(paths[0].starts_with("/gifs/trending-gifs?limit="));
+			assert!(paths[1].starts_with("/gifs/trending?"));
+		})
+		.await
+		.unwrap();
+	}
 	#[tokio::test]
 	async fn single_message_delete_confirms_only_success_and_never_retries_ambiguity() {
 		{

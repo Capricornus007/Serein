@@ -282,6 +282,8 @@ pub struct MessagingUi {
 	profile_formatted: markdown::FormatCache,
 	pub reading_preferences: model::ReadingPreferences,
 	pub show_hidden_channels: bool,
+	/// Custom emoji that need Nitro stay out of `:` suggestions and are locked in pickers.
+	pub hide_nitro_emojis: bool,
 	pub hide_title_bar: bool,
 	pub hide_window_decorations: bool,
 	pub custom_font: fonts::Settings,
@@ -3014,6 +3016,7 @@ impl MessagingUi {
 			.and_then(|s| s.cursor.char_range())
 			.filter(|r| r.is_empty())
 			.map(|r| r.primary.index.0);
+		self.mention_menu.hide_nitro_emojis = self.hide_nitro_emojis;
 		self.mention_menu.refresh(
 			state,
 			channel,
@@ -3180,6 +3183,7 @@ impl MessagingUi {
                         let pick = ui
                             .add_enabled_ui(!application_command && !self.ime_active && !ime_this_frame, |ui| {
                                 self.emoji_picker.image_sharing_enabled = self.image_sharing_enabled;
+                                self.emoji_picker.hide_nitro_emojis = self.hide_nitro_emojis;
                                 self.emoji_picker
                                     .show(ui, state, channel, &mut self.avatars, commands)
                             })
@@ -4524,6 +4528,7 @@ impl MessagingUi {
 							self.reaction_picker
 								.open_reaction(state, message, anchor, trigger);
 						}
+						self.reaction_picker.hide_nitro_emojis = self.hide_nitro_emojis;
 						self.reaction_picker.show_reaction(
 							ui,
 							state,

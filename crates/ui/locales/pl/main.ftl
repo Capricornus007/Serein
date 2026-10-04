@@ -810,6 +810,10 @@ emoji-picker-gif-body-searching-klipy = Wyszukiwanie KLIPY…
 # Context: gif_body
 emoji-picker-gif-body-trending-gifs = Popularne GIF-y
 # Context: gif_body
+emoji-picker-gif-body-retry = Spróbuj ponownie
+# Context: gif_body
+emoji-picker-gif-body-no-trending-gifs-right-now = Wyszukaj GIF-a lub spróbuj ponownie później.
+# Context: gif_body
 emoji-picker-gif-body-try-a-different-search-term = Wypróbuj inne wyszukiwane hasło.
 # Context: gif_grid
 emoji-picker-gif-grid-favorite = Ulubiony
@@ -835,6 +839,8 @@ emoji-picker-popup-hover-an-emoji-to-preview-it = Najedź kursorem na emoji, aby
 emoji-picker-popup-no-matching-emoji = Brak pasującego emoji.
 # Context: popup
 emoji-picker-popup-retry-sticker-packs = Spróbuj ponownie pakietów naklejek
+# Context: popup
+emoji-picker-popup-requires-nitro = Wymaga Nitro, aby użyć tutaj
 # Context: popup
 emoji-picker-popup-search-results = Wyniki wyszukiwania
 # Context: popup
@@ -3440,6 +3446,12 @@ settings-chat-settings-channel-list = Lista kanałów
 settings-chat-settings-show-channels-you-cannot-currently-access = Pokaż kanały, do których aktualnie nie masz dostępu.
 # Context: chat_settings
 settings-chat-settings-show-hidden-channels = Pokaż ukryte kanały
+# Context: chat_settings
+settings-chat-settings-emoji = Emoji
+# Context: chat_settings
+settings-chat-settings-suggest-nitro-emojis = Proponuj emoji wymagające Nitro
+# Context: chat_settings
+settings-chat-settings-suggest-nitro-emojis-description = Pokazuj animowane emoji i emoji z innych serwerów w podpowiedziach : i w selektorze bez Nitro. Po wyłączeniu są ukryte w podpowiedziach i zablokowane w selektorze.
 # Context: close_control
 settings-close-control-close-settings-esc = Zamknij ustawienia (Esc)
 # Context: colour_preset_settings

@@ -27,6 +27,8 @@ pub struct Menu {
 	dismissed: bool,
 	/// Keyboard moved the highlight; scroll the popout so it stays visible.
 	follow: bool,
+	/// Leave custom emoji that need Nitro out of `:` suggestions.
+	pub hide_nitro_emojis: bool,
 }
 pub struct Pick {
 	range: Range<usize>,
@@ -450,7 +452,10 @@ impl Menu {
 		users: &[User],
 	) {
 		let Some((range, query, kind)) = cursor.and_then(|cursor| query(draft, cursor)) else {
-			*self = Self::default();
+			*self = Self {
+				hide_nitro_emojis: self.hide_nitro_emojis,
+				..Self::default()
+			};
 			return;
 		};
 		if self.channel != Some(channel)
@@ -557,7 +562,8 @@ impl Menu {
 						if let Some(rank) = rank(&query, &emoji.name, Id(0)).or(source_match)
 							&& state
 								.custom_emoji_unavailable_reason(channel, guild.id, emoji)
-								.is_none()
+								.is_none() && !(self.hide_nitro_emojis
+							&& state.custom_emoji_requires_nitro(channel, guild.id, emoji))
 						{
 							push_emoji(&mut out, (rank, 0, emoji.id.0), || Candidate::Custom {
 								id: emoji.id,
@@ -1394,7 +1400,7 @@ mod tests {
 				},
 			]),
 		}];
-		let state = State {
+		let mut state = State {
 			guilds,
 			channels: vec![channel(1, None, 1, "DM")],
 			user: Some(user(7, "Owner")),
@@ -1429,6 +1435,24 @@ mod tests {
 		let mut draft = "hi :he".to_owned();
 		insert(&mut draft, menu.pick(unicode).unwrap(), true).unwrap();
 		assert_eq!(draft, "hi ❤️ ");
+		// Opting out of Nitro-only suggestions drops the animated, other-server emoji only.
+		menu.hide_nitro_emojis = true;
+		menu.refresh(&state, Id(1), "x", None, &[]);
+		menu.refresh(&state, Id(1), "hi :he", Some(6), &[]);
+		assert!(
+			menu.hide_nitro_emojis,
+			"the preference survives a closed menu"
+		);
+		assert!(!menu.candidates.iter().any(|c| c.id() == Id(9001)));
+		assert!(
+			menu.candidates
+				.iter()
+				.any(|c| matches!(c, Candidate::Unicode { code, .. } if *code == ":heart:"))
+		);
+		state.premium_type = 2;
+		menu.refresh(&state, Id(1), "hi :he", Some(6), &[]);
+		assert!(menu.candidates.iter().any(|c| c.id() == Id(9001)));
+		menu.hide_nitro_emojis = false;
 		menu.refresh(&state, Id(1), ":+1", Some(3), &[]);
 		assert!(menu.candidates.iter().any(|candidate| matches!(
 			candidate,
