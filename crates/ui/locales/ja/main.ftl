@@ -2140,6 +2140,8 @@ profiles-show-view-profile-picture = プロフィール写真を見る
 ## crates/ui/src/reactions.rs
 # Context: add_button
 reactions-add-button-add-reaction = リアクションを追加
+# Context: quick_button
+reactions-quick-react = { $emoji } でリアクション
 # Context: show
 reactions-show-reactions-unavailable = 反応がありません
 # Context: show
@@ -3764,6 +3766,10 @@ timeline-deleted-message-actions-toggle-deleted-highlight = 削除されたハ�
 timeline-loading-messages-loading-messages = メッセージをロードしています
 # Context: message_actions
 timeline-message-actions-copy = コピー
+# Context: message_actions
+timeline-message-actions-copy-message-id = メッセージIDをコピー
+# Context: message_actions
+timeline-message-actions-copy-message-link = メッセージリンクをコピー
 # Context: message_actions
 timeline-message-actions-create-thread = スレッドを作成…
 # Context: message_actions

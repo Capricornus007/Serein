@@ -2139,6 +2139,8 @@ profiles-show-view-profile-picture = Voir la photo de profil
 ## crates/ui/src/reactions.rs
 # Context: add_button
 reactions-add-button-add-reaction = Ajouter une réaction
+# Context: quick_button
+reactions-quick-react = Réagir avec { $emoji }
 # Context: show
 reactions-show-reactions-unavailable = Réactions indisponibles
 # Context: show
@@ -3763,6 +3765,10 @@ timeline-deleted-message-actions-toggle-deleted-highlight = Basculer la surbrill
 timeline-loading-messages-loading-messages = Chargement des messages
 # Context: message_actions
 timeline-message-actions-copy = Copie
+# Context: message_actions
+timeline-message-actions-copy-message-id = Copier l'ID du message
+# Context: message_actions
+timeline-message-actions-copy-message-link = Copier le lien du message
 # Context: message_actions
 timeline-message-actions-create-thread = Créer un fil de discussion…
 # Context: message_actions

@@ -89,6 +89,10 @@ pub struct TimelineView {
 	pub(super) reaction_picker: Option<(Id, egui::Rect, egui::Id)>,
 	pub(super) reaction: Option<(Id, Option<model::ReactionEmoji>)>,
 	pub(super) reaction_users: Option<(Id, model::ReactionEmoji, bool)>,
+	/// Hover-bar reactions, most used first; `None` uses the defaults.
+	pub(super) quick_reactions: Option<[&'static str; 3]>,
+	/// A quick reaction the reader added this frame, for the usage ranking.
+	pub(super) quick_reaction_used: Option<&'static str>,
 	/// Requested pin change: channel, message, pinned.
 	pub(super) pin_request: Option<(Id, Id, bool)>,
 	/// Requested new thread: parent channel and the message that starts it.
@@ -783,6 +787,25 @@ fn divider(ui: &mut egui::Ui, label: String, unread: bool, compact: bool) {
 	});
 	ui.add_space(if compact { 2.0 } else { 4.0 });
 }
+/// A hover-bar reaction: its emoji, whether the reader already reacted, and whether it toggles now.
+fn quick_reaction(
+	state: &State,
+	message: &Message,
+	text: &str,
+) -> (model::ReactionEmoji, bool, bool) {
+	let emoji = model::ReactionEmoji {
+		id: None,
+		name: Some(text.to_owned()),
+	};
+	let reactions = state.reactions.display(message);
+	let reacted = reactions
+		.and_then(|items| items.iter().find(|r| r.emoji.same(&emoji)))
+		.is_some_and(|r| r.me);
+	let enabled = reactions.is_some()
+		&& !state.reactions.busy()
+		&& state.can_react(message.id, Some(&emoji), !reacted);
+	(emoji, reacted, enabled)
+}
 fn action_button(ui: &mut egui::Ui, icon: crate::icons::Icon, label: &str) -> egui::Response {
 	crate::icons::button(ui, icon, 28.0, label)
 }
@@ -818,8 +841,9 @@ fn deleted_message_actions(popup: egui::Popup<'_>, action: &mut Option<DeletedLo
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn message_actions(
 	popup: egui::Popup<'_>,
-	(message, extension_actions, extension_request): (
+	(message, link, extension_actions, extension_request): (
 		&Message,
+		Option<&str>,
 		&[crate::extensions_ui::MenuAction],
 		&mut Option<(crate::extensions_ui::MenuAction, String)>,
 	),
@@ -874,6 +898,25 @@ fn message_actions(
 			.clicked()
 		{
 			ui.ctx().copy_text(message.display_text().into_owned());
+			ui.close();
+		}
+		if let Some(link) = link
+			&& ui
+				.button(crate::i18n::translate(
+					"timeline-message-actions-copy-message-link",
+				))
+				.clicked()
+		{
+			ui.ctx().copy_text(link.to_owned());
+			ui.close();
+		}
+		if ui
+			.button(crate::i18n::translate(
+				"timeline-message-actions-copy-message-id",
+			))
+			.clicked()
+		{
+			ui.ctx().copy_text(message.id.to_string());
 			ui.close();
 		}
 		if ui
@@ -1532,6 +1575,7 @@ impl TimelineView {
 			let following = restored.is_none_or(|cursor| cursor.message.is_none());
 			*self = Self {
 				extension_actions: self.extension_actions.clone(),
+				quick_reactions: self.quick_reactions,
 				compact_messages: self.compact_messages,
 				hide_media_links: self.hide_media_links,
 				instant_scrolling: self.instant_scrolling,
@@ -2173,6 +2217,8 @@ impl TimelineView {
 					let mut time_rect = None;
 					// A reaction claims its own right click: the row menu must stay closed.
 					let mut reaction_menu = false;
+					// A double-click away from text, links and media reacts with the top quick reaction.
+					let mut double_click = None;
 					let row = egui::Frame::NONE
 						.inner_margin(egui::Margin {
 							left: 16,
@@ -3072,6 +3118,7 @@ impl TimelineView {
 											self.channel_reference = Some(thread.id);
 										}
 									}
+									let reactions_top = ui.cursor().top();
 									if deleted {
 										crate::reactions::show_frozen(
 											ui,
@@ -3105,6 +3152,10 @@ impl TimelineView {
 											}
 										}
 									}
+									surface.exclude(egui::Rect::from_min_max(
+										egui::pos2(ui.max_rect().left(), reactions_top),
+										egui::pos2(ui.max_rect().right(), ui.min_rect().bottom()),
+									));
 									fill_header_line(ui, compact, text_line);
 								});
 							});
@@ -3112,10 +3163,40 @@ impl TimelineView {
 							if body_bottom.is_finite() {
 								cover.max.y = body_bottom;
 							}
+							double_click = ui
+								.input(|input| {
+									input
+										.pointer
+										.button_double_clicked(egui::PointerButton::Primary)
+										.then(|| input.pointer.interact_pos())
+										.flatten()
+								})
+								.filter(|pos| surface.blank_at(*pos));
 							surface.cover(cover);
 							surface.finish(ui);
 						});
 					let rect = row.response.rect;
+					if let Some(pos) = double_click
+						&& !deleted && rect.contains(pos)
+						&& self
+							.toolbar
+							.is_none_or(|(_, toolbar)| !toolbar.contains(pos))
+						&& ui.ctx().layer_id_at(pos) == Some(ui.layer_id())
+						&& !egui::Popup::is_any_open(ui.ctx())
+					{
+						let text = self
+							.quick_reactions
+							.unwrap_or(crate::reactions::QUICK_DEFAULTS)[0];
+						let (emoji, reacted, enabled) = quick_reaction(state, message, text);
+						if enabled {
+							// The second click selected the nearest word in the blank band.
+							crate::select::clear(ui.ctx());
+							self.reaction = Some((id, Some(emoji)));
+							if !reacted {
+								self.quick_reaction_used = Some(text);
+							}
+						}
+					}
 					let mentioned = mentions_viewer(message, state);
 					// Mentions mark the row in the warning colour; a private command response in
 					// the house accent, as in the official client.
@@ -3282,12 +3363,35 @@ impl TimelineView {
 							}
 							self.toolbar = Some((id, toolbar_rect));
 						} else {
+							let react = state.can_react(id, None, true)
+								|| message.reactions.as_ref().is_some_and(|items| {
+									items
+										.iter()
+										.any(|r| state.can_react(id, Some(&r.emoji), true))
+								});
+							// Holding Shift trades the menu for direct actions, like the official client.
+							let shift = !context_menu
+								&& ui.input(|input| input.modifiers.shift)
+								&& !egui::Popup::is_any_open(ui.ctx());
+							let can_pin = state.can_pin(message.channel, id);
+							let link = state
+								.channel(message.channel)
+								.and_then(|channel| discord_url(channel, Some(id)));
+							let buttons = if react { 4 } else { 1 }
+								+ 3 + usize::from(own) + if shift {
+								2 + usize::from(link.is_some())
+									+ usize::from(can_mark_unread)
+									+ usize::from(can_pin)
+							} else {
+								0
+							};
+							let width = buttons as f32 * 30.0;
 							let toolbar_rect = egui::Rect::from_min_size(
 								egui::pos2(
-									rect.right() - if own { 166.0 } else { 136.0 },
+									(rect.right() - 16.0 - width).max(rect.left()),
 									rect.top() - 10.0,
 								),
-								egui::vec2(if own { 150.0 } else { 120.0 }, 28.0),
+								egui::vec2(width, 28.0),
 							);
 							// A child overlay keeps hover from changing wrapping or cached row heights.
 							let mut toolbar = ui.new_child(
@@ -3308,12 +3412,37 @@ impl TimelineView {
 								egui::Stroke::new(1.0, colors.border),
 								egui::StrokeKind::Inside,
 							);
-							let react = state.can_react(id, None, true)
-								|| message.reactions.as_ref().is_some_and(|items| {
-									items
-										.iter()
-										.any(|r| state.can_react(id, Some(&r.emoji), true))
-								});
+							if react {
+								let quick = self
+									.quick_reactions
+									.unwrap_or(crate::reactions::QUICK_DEFAULTS);
+								let mut last = egui::Rect::NOTHING;
+								for (index, text) in quick.into_iter().enumerate() {
+									let (emoji, reacted, enabled) =
+										quick_reaction(state, message, text);
+									let response = toolbar
+										.push_id(("quick-reaction", index), |ui| {
+											ui.add_enabled_ui(enabled, |ui| {
+												crate::reactions::quick_button(ui, text, reacted)
+											})
+											.inner
+										})
+										.inner;
+									last = response.rect;
+									if response.clicked() {
+										self.reaction = Some((id, Some(emoji)));
+										if !reacted {
+											self.quick_reaction_used = Some(text);
+										}
+									}
+								}
+								let x = last.right() + 1.0;
+								toolbar.painter().vline(
+									x,
+									last.y_range().shrink(6.0),
+									egui::Stroke::new(1.0, colors.border),
+								);
+							}
 							if let Some((anchor, trigger)) = crate::reactions::add_button(
 								&mut toolbar,
 								react,
@@ -3366,10 +3495,62 @@ impl TimelineView {
 								*editing = Some((message.channel, id, message.content.clone()));
 								self.edit_started = true;
 							}
-							if can_delete
-								&& !context_menu && toolbar.input(|input| input.modifiers.shift)
-								&& !egui::Popup::is_any_open(toolbar.ctx())
-							{
+							if shift {
+								let pinned = state.is_pinned(message.channel, id);
+								if can_pin
+									&& action_button(
+										&mut toolbar,
+										crate::icons::Icon::Pin,
+										if pinned {
+											"timeline-message-actions-unpin-message"
+										} else {
+											"timeline-message-actions-pin-message"
+										},
+									)
+									.clicked()
+								{
+									self.pin_request = Some((message.channel, id, !pinned));
+								}
+								if can_mark_unread
+									&& action_button(
+										&mut toolbar,
+										crate::icons::Icon::Inbox,
+										"timeline-message-actions-mark-unread",
+									)
+									.clicked()
+								{
+									self.mark_unread = Some(id);
+								}
+								if let Some(link) = &link
+									&& action_button(
+										&mut toolbar,
+										crate::icons::Icon::Link,
+										"timeline-message-actions-copy-message-link",
+									)
+									.clicked()
+								{
+									toolbar.ctx().copy_text(link.clone());
+								}
+								if action_button(
+									&mut toolbar,
+									crate::icons::Icon::Copy,
+									"message-menu-copy",
+								)
+								.clicked()
+								{
+									toolbar.ctx().copy_text(message.display_text().into_owned());
+								}
+								if action_button(
+									&mut toolbar,
+									crate::icons::Icon::Hash,
+									"timeline-message-actions-copy-message-id",
+								)
+								.clicked()
+								{
+									toolbar.ctx().copy_text(id.to_string());
+								}
+							}
+							if can_delete && shift {
 								if toolbar
 									.push_id("quick-delete", |ui| {
 										action_button(
@@ -3418,6 +3599,7 @@ impl TimelineView {
 									popup,
 									(
 										message,
+										link.as_deref(),
 										&self.extension_actions,
 										&mut self.extension_request,
 									),
@@ -3430,7 +3612,7 @@ impl TimelineView {
 									(editing, &mut self.edit_started),
 									deleting,
 									(
-										state.can_pin(message.channel, id),
+										can_pin,
 										state.is_pinned(message.channel, id),
 										&mut self.pin_request,
 									),
@@ -5286,7 +5468,7 @@ mod tests {
 						let menu = action_button(ui, crate::icons::Icon::More, "More");
 						message_actions(
 							egui::Popup::menu(&menu),
-							(&message, &[], &mut None),
+							(&message, None, &[], &mut None),
 							(own, true, true, can_delete),
 							(None, None, &mut reply),
 							(&mut editing, &mut edit_started),
@@ -6261,9 +6443,10 @@ mod tests {
 				vec![egui::Event::PointerMoved(row.center())],
 			);
 			assert!(hovered.iter().any(|(t, _)| t == "00:01"));
-			assert_eq!(view.toolbar.unwrap().1.width(), 150.0);
+			// Three quick reactions, add reaction, reply, forward, edit and the menu.
+			assert_eq!(view.toolbar.unwrap().1.width(), 240.0);
 			assert_eq!(view.heights, heights);
-			let point = view.toolbar.unwrap().1.left_top() + egui::vec2(44.0, 14.0);
+			let point = view.toolbar.unwrap().1.left_top() + egui::vec2(134.0, 14.0);
 			for pressed in [true, false] {
 				render(
 					&mut view,
@@ -6387,12 +6570,12 @@ mod tests {
 				let focused = ctx
 					.memory(|m| m.focused())
 					.and_then(|id| ctx.read_response(id));
-				// Reply is the second 28px icon in the retained toolbar.
+				// Reply follows the quick reactions and add reaction in the retained toolbar.
 				if focused.is_some_and(|r| {
 					view.toolbar.is_some_and(|(_, toolbar)| {
 						toolbar.contains_rect(r.rect)
 							&& r.rect.width() < 40.0
-							&& (r.rect.left() - (toolbar.left() + 30.0)).abs() < 3.0
+							&& (r.rect.left() - (toolbar.left() + 120.0)).abs() < 3.0
 					})
 				}) {
 					render(&mut view, &mut state, vec![key(egui::Key::Enter)]);
@@ -6403,6 +6586,166 @@ mod tests {
 				state.reply.is_some(),
 				"Keyboard navigation must reach Reply"
 			);
+		}
+	}
+	#[test]
+	fn quick_reactions_shift_actions_and_double_click_use_existing_paths() {
+		fn texts(shape: &egui::Shape, out: &mut Vec<(String, egui::Rect)>) {
+			match shape {
+				egui::Shape::Text(t) => out.push((
+					t.galley.job.text.clone(),
+					t.galley.rect.translate(t.pos.to_vec2()),
+				)),
+				egui::Shape::Vec(shapes) => {
+					for shape in shapes {
+						texts(shape, out);
+					}
+				}
+				_ => {}
+			}
+		}
+		let ctx = egui::Context::default();
+		crate::design::apply(&ctx);
+		let mut state = test_support::demo_state();
+		state.timeline.clear();
+		state.read_state.reset();
+		let id = Id(60_000 << 22);
+		let mut message = text_message(id.0);
+		message.content = "Short".into();
+		state.user = Some(message.author.clone());
+		state.timeline.insert(message, false, false).unwrap();
+		let mut view = TimelineView {
+			quick_reactions: Some(["🚀", "👍", "❤️"]),
+			..Default::default()
+		};
+		let mut avatars = crate::avatars::Avatars::default();
+		let clock = std::cell::Cell::new(0.0);
+		let mut render = |view: &mut TimelineView,
+		                  state: &mut State,
+		                  mut events: Vec<egui::Event>,
+		                  modifiers: egui::Modifiers| {
+			events.insert(0, egui::Event::ModifiersChanged(modifiers));
+			let output = ctx.run_ui(
+				egui::RawInput {
+					screen_rect: Some(egui::Rect::from_min_size(
+						egui::Pos2::ZERO,
+						egui::vec2(900.0, 600.0),
+					)),
+					time: Some(clock.replace(clock.get() + 1.0 / 60.0)),
+					events,
+					..Default::default()
+				},
+				|ui| {
+					view.show(
+						ui,
+						state,
+						&mut None,
+						&mut None,
+						(
+							&mut avatars,
+							&mut crate::profiles::ProfileSession::default(),
+						),
+						None,
+					)
+				},
+			);
+			let mut painted = vec![];
+			for shape in &output.shapes {
+				texts(&shape.shape, &mut painted);
+			}
+			let copied: Vec<String> = output
+				.platform_output
+				.commands
+				.iter()
+				.filter_map(|command| match command {
+					egui::OutputCommand::CopyText(text) => Some(text.clone()),
+					_ => None,
+				})
+				.collect();
+			output.drop_without_applying_deltas();
+			(painted, copied)
+		};
+		let click = |pos: egui::Pos2, modifiers: egui::Modifiers| {
+			[true, false].map(|pressed| {
+				vec![
+					egui::Event::PointerMoved(pos),
+					egui::Event::PointerButton {
+						pos,
+						button: egui::PointerButton::Primary,
+						pressed,
+						modifiers,
+					},
+				]
+			})
+		};
+		let none = egui::Modifiers::NONE;
+		for _ in 0..5 {
+			render(&mut view, &mut state, vec![], none);
+		}
+		let (idle, _) = render(&mut view, &mut state, vec![], none);
+		let text = idle.iter().find(|(t, _)| t == "Short").unwrap().1;
+		render(
+			&mut view,
+			&mut state,
+			vec![egui::Event::PointerMoved(text.center())],
+			none,
+		);
+		let toolbar = view.toolbar.unwrap().1;
+		assert_eq!(toolbar.width(), 240.0);
+		// The first quick reaction toggles through the shared reaction path.
+		for events in click(toolbar.left_center() + egui::vec2(14.0, 0.0), none) {
+			render(&mut view, &mut state, events, none);
+		}
+		let rocket = model::ReactionEmoji {
+			id: None,
+			name: Some("🚀".into()),
+		};
+		assert_eq!(view.reaction.take(), Some((id, Some(rocket.clone()))));
+		assert_eq!(view.quick_reaction_used.take(), Some("🚀"));
+
+		// Shift adds direct actions and swaps the menu for quick delete.
+		let shift = egui::Modifiers::SHIFT;
+		render(
+			&mut view,
+			&mut state,
+			vec![egui::Event::PointerMoved(text.center())],
+			shift,
+		);
+		let toolbar = view.toolbar.unwrap().1;
+		assert!(toolbar.width() >= 240.0 + 2.0 * 30.0, "{toolbar:?}");
+		let mut copied = vec![];
+		for events in click(toolbar.right_center() - egui::vec2(44.0, 0.0), shift) {
+			copied.extend(render(&mut view, &mut state, events, shift).1);
+		}
+		assert_eq!(copied, [id.to_string()]);
+		for events in click(toolbar.right_center() - egui::vec2(74.0, 0.0), shift) {
+			copied.extend(render(&mut view, &mut state, events, shift).1);
+		}
+		assert_eq!(copied, [id.to_string(), "Short".into()]);
+		for events in click(toolbar.right_center() - egui::vec2(14.0, 0.0), shift) {
+			render(&mut view, &mut state, events, shift);
+		}
+		assert_eq!(view.quick_delete.take(), Some((Id(20), id)));
+		render(&mut view, &mut state, vec![egui::Event::PointerGone], none);
+
+		// Double-clicking text selects a word; beside it the top quick reaction toggles.
+		for (pos, reacts) in [
+			(text.center(), false),
+			(egui::pos2(450.0, text.center().y), true),
+		] {
+			// Let the multi-click window lapse so this pair counts as a double click.
+			clock.set(clock.get() + 2.0);
+			for _ in 0..2 {
+				for events in click(pos, none) {
+					render(&mut view, &mut state, events, none);
+				}
+			}
+			assert_eq!(
+				view.reaction.take(),
+				reacts.then(|| (id, Some(rocket.clone()))),
+				"{pos:?}"
+			);
+			render(&mut view, &mut state, vec![egui::Event::PointerGone], none);
 		}
 	}
 	#[test]

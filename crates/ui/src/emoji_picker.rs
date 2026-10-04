@@ -706,6 +706,26 @@ impl Picker {
 			.sort_by_key(|entry| std::cmp::Reverse(entry.1));
 	}
 
+	/// The most used Unicode emoji first, filled with the hover bar defaults.
+	pub(crate) fn quick_reactions(&self) -> [&'static str; 3] {
+		let mut quick = crate::reactions::QUICK_DEFAULTS;
+		let mut filled = 0;
+		for text in self.frequent.iter().take(3).map(|(i, _)| standard()[*i].0) {
+			quick[filled] = text;
+			filled += 1;
+		}
+		for text in crate::reactions::QUICK_DEFAULTS {
+			if filled == 3 {
+				break;
+			}
+			if !quick[..filled].contains(&text) {
+				quick[filled] = text;
+				filled += 1;
+			}
+		}
+		quick
+	}
+
 	fn favorites(&self) -> Vec<usize> {
 		let mut favorites: Vec<_> = self.frequent.iter().take(8).map(|(i, _)| *i).collect();
 		for text in ["👍", "❤️", "😂", "🎉", "👀", "✅", "🙏", "😢"] {

@@ -2142,6 +2142,8 @@ profiles-show-view-profile-picture = Zobrazit profilový obrázek
 ## crates/ui/src/reactions.rs
 # Context: add_button
 reactions-add-button-add-reaction = Přidejte reakci
+# Context: quick_button
+reactions-quick-react = Reagovat { $emoji }
 # Context: show
 reactions-show-reactions-unavailable = Reakce nedostupné
 # Context: show
@@ -3766,6 +3768,10 @@ timeline-deleted-message-actions-toggle-deleted-highlight = Přepněte Odstraně
 timeline-loading-messages-loading-messages = Načítání zpráv
 # Context: message_actions
 timeline-message-actions-copy = Kopie
+# Context: message_actions
+timeline-message-actions-copy-message-id = Kopírovat ID zprávy
+# Context: message_actions
+timeline-message-actions-copy-message-link = Kopírovat odkaz na zprávu
 # Context: message_actions
 timeline-message-actions-create-thread = Vytvořit vlákno…
 # Context: message_actions

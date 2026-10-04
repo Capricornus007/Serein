@@ -2140,6 +2140,8 @@ profiles-show-view-profile-picture = Profil resmini görüntüle
 ## crates/ui/src/reactions.rs
 # Context: add_button
 reactions-add-button-add-reaction = Tepki ekle
+# Context: quick_button
+reactions-quick-react = { $emoji } ile tepki ver
 # Context: show
 reactions-show-reactions-unavailable = Tepkiler kullanılamıyor
 # Context: show
@@ -3764,6 +3766,10 @@ timeline-deleted-message-actions-toggle-deleted-highlight = Silinen Vurgulamayı
 timeline-loading-messages-loading-messages = Mesajlar yükleniyor
 # Context: message_actions
 timeline-message-actions-copy = Kopyala
+# Context: message_actions
+timeline-message-actions-copy-message-id = Mesaj Kimliğini Kopyala
+# Context: message_actions
+timeline-message-actions-copy-message-link = Mesaj Bağlantısını Kopyala
 # Context: message_actions
 timeline-message-actions-create-thread = Konu Oluştur…
 # Context: message_actions

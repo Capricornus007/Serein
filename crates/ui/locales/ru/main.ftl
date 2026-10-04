@@ -2140,6 +2140,8 @@ profiles-show-view-profile-picture = Посмотреть изображение
 ## crates/ui/src/reactions.rs
 # Context: add_button
 reactions-add-button-add-reaction = Добавить реакцию
+# Context: quick_button
+reactions-quick-react = Реакция { $emoji }
 # Context: show
 reactions-show-reactions-unavailable = Реакции недоступны.
 # Context: show
@@ -3764,6 +3766,10 @@ timeline-deleted-message-actions-toggle-deleted-highlight = Переключит
 timeline-loading-messages-loading-messages = Загрузка сообщений
 # Context: message_actions
 timeline-message-actions-copy = Копировать
+# Context: message_actions
+timeline-message-actions-copy-message-id = Копировать ID сообщения
+# Context: message_actions
+timeline-message-actions-copy-message-link = Копировать ссылку на сообщение
 # Context: message_actions
 timeline-message-actions-create-thread = Создать тему…
 # Context: message_actions
