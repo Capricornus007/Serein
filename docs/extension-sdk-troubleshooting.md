@@ -88,6 +88,21 @@ returned storage and succeeded before restarting. Storage has a 1-MiB disk limit
 but must also fit inside the 256-KiB serialized invocation/output budgets.
 See [storage semantics](extension-sdk-actions.md#storage-is-one-value-not-a-filesystem).
 
+## Voice-message recorder (preview)
+
+| Symptom | What to check |
+| --- | --- |
+| No recorder item in the composer + menu | Enable Voice Messages and consent to `voice_messages` on a matching host. Import alone is passive. A failed activation or invalid saved config provides no contribution. |
+| Settings edits do nothing | Click the plugin's **Save voice message settings** button; edits are local until then. Save applies only to new recordings and never starts capture. |
+| Saved configuration does not restore | Grant `storage`; saved JSON must contain all three valid configuration fields. Open settings and explicitly Save valid values to repair corrupt data. |
+| Native recording is unavailable | Check native conversation permissions, device/OS capture access, mute and push-to-talk gates. These are host conditions; a capability cannot bypass them. |
+| Trying to inspect recordings in the handler | No audio, device lists, filesystem or microphone API is supplied. `voice_messages` accepts typed host settings only. |
+
+See [Voice Messages configuration](extension-sdk-actions.md#voice-messages). Native
+Cancel/navigation/disable/logout/call teardown release capture; recordings are
+session-only, with 120-second and 8-MiB audio ceilings. Offline checks do not prove
+live Discord interoperability.
+
 ## Execution errors
 
 The names below are host error categories. The native UI shows fixed explanatory
