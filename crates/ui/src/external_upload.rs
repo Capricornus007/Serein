@@ -123,23 +123,6 @@ impl ExternalUpload {
 				}
 				file_card(ui, &prompt.filename, prompt.bytes, state.upload_limit());
 				ui.add_space(4.0);
-				design::section(ui, "public-upload-host", None);
-				ui.add_enabled_ui(!prompt.running && prompt.result.is_none(), |ui| {
-					for choice in Host::ALL {
-						let detail = if eligible(choice, &prompt.filename, prompt.bytes) {
-							crate::i18n::translate(host_detail_key(choice))
-						} else {
-							crate::i18n::translate("public-upload-limits")
-						};
-						if design::radio_row(ui, *host == choice, choice.name(), Some(&detail))
-							.clicked()
-						{
-							*host = choice;
-						}
-					}
-				});
-				ui.add_space(4.0);
-				design::notice(ui, design::Level::Warning, "public-upload-privacy");
 				if !same_channel {
 					design::notice(ui, design::Level::Warning, "public-upload-return");
 				}
@@ -197,7 +180,24 @@ impl ExternalUpload {
 								.fill(colors.accent),
 						);
 					}
-					None => {}
+					// Before uploading: choose the host and acknowledge that the link is public.
+					None => {
+						design::section(ui, "public-upload-host", None);
+						for choice in Host::ALL {
+							let detail = if eligible(choice, &prompt.filename, prompt.bytes) {
+								crate::i18n::translate(host_detail_key(choice))
+							} else {
+								crate::i18n::translate("public-upload-limits")
+							};
+							if design::radio_row(ui, *host == choice, choice.name(), Some(&detail))
+								.clicked()
+							{
+								*host = choice;
+							}
+						}
+						ui.add_space(4.0);
+						design::notice(ui, design::Level::Warning, "public-upload-privacy");
+					}
 				}
 			});
 			body.footer(|ui| {
@@ -222,6 +222,13 @@ impl ExternalUpload {
 					close |= dialog::action(ui, "public-upload-close", dialog::Action::Neutral)
 						.clicked();
 				} else if prompt.result.is_some() {
+					// The selection is only consumed on success, so a failed file can be retried,
+					// possibly on the other host.
+					if dialog::action(ui, "public-upload-retry", dialog::Action::Primary).clicked()
+					{
+						prompt.result = None;
+						prompt.progress = None;
+					}
 					close |= dialog::action(ui, "public-upload-close", dialog::Action::Neutral)
 						.clicked();
 				} else if prompt.running {
@@ -261,7 +268,8 @@ impl ExternalUpload {
 		if modal.close {
 			if prompt.running {
 				self.cancel_requested = true;
-			} else if prompt.result.is_none() {
+			} else if !matches!(prompt.result, Some(Ok(_))) {
+				// Only an unreviewed link needs an explicit choice; failures dismiss normally.
 				close = true;
 			}
 		}
@@ -305,8 +313,9 @@ fn file_card(ui: &mut egui::Ui, filename: &str, bytes: u64, limit: u64) {
 }
 fn host_detail_key(host: Host) -> &'static str {
 	match host {
-		Host::ZeroX0 => "public-upload-host-zerox0",
+		Host::X0At => "public-upload-host-x0at",
 		Host::Catbox => "public-upload-host-catbox",
+		Host::Litterbox => "public-upload-host-litterbox",
 	}
 }
 fn error_key(error: Error) -> &'static str {
@@ -322,6 +331,7 @@ fn error_key(error: Error) -> &'static str {
 		Error::Interrupted => "public-upload-error-interrupted",
 		Error::InvalidLink => "public-upload-error-invalid-link",
 		Error::Busy => "public-upload-error-busy",
+		Error::Unavailable => "public-upload-error-unavailable",
 		Error::ConversationChanged => "public-upload-error-conversation",
 		Error::SelectionChanged => "public-upload-error-selection",
 		Error::MissingSelection => "public-upload-error-missing",
@@ -369,6 +379,7 @@ mod tests {
 			Error::Interrupted,
 			Error::InvalidLink,
 			Error::Busy,
+			Error::Unavailable,
 			Error::ConversationChanged,
 			Error::SelectionChanged,
 			Error::MissingSelection,
@@ -441,6 +452,30 @@ mod tests {
 		labels
 	}
 	#[test]
+	fn failed_upload_dismisses_like_any_dialog_but_a_link_does_not() {
+		let ctx = Context::default();
+		let mut state = test_support::demo_state();
+		let channel = state.selected.unwrap();
+		let escape = || egui::Event::Key {
+			key: egui::Key::Escape,
+			physical_key: None,
+			pressed: true,
+			repeat: false,
+			modifiers: Default::default(),
+		};
+		for (result, dismissed) in [
+			(Err(Error::Unavailable), true),
+			(Ok("https://files.catbox.moe/a.png".to_owned()), false),
+		] {
+			let mut view = ExternalUpload::default();
+			view.open(state.generation, channel, 0, None, "a.png".into(), 1);
+			view.complete(result);
+			let _ = frame(&ctx, &mut view, &mut state, vec![]);
+			let _ = frame(&ctx, &mut view, &mut state, vec![escape()]);
+			assert_eq!(view.prompt.is_none(), dismissed);
+		}
+	}
+	#[test]
 	fn public_upload_requires_an_explicit_click_and_keeps_result_for_review() {
 		let ctx = Context::default();
 		let mut state = test_support::demo_state();
@@ -460,7 +495,7 @@ mod tests {
 		assert!(!view.has_unsent());
 		let button = labels
 			.iter()
-			.find(|(label, _)| label == "Upload to 0x0.st")
+			.find(|(label, _)| label.replace(['\u{2068}', '\u{2069}'], "") == "Upload to x0.at")
 			.unwrap()
 			.1
 			.center();

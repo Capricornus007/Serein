@@ -1,35 +1,40 @@
 //! UI-neutral limits and outcomes for explicitly consented anonymous public uploads.
 
-/// Anonymous public file host. 0x0.st is the default; Catbox stays available as an alternative.
+/// Anonymous public file host. x0.at (a 0x0 instance with direct, embeddable links) is the
+/// default; Catbox and its temporary 72-hour Litterbox service remain alternatives.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Host {
 	#[default]
-	ZeroX0,
+	X0At,
 	Catbox,
+	Litterbox,
 }
 
 impl Host {
-	pub const ALL: [Self; 2] = [Self::ZeroX0, Self::Catbox];
+	pub const ALL: [Self; 3] = [Self::X0At, Self::Catbox, Self::Litterbox];
 
 	pub fn name(self) -> &'static str {
 		match self {
-			Self::ZeroX0 => "0x0.st",
+			Self::X0At => "x0.at",
 			Self::Catbox => "Catbox",
+			Self::Litterbox => "Litterbox",
 		}
 	}
 
 	pub fn max_bytes(self) -> u64 {
 		match self {
-			Self::ZeroX0 => 512 * 1024 * 1024,
+			Self::X0At => 1024 * 1024 * 1024,
 			Self::Catbox => 200_000_000,
+			Self::Litterbox => 1_000_000_000,
 		}
 	}
 
 	/// Every link the host returns starts with this prefix and names one flat file.
 	pub fn link_prefix(self) -> &'static str {
 		match self {
-			Self::ZeroX0 => "https://0x0.st/",
+			Self::X0At => "https://x0.at/",
 			Self::Catbox => "https://files.catbox.moe/",
+			Self::Litterbox => "https://litter.catbox.moe/",
 		}
 	}
 }
@@ -43,10 +48,11 @@ pub fn eligible(host: Host, filename: &str, bytes: u64) -> bool {
 		&& bytes <= host.max_bytes()
 		&& !matches!(extension.as_str(), "exe" | "scr" | "cpl" | "jar" | "apk")
 		&& match host {
-			Host::ZeroX0 => true,
+			Host::X0At => true,
 			Host::Catbox => {
 				!extension.starts_with("doc") && !(extension == "gif" && bytes > 20_000_000)
 			}
+			Host::Litterbox => !extension.starts_with("doc"),
 		}
 }
 
@@ -63,6 +69,7 @@ pub enum Error {
 	Interrupted,
 	InvalidLink,
 	Busy,
+	Unavailable,
 	ConversationChanged,
 	SelectionChanged,
 	MissingSelection,

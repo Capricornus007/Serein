@@ -8,8 +8,9 @@ const RESPONSE_BYTES: usize = 4096;
 
 fn endpoint(host: Host) -> &'static str {
 	match host {
-		Host::ZeroX0 => "https://0x0.st",
+		Host::X0At => "https://x0.at",
 		Host::Catbox => "https://catbox.moe/user/api.php",
+		Host::Litterbox => "https://litterbox.catbox.moe/resources/internals/api.php",
 	}
 }
 
@@ -123,14 +124,18 @@ async fn transfer(
 	);
 	let name = source.filename().replace(['"', '\\'], "_");
 	let fields = match host {
-		Host::ZeroX0 => String::new(),
+		Host::X0At => String::new(),
 		Host::Catbox => format!(
 			"--{boundary}\r\nContent-Disposition: form-data; name=\"reqtype\"\r\n\r\nfileupload\r\n"
 		),
+		// Litterbox's longest retention; it offers 1, 12, 24 or 72 hours.
+		Host::Litterbox => format!(
+			"--{boundary}\r\nContent-Disposition: form-data; name=\"reqtype\"\r\n\r\nfileupload\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"time\"\r\n\r\n72h\r\n"
+		),
 	};
 	let field = match host {
-		Host::ZeroX0 => "file",
-		Host::Catbox => "fileToUpload",
+		Host::X0At => "file",
+		Host::Catbox | Host::Litterbox => "fileToUpload",
 	};
 	let prefix = format!("{fields}--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; filename=\"{name}\"\r\nContent-Type: application/octet-stream\r\n\r\n").into_bytes();
 	let suffix = format!("\r\n--{boundary}--\r\n").into_bytes();
@@ -190,7 +195,17 @@ async fn transfer(
 		.body(reqwest::Body::wrap_stream(stream))
 		.send()
 		.await
-		.map_err(|_| Error::Failed)?;
+		// A refused or unreachable host received nothing, unlike a transfer cut midway.
+		.map_err(|error| {
+			if error.is_connect() {
+				Error::Unavailable
+			} else {
+				Error::Failed
+			}
+		})?;
+	if response.status() == reqwest::StatusCode::SERVICE_UNAVAILABLE {
+		return Err(Error::Unavailable);
+	}
 	if !response.status().is_success() {
 		return Err(Error::Rejected);
 	}
@@ -234,8 +249,8 @@ mod tests {
 			"video.mp4",
 			Host::Catbox.max_bytes()
 		));
-		assert!(eligible(Host::ZeroX0, "image.gif", 20_000_001));
-		assert!(eligible(Host::ZeroX0, "notes.docx", 1));
+		assert!(eligible(Host::X0At, "image.gif", 20_000_001));
+		assert!(eligible(Host::X0At, "notes.docx", 1));
 		for (name, size) in [
 			("file.zip", 0),
 			("file.zip", Host::Catbox.max_bytes() + 1),
@@ -245,23 +260,23 @@ mod tests {
 		] {
 			assert!(!eligible(Host::Catbox, name, size));
 		}
-		assert!(!eligible(Host::ZeroX0, "app.exe", 1));
+		assert!(!eligible(Host::X0At, "app.exe", 1));
 		assert!(!eligible(
-			Host::ZeroX0,
+			Host::X0At,
 			"file.zip",
-			Host::ZeroX0.max_bytes() + 1
+			Host::X0At.max_bytes() + 1
 		));
 		assert_eq!(
-			validated_link(Host::ZeroX0, b"https://0x0.st/AbC1.png\n").unwrap(),
-			"https://0x0.st/AbC1.png"
+			validated_link(Host::X0At, b"https://x0.at/AbC1.png\n").unwrap(),
+			"https://x0.at/AbC1.png"
 		);
 		for link in [
 			"https://files.catbox.moe/abc123.png",
-			"https://0x0.st.evil/a.png",
-			"http://0x0.st/a.png",
+			"https://x0.at.evil/a.png",
+			"http://x0.at/a.png",
 		] {
 			assert!(
-				validated_link(Host::ZeroX0, link.as_bytes()).is_err(),
+				validated_link(Host::X0At, link.as_bytes()).is_err(),
 				"{link}"
 			);
 		}
@@ -493,7 +508,7 @@ mod tests {
 		let (_sender, cancel) = watch::channel(true);
 		assert_eq!(
 			upload(
-				Host::ZeroX0,
+				Host::X0At,
 				Source::pasted_png(vec![1]).unwrap(),
 				progress,
 				cancel

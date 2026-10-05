@@ -4334,6 +4334,17 @@ lib-composer-onboarding-rules-pending = Sohbete başlamak için bu sunucunun kur
 lib-composer-onboarding-incomplete = Daha fazla kanalın kilidini açmak için sunucuya katılımı tamamla.
 # Context: composer
 lib-composer-onboarding-complete = Tanıtımı tamamla
+profiles-message-placeholder = @{ $user } kullanıcısına mesaj
+profiles-message-send = Mesaj gönder
+profiles-message-sending = Direkt mesaj açılıyor…
+user-menu-contents-start-a-call = Arama başlat
+verification-show-complete-the-check-to-open-this-conversation = Bu sohbeti açmak için doğrulamayı tamamla.
+verification-show-discord-requires-a-security-check-before-you-can-message = Bu kişiye mesaj gönderebilmen için Discord bir güvenlik doğrulaması istiyor.
+verification-show-complete-the-check-to-send-this-message = Bu mesajı göndermek için doğrulamayı tamamla.
+verification-show-discord-requires-a-security-check-before-this-message = Bu mesajın gönderilebilmesi için Discord bir güvenlik doğrulaması istiyor.
+profiles-message-busy = Başka bir işlemin bitmesi bekleniyor…
+profiles-message-offline = Mesaj göndermek için yeniden bağlan
+
 voice-recipient-ring = Yeniden ara
 voice-recipient-stop-ringing = Çalmayı durdur
 voice-recipient-ringing = Çalıyor…

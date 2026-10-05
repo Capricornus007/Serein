@@ -4349,6 +4349,16 @@ lib-composer-onboarding-rules-pending = Примите правила серве
 lib-composer-onboarding-incomplete = Завершите вступление, чтобы открыть больше каналов.
 # Context: composer
 lib-composer-onboarding-complete = Завершить знакомство
+profiles-message-placeholder = Сообщение @{ $user }
+profiles-message-send = Отправить сообщение
+profiles-message-sending = Открытие личных сообщений…
+user-menu-contents-start-a-call = Начать звонок
+verification-show-complete-the-check-to-open-this-conversation = Пройдите проверку, чтобы открыть этот разговор.
+verification-show-discord-requires-a-security-check-before-you-can-message = Discord требует проверку безопасности, прежде чем вы сможете написать этому человеку.
+verification-show-complete-the-check-to-send-this-message = Пройдите проверку, чтобы отправить это сообщение.
+verification-show-discord-requires-a-security-check-before-this-message = Discord требует проверку безопасности перед отправкой этого сообщения.
+profiles-message-busy = Ожидание завершения другого действия…
+profiles-message-offline = Переподключитесь, чтобы отправить сообщение
 
 voice-recipient-ring = Позвонить снова
 voice-recipient-stop-ringing = Перестать звонить

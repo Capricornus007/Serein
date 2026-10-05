@@ -79,6 +79,13 @@ const SIGN_IN_HEADER_HEIGHT: f32 = if cfg!(target_os = "windows") {
 fn main() -> eframe::Result {
 	#[cfg(all(debug_assertions, feature = "demo"))]
 	if std::env::args().any(|arg| arg == "--demo")
+		&& std::env::args().any(|arg| arg == "--demo-check-window-geometry")
+	{
+		app_settings::debug_window_geometry_check();
+		return Ok(());
+	}
+	#[cfg(all(debug_assertions, feature = "demo"))]
+	if std::env::args().any(|arg| arg == "--demo")
 		&& std::env::args().any(|arg| arg == "--demo-check-voice-preferences")
 	{
 		cache::debug_voice_preferences_check();
@@ -362,16 +369,18 @@ fn main() -> eframe::Result {
 	} else {
 		local_store::LocalStore::open_default().and_then(|store| store.app_preferences())
 	};
-	let (gpu_preference, transparency_available, hide_window_decorations) = preferences
-		.as_ref()
-		.map(|value| {
-			(
-				value.gpu_preference,
-				value.transparency_blur,
-				value.hide_window_decorations,
-			)
-		})
-		.unwrap_or_default();
+	let (gpu_preference, transparency_available, hide_window_decorations, window_geometry) =
+		preferences
+			.as_ref()
+			.map(|value| {
+				(
+					value.gpu_preference,
+					value.transparency_blur,
+					value.hide_window_decorations,
+					value.window_geometry,
+				)
+			})
+			.unwrap_or_default();
 	#[cfg(feature = "demo")]
 	let transparency_available =
 		transparency_available || demo && std::env::args().any(|arg| arg == "--demo-transparency");
@@ -383,7 +392,9 @@ fn main() -> eframe::Result {
 		viewport: {
 			let builder = egui::ViewportBuilder::default()
 				.with_transparent(transparency_available)
-				.with_inner_size([1120.0, 760.0])
+				.with_inner_size(window_geometry.map_or([1120.0, 760.0], |geometry| {
+					geometry.size.map(|value| value as f32)
+				}))
 				.with_min_inner_size([760.0, 520.0])
 				.with_active(!start_minimized)
 				.with_app_id("cz.viceverse.serein");
@@ -458,6 +469,9 @@ fn main() -> eframe::Result {
 		Box::new(move |cc| {
 			let desktop =
 				Desktop::new(cc, demo, frame_sample, transparency_available, preferences)?;
+			if let Some(geometry) = window_geometry {
+				app_settings::restore_window_geometry(&desktop.window, geometry);
+			}
 			if start_minimized {
 				cc.egui_ctx
 					.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
@@ -876,6 +890,7 @@ struct Desktop {
 	reading: reading_settings::ReadingSettings,
 	app_settings: app_settings::Settings,
 	font_picker: Option<std::sync::mpsc::Receiver<font_import::Selected>>,
+	font_families: Option<std::sync::mpsc::Receiver<Vec<String>>>,
 	updater: updater::Updater,
 	game_activity: toggle_setting::Settings,
 	registered_games: registered_games::Registered,
@@ -2008,6 +2023,16 @@ impl Desktop {
 			onboarding_demo::open(&mut state);
 		}
 		#[cfg(feature = "demo")]
+		if demo
+			&& std::env::args().any(|arg| arg == "--demo-server-invite")
+			&& let Some(guild) = state
+				.selected
+				.and_then(|id| state.channels.iter().find(|c| c.id == id))
+				.and_then(|c| c.guild)
+		{
+			messaging.preview_server_invite(&mut state, guild);
+		}
+		#[cfg(feature = "demo")]
 		if demo && std::env::args().any(|arg| arg == "--demo-server-settings") {
 			server_settings_demo::open(&mut state, &mut messaging);
 		}
@@ -2045,7 +2070,11 @@ impl Desktop {
 		}
 		// The GPU surface and X11 visual are selected at startup. Opaque launches
 		// keep the same native/compositor path as builds without window effects.
-		let tray_window = tray_window::State::default();
+		// KWin hiding runs its D-Bus worker on the application runtime.
+		let tray_window = {
+			let _runtime = runtime.enter();
+			tray_window::State::default()
+		};
 		Ok(Self {
 			proxy_auth: proxy_auth::Authentication::default(),
 			api_proxy: tokio::sync::watch::channel(None).0,
@@ -2116,6 +2145,7 @@ impl Desktop {
 			reading,
 			app_settings,
 			font_picker: None,
+			font_families: None,
 			updater: updater::Updater::new(demo),
 			game_activity,
 			registered_games: if demo {
@@ -2547,15 +2577,31 @@ impl Desktop {
 				}
 			}
 		}
+		if let Some(families) = &self.font_families
+			&& let Ok(families) = families.try_recv()
+		{
+			self.font_families = None;
+			self.messaging.custom_font.families = Some(families);
+		}
+		// Listing is independent of a pending save, so it is never dropped while busy.
+		if matches!(
+			self.messaging.custom_font.request,
+			Some(ui::fonts::Action::List)
+		) {
+			self.messaging.custom_font.request = None;
+			if self.font_families.is_none() && self.messaging.custom_font.families.is_none() {
+				self.font_families = Some(font_import::installed(&self.runtime, ctx));
+			}
+		}
 		if let Some(action) = self.messaging.custom_font.request.take()
 			&& !self.messaging.custom_font.busy
 		{
 			match action {
-				ui::fonts::Action::Import => {
-					self.font_picker =
-						Some(font_import::choose(&self.runtime, ctx, self.window.clone()));
+				ui::fonts::Action::List => {}
+				ui::fonts::Action::Select(family) => {
+					self.font_picker = Some(font_import::load(&self.runtime, ctx, family));
 					self.messaging.custom_font.busy = true;
-					self.messaging.custom_font.status = "Choosing font…";
+					self.messaging.custom_font.status = "Loading font…";
 				}
 				ui::fonts::Action::Reset => self.save_font(ctx, None),
 			}
@@ -3977,6 +4023,11 @@ impl Desktop {
 						.find(|s| s.id == id)
 						.cloned()
 						.ok_or(Failure::Protocol),
+				},
+				// The offline fixture never issues challenges, so it never resumes one.
+				Command::VerifiedSend { nonce, .. } => Event::SendResult {
+					nonce,
+					result: Err(Failure::Protocol),
 				},
 				Command::Forward {
 					message,
@@ -5818,6 +5869,34 @@ impl eframe::App for Desktop {
 	fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
 		// Before the pass begins, so the whole frame resolves System to the same theme.
 		self.sync_system_theme(ctx);
+		// Read native size independently of viewport rectangles: Wayland has no global position,
+		// so egui-winit cannot supply either rectangle there. Native scale excludes egui zoom.
+		if !self.fixture_only
+			&& !self.state.demo
+			&& self.app_settings.loaded
+			&& let Some(viewport) = raw_input.viewports.get(&raw_input.viewport_id)
+			&& viewport.minimized != Some(true)
+			&& viewport.maximized != Some(true)
+			&& viewport.fullscreen != Some(true)
+			&& self.window.is_visible() != Some(false)
+		{
+			let size = self
+				.window
+				.inner_size()
+				.to_logical::<u32>(self.window.scale_factor());
+			let geometry = local_store::WindowGeometry {
+				size: [size.width, size.height],
+				position: self
+					.window
+					.outer_position()
+					.ok()
+					.map(|position| [position.x, position.y]),
+			};
+			if geometry.is_valid() && self.app_settings.current.window_geometry != Some(geometry) {
+				self.app_settings.current.window_geometry = Some(geometry);
+				self.app_settings.state.dirty = true;
+			}
+		}
 		// Viewport position/scale comes from native events; avoid an OS monitor query on paints.
 		if let Some(viewport) = raw_input.viewports.get(&raw_input.viewport_id) {
 			let geometry = (viewport.outer_rect, viewport.native_pixels_per_point);

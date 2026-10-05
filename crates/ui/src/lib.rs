@@ -2,6 +2,8 @@
 //! Native egui views; emits commands without owning transports or session credentials.
 mod account_badge;
 mod account_menu;
+#[cfg(test)]
+mod appearance_transparency_tests;
 mod archives;
 mod audio;
 mod forwarding;
@@ -122,6 +124,7 @@ mod title_bar_tests;
 pub mod toasts;
 mod typing;
 pub mod updates;
+mod user_direct;
 mod user_menu;
 mod verification;
 mod voice;
@@ -149,6 +152,13 @@ pub struct AttachmentPaste {
 	pub target: egui::Id,
 	pub text: Option<String>,
 	pub image: Option<std::sync::Arc<egui::ColorImage>>,
+}
+
+fn oversized_text(limit: u64) -> String {
+	crate::i18n::translate_args(
+		"public-upload-oversized",
+		&[("limit", &attachments::format_size(limit))],
+	)
 }
 
 fn thread_member_rows<'a>(
@@ -206,7 +216,7 @@ pub fn debug_emoticon_conversion_check(make_state: impl Fn() -> State) {
 	assert_eq!(emoticons::convert("Hi :) ;) :D <3"), "Hi 🙂 😉 😃 ❤️");
 	let protected = "`:D` ```\n:)\n``` https://example.test/:) \\:) <:smile:123>";
 	assert_eq!(emoticons::convert(protected), protected);
-	for enabled in [false, true] {
+	for (enabled, oversized) in [(false, false), (true, false), (false, true), (true, true)] {
 		let mut state = make_state();
 		let channel = state.selected.unwrap();
 		state.drafts.insert(channel, "Hello :)".into());
@@ -215,6 +225,9 @@ pub fn debug_emoticon_conversion_check(make_state: impl Fn() -> State) {
 			focus_switched_composer: true,
 			..Default::default()
 		};
+		if oversized {
+			view.attachment = Some(("oversized.txt".into(), state.upload_limit() + 1));
+		}
 		let ctx = egui::Context::default();
 		for frame in 0..3 {
 			let mut commands = vec![];
@@ -239,7 +252,10 @@ pub fn debug_emoticon_conversion_check(make_state: impl Fn() -> State) {
 				},
 			)
 			.drop_without_applying_deltas();
-			if frame == 2 {
+			if frame == 2 && oversized {
+				assert!(commands.is_empty());
+				assert_eq!(state.drafts[&channel], "Hello :)");
+			} else if frame == 2 {
 				let expected = if enabled { "Hello 🙂" } else { "Hello :)" };
 				assert!(commands.iter().any(|command| matches!(command,
 					Command::Send { content, .. } if content == expected)));
@@ -362,6 +378,7 @@ pub struct MessagingUi {
 	/// slider does not rescale under the cursor mid-drag.
 	reading_zoom_draft: Option<u16>,
 	friend_removal: Option<(u64, model::User)>,
+	user_direct: Option<user_direct::Pending>,
 	members_narrow_open: bool,
 	/// Only the open member request's revealed prefix; member data stays in the bounded core cache.
 	member_extent: Option<((u64, Id, u64), usize)>,
@@ -741,6 +758,14 @@ impl MessagingUi {
 	#[cfg(feature = "demo")]
 	pub fn preview_forum(&mut self, forum: Id, tags: &[Id], draft: Option<&str>) {
 		self.forum.preview(forum, tags, draft);
+	}
+	/// Fixture-only: open the server invite dialog at startup, as the rail menu would.
+	#[cfg(any(test, feature = "demo"))]
+	pub fn preview_server_invite(&mut self, state: &mut State, guild: Id) {
+		if let Some(channel) = state.invite_channel(guild) {
+			self.guild = Some(guild);
+			self.server_menu.open_invite(state, guild, channel);
+		}
 	}
 	/// Fixture-only: open the Threads dialog for `parent` at startup, as the header control would.
 	#[cfg(any(test, feature = "demo"))]
@@ -2389,11 +2414,21 @@ impl MessagingUi {
 								profiles::presence(state, user.id, None);
 							profiles::subtitle(custom, activities)
 						});
-					let in_voice = channel
-						.as_ref()
-						.filter(|_| dm)
-						.and_then(|channel| channel.recipients.first())
-						.is_some_and(|user| profiles::voice_users(state).contains(&user.id));
+					let in_call = state.voice.active.as_ref().is_some_and(|call| {
+						Some(call.channel) == state.selected
+							&& matches!(
+								call.phase,
+								client_core::voice::Phase::Connected
+									| client_core::voice::Phase::Waiting
+							)
+					});
+					// The "In a call" label beside the name already says it while we share the call.
+					let in_voice = !in_call
+						&& channel
+							.as_ref()
+							.filter(|_| dm)
+							.and_then(|channel| channel.recipients.first())
+							.is_some_and(|user| profiles::user_in_voice(state, user.id));
 					let name_height = ui
 						.painter()
 						.layout_no_wrap(
@@ -2425,6 +2460,8 @@ impl MessagingUi {
 								.max(0.0),
 						);
 						ui.spacing_mut().item_spacing.y = 1.0;
+						// Keep the status row at its text height so the measured centring holds.
+						ui.spacing_mut().interact_size.y = 0.0;
 						ui.add(
 							egui::Label::new(
 								design::semibold(ui, name, 16.0).color(colors.text_strong),
@@ -2448,14 +2485,6 @@ impl MessagingUi {
 								});
 							}
 						}
-					});
-					let in_call = state.voice.active.as_ref().is_some_and(|call| {
-						Some(call.channel) == state.selected
-							&& matches!(
-								call.phase,
-								client_core::voice::Phase::Connected
-									| client_core::voice::Phase::Waiting
-							)
 					});
 					if in_call {
 						ui.add_space(4.0);
@@ -2986,6 +3015,13 @@ impl MessagingUi {
 		emoji_picker::set_content_limit(max_content);
 		let new_content_valid =
 			model::message_options::valid(composer_content, max_content, self.attachment.is_some());
+		// Discord refuses any file over the account's limit, so such a message is never sent.
+		let upload_limit = state.upload_limit();
+		let oversized = !editing_here
+			&& self
+				.selected_files()
+				.iter()
+				.any(|(_, bytes)| *bytes > upload_limit);
 		// Suggestion rows can take focus on press; keep the editor alive until release
 		// so the shared member/channel/emoji popup can finish the click.
 		let suggestion_pointer = self.mention_menu.pointer_interacting(ctx, channel)
@@ -3087,6 +3123,7 @@ impl MessagingUi {
 				&& !self.upload_busy
 				&& !(state.demo && self.attachment.is_some())
 				&& new_content_valid
+				&& !oversized
 		};
 		if cap_top.is_some() {
 			// The cap and the input form one block: undo the automatic vertical item gap.
@@ -3106,10 +3143,29 @@ impl MessagingUi {
                     egui::pos2(ui.max_rect().right() + 10.0, ui.max_rect().top()),
                 );
                 if !editing_here && self.attachment.is_some() {
-                    self.attachment_tray(ui, state.can_send(channel), state.upload_limit());
+                    self.attachment_tray(ui, state.can_send(channel), upload_limit);
                 }
+                // Tall drafts stack the actions in bottom-aligned columns so the text keeps the
+                // width. Last pass's visible draft height decides.
+                let stack_id = composer_id.with("stacked-actions");
+                let (stacked, draft_height) = ctx.data(|d| d.get_temp::<(bool, f32)>(stack_id)).unwrap_or_default();
+                let column = |ui: &mut egui::Ui, add: &mut dyn FnMut(&mut egui::Ui)| {
+                    if stacked {
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(28.0, draft_height),
+                            egui::Layout::bottom_up(egui::Align::Center),
+                            |ui| {
+                                ui.spacing_mut().item_spacing.y = 4.0;
+                                add(ui);
+                            },
+                        );
+                    } else {
+                        add(ui);
+                    }
+                };
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 8.0;
+                    column(ui, &mut |ui| {
                     // An active application command shows its app in place of the attach button.
                     let attach = if !editing_here && self.slash_commands.composer_badge(ui, state, &mut self.avatars) {
                         None
@@ -3149,8 +3205,11 @@ impl MessagingUi {
                                 }
                             });
                     }
+                    });
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.spacing_mut().item_spacing.x = 4.0;
+                        let mut actions = None;
+                        column(ui, &mut |ui| {
                         let send_button = ui
                             .add_enabled_ui(can_send, |ui| {
                                 icons::button(
@@ -3223,6 +3282,9 @@ impl MessagingUi {
                             }
                             None => None,
                         };
+                        actions = Some((send, pick));
+                        });
+                        let (send, pick) = actions.expect("composer actions ran");
                         let edit = ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                             ui.vertical(|ui| {
                                 ui.set_width(ui.available_width());
@@ -3383,6 +3445,19 @@ impl MessagingUi {
                                         demo,
                                     )
                                 };
+                                // Multiline edits wrap their hint; a pre-laid galley keeps a
+                                // long channel name on one elided line.
+                                let hint = if draft.is_empty() {
+                                    let mut job = egui::text::LayoutJob::simple_singleline(
+                                        placeholder.clone(),
+                                        egui::TextStyle::Body.resolve(ui.style()),
+                                        ui.visuals().weak_text_color(),
+                                    );
+                                    job.wrap = egui::text::TextWrapping::truncate_at_width(ui.available_width());
+                                    egui::WidgetText::from(ui.painter().layout_job(job))
+                                } else {
+                                    egui::WidgetText::default()
+                                };
                                 let output = TextEdit::multiline(draft)
                                     .interactive(keyboard_enabled)
                                     .layouter(&mut layouter)
@@ -3398,7 +3473,7 @@ impl MessagingUi {
                                     .min_size(egui::vec2(0.0, ui.spacing().interact_size.y))
                                     .align(egui::Align2::LEFT_CENTER)
                                     .frame(egui::Frame::NONE)
-                                    .hint_text(placeholder.as_str())
+                                    .hint_text(hint)
                                     .show(ui);
                                 rich_layout.paint(ui, &output);
                                 output
@@ -3466,6 +3541,18 @@ impl MessagingUi {
                         edit.response
                             }).inner
                         }).inner;
+                        // Stack once three buttons fit beside the draft; unstack only at one line,
+                        // so the width gained by stacking cannot flip the layout back and forth.
+                        // The text edit reports its full content height; the scroll area shows at most half the viewport.
+                        let height = edit.rect.height().min(ctx.viewport_rect().height() * 0.5);
+                        let stacked = if height >= 3.0 * 28.0 + 8.0 {
+                            true
+                        } else if height <= ui.spacing().interact_size.y + 1.0 {
+                            false
+                        } else {
+                            stacked
+                        };
+                        ctx.data_mut(|d| d.insert_temp(stack_id, (stacked, height)));
                         if std::mem::take(&mut self.slash_commands.retry)
                             && let Some(command) = state.request_application_commands(channel, true) {
                             commands.push(command);
@@ -3486,6 +3573,8 @@ impl MessagingUi {
                                 }
                             } else if self.send_application_command(state, channel, commands)
                                 || self.handle_builtin_slash(state, channel, ctx, commands) {
+                            } else if oversized {
+                                self.toasts.push(design::Level::Error, oversized_text(upload_limit));
                             } else if !self.upload_busy && !(state.demo && self.attachment.is_some()) {
                                 let original_draft = if self.convert_emoticons {
                                     state.drafts.get_mut(&channel).map(|draft| {
@@ -3494,11 +3583,11 @@ impl MessagingUi {
                                     })
                                 } else { None };
                                 if let Some(command) = state.prepare_send_with_attachments(&self.selected_files().iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>()) {
-                                // Consume the selection in this UI pass, before desktop dispatch.
-                                // A second render or Send gesture must not enqueue it again.
-                                self.stage_pending_upload(ctx, &command);
-                                self.timeline.follow_latest(state);
-                                commands.push(command);
+                                    // Consume the selection in this UI pass, before desktop dispatch.
+                                    // A second render or Send gesture must not enqueue it again.
+                                    self.stage_pending_upload(ctx, &command);
+                                    self.timeline.follow_latest(state);
+                                    commands.push(command);
                                 } else if let Some(original) = original_draft {
                                     state.drafts.insert(channel, original);
                                 }
@@ -3540,8 +3629,11 @@ impl MessagingUi {
 		let textures = self.attachment_textures(ui.ctx());
 		ui.add_space(4.0);
 		let files = self.selected_files();
-		// Public hosting is only offered once the files would not fit Discord's upload limit.
-		let over_limit = files.iter().map(|(_, bytes)| *bytes).sum::<u64>() > upload_limit;
+		// Public hosting is only offered for files Discord would refuse.
+		if files.iter().any(|(_, bytes)| *bytes > upload_limit) {
+			design::notice(ui, design::Level::Error, &oversized_text(upload_limit));
+			ui.add_space(6.0);
+		}
 		egui::ScrollArea::horizontal()
 			.id_salt("pending-attachments")
 			.show(ui, |ui| {
@@ -3564,7 +3656,7 @@ impl MessagingUi {
 								{
 									self.remove_attachment_index = Some(index);
 								}
-								if over_limit
+								if *bytes > upload_limit
 									&& ui
 										.add_enabled_ui(!self.upload_busy && can_host, |ui| {
 											design::button(
@@ -3810,6 +3902,7 @@ impl MessagingUi {
 			data.remove::<egui::Rect>(profiles::profile_opener_id());
 		});
 		let ctx = ui.ctx().clone();
+		user_menu::set_voice_available(&ctx, self.voice_available);
 		self.extensions.reset_theme_shortcut(&ctx);
 		if self.extensions.has_result() {
 			self.settings.open = false;
@@ -3921,9 +4014,11 @@ impl MessagingUi {
 			self.switcher.open(&ctx);
 		}
 		self.switcher_frame = self.switcher.is_open();
+		let direct_origin = (state.selected, state.request);
 		if let Some(command) = state.select_opened_dm() {
 			commands.push(command);
 		}
+		self.finish_user_direct(state, direct_origin, &mut commands);
 		self.finish_slash_direct(state);
 		if let Some(target) = self.switcher.show(&ctx, state, &mut self.avatars) {
 			match target {
@@ -4815,6 +4910,14 @@ impl MessagingUi {
 		}
 		if let Some(action) = self.user_action.take().or(self.timeline.user_action.take()) {
 			let command = match action {
+				user_menu::Action::Message(user) => {
+					self.open_user_direct(state, user, user_direct::Intent::Message, &mut commands);
+					None
+				}
+				user_menu::Action::StartCall(user) => {
+					self.open_user_direct(state, user, user_direct::Intent::Call, &mut commands);
+					None
+				}
 				user_menu::Action::Note(user) => {
 					self.profile.hide();
 					self.contact_editor.open(user, false, state)
@@ -4842,7 +4945,15 @@ impl MessagingUi {
 		}
 		self.contact_editor.show(&ctx, state, &mut commands);
 		self.drain_profile(state, &mut commands);
-		if let Some(user) = self.profile.open_user().cloned() {
+		// While the card's DM waits on a captcha, step aside for the dialog but keep its draft.
+		let direct_verifying = self.user_direct.is_some()
+			&& matches!(
+				state.verification(),
+				Some((client_core::captcha::Verification::Direct { .. }, _))
+			);
+		if let Some(user) = self.profile.open_user().cloned()
+			&& !direct_verifying
+		{
 			let profile_guild = self.server_settings.guild().or_else(|| {
 				state
 					.channels
@@ -4853,7 +4964,7 @@ impl MessagingUi {
 			self.sync_profile(state, &mut commands, &user, profile_guild);
 			let anchor = self.profile.anchor_or_place(&ctx, user.id);
 			self.profile.ingest_opener_rect(&ctx);
-			match profiles::show(
+			match profiles::show_with_session(
 				ui,
 				&user,
 				state.profile.as_ref(),
@@ -4863,6 +4974,7 @@ impl MessagingUi {
 				&mut self.profile_formatted,
 				self.reading_preferences.confirm_external_links,
 				anchor,
+				&mut self.profile,
 			) {
 				Some(profiles::Action::Avatar(media)) => {
 					let ext = media
@@ -4949,13 +5061,13 @@ impl MessagingUi {
 						commands.push(command);
 					}
 				}
-				Some(profiles::Action::Message(channel)) => {
-					self.profile.close();
-					if self.server_settings.navigate_away(state)
-						&& let Some(command) = state.select(channel)
-					{
-						commands.push(command);
-					}
+				Some(profiles::Action::SendMessage { user, content }) => {
+					self.open_user_direct(
+						state,
+						user,
+						user_direct::Intent::Send(content),
+						&mut commands,
+					);
 				}
 				None => {}
 			}
@@ -8293,7 +8405,7 @@ pub fn debug_member_voice_status_check(mut state: State, mut private: State) {
 					|ui| match surface {
 						"friends" => view.friends_page(ui, state, &mut vec![]),
 						"profile" => {
-							profiles::show(
+							profiles::show_with_session(
 								ui,
 								&user,
 								None,
@@ -8303,6 +8415,7 @@ pub fn debug_member_voice_status_check(mut state: State, mut private: State) {
 								&mut markdown::FormatCache::default(),
 								true,
 								egui::pos2(50.0, 50.0),
+								&mut profiles::ProfileSession::default(),
 							);
 						}
 						"dm-list" => {
@@ -8335,6 +8448,7 @@ pub fn debug_member_voice_status_check(mut state: State, mut private: State) {
 	check_cards(&mut view, &mut private, true);
 	private.gateway_connected = false;
 	assert!(!profiles::voice_users(&private).contains(&user.id));
+	assert!(!profiles::user_in_voice(&private, user.id));
 	private.gateway_connected = true;
 	let guild = private
 		.guilds
@@ -8344,6 +8458,7 @@ pub fn debug_member_voice_status_check(mut state: State, mut private: State) {
 		.clone();
 	private.guilds.retain(|guild| guild.id != entry.guild);
 	assert!(!profiles::voice_users(&private).contains(&user.id));
+	assert!(!profiles::user_in_voice(&private, user.id));
 	private.guilds.push(guild);
 	private.voice.roster.clear();
 	assert!(
@@ -8376,6 +8491,7 @@ pub fn debug_member_voice_status_check(mut state: State, mut private: State) {
 	}
 	private.selected = Some(entry.channel);
 	assert!(profiles::voice_users(&private).contains(&user.id));
+	assert!(profiles::user_in_voice(&private, user.id));
 	check_cards(&mut view, &mut private, false);
 	private.selected = Some(channel);
 	private.demo = false;

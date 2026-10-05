@@ -47,7 +47,7 @@ mod trail;
 pub use trail::Trail;
 pub mod typing;
 pub mod user_actions;
-mod verification;
+pub mod verification;
 mod view_revisions;
 pub mod voice;
 use model::*;
@@ -261,6 +261,15 @@ pub enum Command {
 		content: String,
 		nonce: String,
 		reply: Option<Reply>,
+	},
+	/// One explicit resend of a challenged message with the user's solution; never automatic.
+	VerifiedSend {
+		sticker: Option<Id>,
+		channel: Id,
+		content: String,
+		nonce: String,
+		reply: Option<Reply>,
+		captcha: Box<captcha::Retry>,
 	},
 	Edit {
 		request: u64,
@@ -616,6 +625,12 @@ pub enum Event {
 		nonce: String,
 		result: Result<Message, auth::Failure>,
 	},
+	/// The service asked the user to solve a captcha before accepting this text message.
+	SendChallenge {
+		nonce: String,
+		reply: Option<Reply>,
+		challenge: Box<captcha::Challenge>,
+	},
 	Failure(auth::Failure),
 	Disconnected,
 	Resumed,
@@ -748,6 +763,7 @@ pub struct State {
 	pub failure_detail: Option<Box<str>>,
 	pub drafts: BTreeMap<Id, String>,
 	pub pending: Vec<Pending>,
+	pub send_verification: verification::SendVerification,
 	pub reply: Option<Reply>,
 	pub send_sequence: u64,
 	pub request: u64,
@@ -949,6 +965,7 @@ impl Default for State {
 			failure_detail: None,
 			drafts: BTreeMap::new(),
 			pending: vec![],
+			send_verification: Default::default(),
 			reply: None,
 			send_sequence: 0,
 			request: 0,
@@ -2208,7 +2225,10 @@ impl State {
 		if matches!(&command, Command::History { request, .. } if *request == self.request) {
 			self.cancel_history();
 		}
-		if let Command::Send { nonce, .. } | Command::Forward { nonce, .. } = command {
+		if let Command::Send { nonce, .. }
+		| Command::VerifiedSend { nonce, .. }
+		| Command::Forward { nonce, .. } = command
+		{
 			self.apply(Envelope {
 				generation: self.generation,
 				event: Event::SendResult {
@@ -3514,6 +3534,14 @@ impl State {
 				self.pending.retain(|p| p.delivery != Delivery::Confirmed);
 				reconciliation
 			}
+			Event::SendChallenge {
+				nonce,
+				reply,
+				challenge,
+			} => {
+				self.apply_send_challenge(nonce, reply, *challenge);
+				Ok(())
+			}
 			Event::Failure(f) => {
 				self.fail(f);
 				Ok(())
@@ -3523,6 +3551,9 @@ impl State {
 				Ok(())
 			}
 			Event::Disconnected => {
+				self.release_message_challenge(
+					"Verification ended by disconnect; retry the message",
+				);
 				self.member_search = Default::default();
 				self.cancel_message_actions();
 				self.cancel_user_action();
@@ -4172,6 +4203,9 @@ impl Event {
 				Self::SendResult { nonce, result } => {
 					nonce.capacity() + result.as_ref().map_or(0, Message::bytes)
 				}
+				Self::SendChallenge {
+					nonce, challenge, ..
+				} => nonce.capacity() + challenge.bytes(),
 				_ => 0,
 			}
 	}

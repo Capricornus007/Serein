@@ -4345,6 +4345,16 @@ lib-composer-onboarding-rules-pending = Accetta le regole di questo server per i
 lib-composer-onboarding-incomplete = Completa l'accesso a questo server per sbloccare altri canali.
 # Context: composer
 lib-composer-onboarding-complete = Completa l'accoglienza
+profiles-message-placeholder = Messaggio a @{ $user }
+profiles-message-send = Invia messaggio
+profiles-message-sending = Apertura del messaggio diretto…
+user-menu-contents-start-a-call = Avvia una chiamata
+verification-show-complete-the-check-to-open-this-conversation = Completa la verifica per aprire questa conversazione.
+verification-show-discord-requires-a-security-check-before-you-can-message = Discord richiede un controllo di sicurezza prima che tu possa scrivere a questa persona.
+verification-show-complete-the-check-to-send-this-message = Completa la verifica per inviare questo messaggio.
+verification-show-discord-requires-a-security-check-before-this-message = Discord richiede un controllo di sicurezza prima di inviare questo messaggio.
+profiles-message-busy = In attesa che un'altra azione finisca…
+profiles-message-offline = Riconnettiti per inviare un messaggio
 
 voice-recipient-ring = Richiama
 voice-recipient-stop-ringing = Interrompi squillo

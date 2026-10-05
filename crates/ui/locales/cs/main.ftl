@@ -998,17 +998,20 @@ extensions-ui-toolbar-working-on-your-last-action = Zpracovávám poslední akci
 
 ## crates/ui/src/fonts.rs
 # Context: show
-fonts-show-import-font = Importovat písmo…
 # Context: show
 fonts-show-inter-default = Inter (výchozí)
 # Context: show
 fonts-show-interface-font = Písmo rozhraní
 # Context: show
 fonts-show-reset = Resetovat
+fonts-show-search = Hledat nainstalovaná písma
+fonts-show-loading = Načítání nainstalovaných písem…
+fonts-show-no-match = Hledání neodpovídá žádné nainstalované písmo.
+fonts-show-none-installed = V tomto systému nebyla nalezena žádná nainstalovaná písma.
 # Context: show
 fonts-show-the-quick-brown-fox-jumps-over-the-lazy-dog-0123456789 = Rychlá hnědá liška přeskakuje líného psa. 0123456789
 # Context: show
-fonts-show-ttf-or-otf-up-to-8-mib-saved-on-this = TTF nebo OTF, až 8 MiB. Uloženo v tomto zařízení. Kód si zachovává jednoprostorové písmo.
+fonts-show-ttf-or-otf-up-to-8-mib-saved-on-this = Písma nainstalovaná v tomto zařízení, až 8 MiB. Kopie se uloží pro Serein. Kód si zachovává jednoprostorové písmo.
 # Context: show
 fonts-show-typography = Typografie
 
@@ -4364,6 +4367,16 @@ lib-composer-onboarding-rules-pending = Přijmi pravidla tohoto serveru, abys mo
 lib-composer-onboarding-incomplete = Dokonči připojení k serveru a odemkni další kanály.
 # Context: composer
 lib-composer-onboarding-complete = Dokončit uvítání
+profiles-message-placeholder = Zpráva pro @{ $user }
+profiles-message-send = Odeslat zprávu
+profiles-message-sending = Otevírání soukromé zprávy…
+user-menu-contents-start-a-call = Zahájit hovor
+verification-show-complete-the-check-to-open-this-conversation = Dokonči ověření a otevři tuto konverzaci.
+verification-show-discord-requires-a-security-check-before-you-can-message = Discord vyžaduje bezpečnostní ověření, než této osobě budeš moct napsat.
+verification-show-complete-the-check-to-send-this-message = Dokonči ověření a odešli tuto zprávu.
+verification-show-discord-requires-a-security-check-before-this-message = Discord vyžaduje bezpečnostní ověření, než bude možné tuto zprávu odeslat.
+profiles-message-busy = Čeká se na dokončení jiné akce…
+profiles-message-offline = Pro odeslání zprávy se znovu připoj
 
 voice-recipient-ring = Znovu zavolat
 voice-recipient-stop-ringing = Zastavit vyzvánění
@@ -4377,8 +4390,9 @@ public-upload-heading = Sdílet veřejným odkazem
 public-upload-subtitle = Nahrajte soubor na veřejné úložiště a pošlete jeho odkaz místo přílohy Discordu
 public-upload-offline = Offline náhled · žádný soubor se nenahrává
 public-upload-host = Úložiště souborů
-public-upload-host-zerox0 = Až 512 MB · uchováno 30 dní až 1 rok, menší soubory déle
+public-upload-host-x0at = Až 1 GB · uchováno 3 až 100 dní, menší soubory déle
 public-upload-host-catbox = Až 200 MB (GIF 20 MB) · může být odstraněn po dvou letech bez přístupu
+public-upload-host-litterbox = Až 1 GB · dočasné, smazáno po 72 hodinách
 public-upload-over-limit = { $size } · nad vaším limitem nahrávání na Discord ({ $limit })
 public-upload-uploading = Nahrávání na { $host } · { $sent } z { $total }
 public-upload-privacy = Kdokoli s odkazem může soubor otevřít. Nahraje se beze změny včetně metadat mimo Discord a Serein jej později nemůže smazat.
@@ -4404,6 +4418,9 @@ public-upload-error-response-limit = Odpověď úložiště souborů překročil
 public-upload-error-interrupted = Veřejné nahrávání přerušeno; přijatá data mohou zůstat na úložišti
 public-upload-error-invalid-link = Úložiště souborů vrátilo neplatný odkaz
 public-upload-error-busy = Počkejte na dokončení aktuální operace s přílohou
+public-upload-retry = Zkusit znovu
+public-upload-error-unavailable = Toto úložiště je nedostupné nebo nyní nepřijímá nahrávání. Zkuste to znovu s jiným úložištěm.
+public-upload-oversized = Soubory nad { $limit } nelze s vaším plánem odeslat. Odeberte je, nebo místo toho sdílejte odkaz.
 public-upload-error-conversation = Před veřejným nahráním se vraťte do původní konverzace a znovu zkontrolujte soubor
 public-upload-error-selection = Výběr se změnil; před veřejným nahráním znovu zkontrolujte soubor
 public-upload-error-missing = Před veřejným nahráním znovu vyberte soubor

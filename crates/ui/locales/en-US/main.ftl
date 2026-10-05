@@ -999,17 +999,20 @@ extensions-ui-toolbar-working-on-your-last-action = Working on your last action
 
 ## crates/ui/src/fonts.rs
 # Context: show
-fonts-show-import-font = Import font…
 # Context: show
 fonts-show-inter-default = Inter (default)
 # Context: show
 fonts-show-interface-font = Interface font
 # Context: show
 fonts-show-reset = Reset
+fonts-show-search = Search installed fonts
+fonts-show-loading = Loading installed fonts…
+fonts-show-no-match = No installed font matches your search.
+fonts-show-none-installed = No installed fonts were found on this system.
 # Context: show
 fonts-show-the-quick-brown-fox-jumps-over-the-lazy-dog-0123456789 = The quick brown fox jumps over the lazy dog. 0123456789
 # Context: show
-fonts-show-ttf-or-otf-up-to-8-mib-saved-on-this = TTF or OTF, up to 8 MiB. Saved on this device. Code keeps its monospace font.
+fonts-show-ttf-or-otf-up-to-8-mib-saved-on-this = Fonts installed on this device, up to 8 MiB. A copy is saved for Serein. Code keeps its monospace font.
 # Context: show
 fonts-show-typography = Typography
 
@@ -4362,6 +4365,16 @@ lib-composer-onboarding-rules-pending = Accept this server's rules to start chat
 lib-composer-onboarding-incomplete = Finish joining this server to unlock more channels.
 # Context: composer
 lib-composer-onboarding-complete = Complete Onboarding
+profiles-message-placeholder = Message @{ $user }
+profiles-message-send = Send message
+profiles-message-sending = Opening direct message…
+user-menu-contents-start-a-call = Start a Call
+verification-show-complete-the-check-to-open-this-conversation = Complete the check to open this conversation.
+verification-show-discord-requires-a-security-check-before-you-can-message = Discord requires a security check before you can message this person.
+verification-show-complete-the-check-to-send-this-message = Complete the check to send this message.
+verification-show-discord-requires-a-security-check-before-this-message = Discord requires a security check before this message can be sent.
+profiles-message-busy = Waiting for another action to finish…
+profiles-message-offline = Reconnect to send a message
 
 voice-recipient-ring = Ring again
 voice-recipient-stop-ringing = Stop ringing
@@ -4375,8 +4388,9 @@ public-upload-heading = Share with a public link
 public-upload-subtitle = Upload the file to a public host and send its link instead of a Discord attachment
 public-upload-offline = Offline preview · no file is uploaded
 public-upload-host = File host
-public-upload-host-zerox0 = Up to 512 MB · kept 30 days to 1 year, longer for smaller files
+public-upload-host-x0at = Up to 1 GB · kept 3 to 100 days, longer for smaller files
 public-upload-host-catbox = Up to 200 MB (GIF 20 MB) · may be removed after two years without access
+public-upload-host-litterbox = Up to 1 GB · temporary, deleted after 72 hours
 public-upload-over-limit = { $size } · over your { $limit } Discord upload limit
 public-upload-uploading = Uploading to { $host } · { $sent } of { $total }
 public-upload-privacy = Anyone with the link can open this file. It is uploaded unchanged, metadata included, outside Discord, and Serein cannot delete it later.
@@ -4402,6 +4416,9 @@ public-upload-error-response-limit = File host response exceeded its limit
 public-upload-error-interrupted = Public upload interrupted; received bytes may remain on the file host
 public-upload-error-invalid-link = File host returned an invalid link
 public-upload-error-busy = Wait for the current attachment operation to finish
+public-upload-retry = Try again
+public-upload-error-unavailable = This host is down or not accepting uploads right now. Try again with another host.
+public-upload-oversized = Files over { $limit } can’t be sent on your plan. Remove them or share a link instead.
 public-upload-error-conversation = Return to the original conversation and review the file again before uploading publicly
 public-upload-error-selection = Selection changed; review the file again before uploading publicly
 public-upload-error-missing = Select the file again before uploading publicly
