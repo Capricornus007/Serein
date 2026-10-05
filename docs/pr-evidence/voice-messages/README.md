@@ -50,3 +50,12 @@ no recorder dialog is active during the matched idle comparison. The baseline
 ignores `--demo-recorder`; the task enables its synthetic opt-in contribution.
 This measures idle integration overhead, not physical microphone DSP, encoding,
 network delivery, startup peaks, GPU memory or frame latency.
+
+Measured October 5, 2026 on Ubuntu 26.04.1 / Linux 7.0.0-34, AMD Ryzen 5 7535U,
+12 logical CPUs and 15,369,355,264 bytes RAM. Each revision has one fresh launch;
+no build or helper child process ran during sampling. Mean idle CPU was 0.00%
+on both. Peak RSS was 242,778,112 → 251,494,400 bytes (+8.31 MiB / +3.59%);
+settled RSS was 242,778,112 → 251,363,328 bytes (+8.19 MiB / +3.54%). This single
+pair does not isolate allocator/driver variation from integration overhead; no
+performance improvement is claimed. The runtime source is committed at
+`9b44a4dfbe6d1702f36b20b0877bd24610cd9fa8` and is unchanged by the evidence follow-up.

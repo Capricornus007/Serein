@@ -4207,3 +4207,44 @@ three sources, 220/560/1260-point widths, light/dark themes and scales 1/2.
 The exact announcement failed on the baseline because the following text began
 at y=76 while its quote rail extended to y=216; explicit row boundaries pass.
 `cargo xtask check` and strict Clippy for the demo preview passed.
+
+## Opt-in Voice Messages — October 5, 2026
+
+Compared baseline `6313e271e9c34b39069eb20787afb1476741b21c` with runtime source
+`9b44a4dfbe6d1702f36b20b0877bd24610cd9fa8`. Both use pinned Rust 1.98.1, ordinary
+fat LTO and the locked dependencies; no new dependency versions or system runtime
+requirements were introduced. Standard packages include voice and disable
+default/demo features; both pass the 225-file Debian smoke check.
+
+| Metric | Baseline | After | Delta |
+| --- | ---: | ---: | ---: |
+| Standard executable | 85,597,872 B | 86,025,264 B | +427,392 B / +0.50% |
+| Installed regular files | 90,111,993 B | 90,539,385 B | +427,392 B / +0.47% |
+| Complete compressed DEB | 44,266,736 B | 44,328,696 B | +61,960 B / +0.14% |
+| Mean idle CPU, one logical core | 0.00% | 0.00% | 0.00 percentage points |
+| Sampled peak RSS | 242,778,112 B | 251,494,400 B | +8,716,288 B / +3.59% |
+| Settled RSS | 242,778,112 B | 251,363,328 B | +8,585,216 B / +3.54% |
+
+Native idle sampling uses release `--no-default-features --features demo`,
+`--demo --demo-chat --demo-recorder`, a neutral channel-header click, eleven seconds
+of total warmup and twenty one-second psutil CPU/RSS samples per revision. The
+baseline ignores the new recorder fixture flag; after enables its synthetic
+contribution with no dialog/capture active. Settled RSS is the final five samples'
+median. Host: Ubuntu 26.04.1 / Linux 7.0.0-34, AMD Ryzen 5 7535U (12 logical CPUs),
+15,369,355,264 bytes RAM, Xvfb/X11 1120×760 scale 1, WGPU/Vulkan llvmpipe
+(LLVM 21.1.8), with Mesa lavapipe forced. No builds or helper children ran during
+sampling. This one launch pair reports an 8.19-MiB settled RSS increase but cannot
+separate integration cost from allocator/driver variation. No improvement is claimed.
+Startup peaks, frame latency, GPU memory, physical microphone/DSP cost and live
+Discord delivery are unmeasured.
+
+One clip is bounded to 120 seconds / 8 MiB, with an eight-frame / 30,720-sample-byte
+PCM queue, at most 6,000 amplitude bytes and a replaceable 64-bin UI snapshot.
+Device-free tests validate Opus/Ogg decoding, duration trimming, controls and
+bounds; synthetic HTTP tests validate the single-send metadata path. These are
+component checks, not physical audio or live-account compatibility evidence.
+
+The [evidence README](pr-evidence/voice-messages/README.md) gives reproduction
+commands and native dark/light inspection. [Raw measurements and package hashes](pr-evidence/voice-messages/measurements.json)
+include every sample and both release executable hashes. `cargo xtask check`,
+extension/SDK checks and standard Linux packaging pass.
