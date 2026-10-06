@@ -39,6 +39,9 @@ both sampled processes mapped `vulkan-1.dll` and `nvoglv64.dll`. Display scale i
 Capture commands, using the preserved executables above and this evidence folder:
 
 ```powershell
+$before='E:/codex-builds/serein-compact-baseline-src/target/native-baseline/profile_preview.exe'
+$after='C:/Users/Jakub/Desktop/Projects/Serein-compact-alignment/target/native-after/profile_preview.exe'
+$evidence='C:/Users/Jakub/Desktop/Projects/Serein-compact-alignment/docs/pr-evidence/compact-message-alignment'
 $env:WGPU_BACKEND='vulkan'
 & $before --demo --compact --page=member-tags --width=1400 --height=900 --scroll=-1200 "--output=$evidence/before.png"
 & $after --demo --compact --page=member-tags --width=1400 --height=900 --scroll=-1200 "--output=$evidence/after.png"
@@ -52,6 +55,10 @@ scroll/input and therefore differs from the scrolled screenshot view. No build o
 ZIP work ran during either valid sample. For each preserved executable:
 
 ```powershell
+$exe='C:/Users/Jakub/Desktop/Projects/Serein-compact-alignment/target/native-after/profile_preview.exe'
+# Repeat with $exe='E:/codex-builds/serein-compact-baseline-src/target/native-baseline/profile_preview.exe' for baseline.
+$stdout='C:/Users/Jakub/Desktop/Projects/Serein-compact-alignment/target/compact-reproduction.stdout.log'
+$stderr='C:/Users/Jakub/Desktop/Projects/Serein-compact-alignment/target/compact-reproduction.stderr.log'
 $env:WGPU_BACKEND='vulkan'
 $scenario=@('--demo','--interactive','--compact','--page=member-tags','--width=1400','--height=900')
 $p=Start-Process -FilePath $exe -ArgumentList $scenario -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
@@ -98,3 +105,16 @@ The complete distribution ZIP uses `.NET ZipFile.CreateFromDirectory` with
 `CompressionLevel.Optimal` and `includeBaseDirectory=false`. NSIS was unavailable;
 the package routine skipped installer generation on both revisions. Package sizes
 and hashes are preserved separately from the demo-preview measurements.
+
+## Verification
+
+- `cargo test --workspace --locked`: 1,153 passed, 27 ignored.
+- `cargo test --locked -p ui --lib compact`: all three tests passed.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: passed.
+- `cargo clippy --locked -p serein --no-default-features --features demo --example profile_preview -- -D warnings`: passed.
+- Task-path formatting, `cargo xtask policy`, and `cargo check --locked -p serein --no-default-features`: passed.
+- `cargo xtask package`: both standard voice-inclusive packages passed.
+- `cargo xtask check`: stops at pre-existing `forum.rs` formatting, independently reproduced with `cargo fmt --all -- --check` on the untouched baseline.
+
+The commands above reproduce native framebuffer captures and process sampling;
+native input, other OS rendering and live Discord behavior remain unverified.
