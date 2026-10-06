@@ -131,7 +131,7 @@ pub struct TimelineView {
 	pub(super) opening: Option<String>,
 	pub(super) browser_opening: Option<String>,
 	text_size: f32,
-	font_revision: (usize, usize),
+	font_revision: (usize, usize, u32),
 	scale: f32,
 	pub(super) load_older: bool,
 	pub(super) latest: bool,

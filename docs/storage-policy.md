@@ -669,9 +669,10 @@ local-storage status. Disk cache contents are unencrypted. Category collapse is 
 account-isolated channel preferences record. Narrow People overlays remain session-local.
 Normal window geometry is device-local in the bounded app_preferences singleton.
 
-Storage commands and results each retain their 16-item limit and have separate 16 MiB
-estimated allocation budgets. Reservations include vector/string capacity and metadata
-allowances and are released when work/results are consumed or dropped. Byte exhaustion
+Storage commands and results each retain their 16-item limit and have separate 48 MiB
+estimated allocation budgets (32 MiB for a custom font plus 16 MiB of work/metadata).
+Reservations include vector/string capacity and metadata allowances and are released
+when work/results are consumed or dropped. Byte exhaustion
 rejects command admission through the existing unsaved/cleanup handling; the storage worker
 waits for result capacity without dropping completions. One completed result awaiting
 admission and the SQLite working set are additional. History payloads retain the 500-row /
@@ -935,13 +936,14 @@ for enumeration on its first missing glyph; its font/cache memory is framework
 overhead, separate from Serein message/image budgets. OS font availability and
 emoji coverage vary by platform. Bundled text faces and Twemoji remain in use.
 
-Explicit Appearance → Typography import accepts one local TTF/OTF up to 8 MiB. A native
+Explicit Appearance → Typography import accepts one installed TTF/OTF face up to 32 MiB. A native
 picker feeds one bounded background read and validation; no file path is saved. The existing
-SQLite worker atomically replaces one `custom_font` row (name ≤128 UTF-8 bytes, font ≤8 MiB),
-within the database's existing total size ceiling. Reset deletes that row; logout retains it.
+SQLite worker atomically replaces one `custom_font` row (name ≤128 UTF-8 bytes, font ≤32 MiB),
+within the database's existing 64 MiB total size ceiling. Schema 27 migrates the old
+8 MiB table constraint while preserving the saved font. Reset deletes that row; logout retains it.
 The prior font stays active if importing or saving fails. The three proportional weight
 definitions share the imported bytes; the active font and one pending replacement can each
-retain up to 8 MiB, in addition to renderer/font-atlas overhead. Cache queue reservations
+retain up to 32 MiB, in addition to renderer/font-atlas overhead. Cache queue reservations
 include font payload bytes. Demo imports stay in memory and do not read or write this row.
 
 
