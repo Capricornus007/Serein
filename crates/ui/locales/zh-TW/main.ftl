@@ -22,7 +22,7 @@ page-updates = 更新
 page-extensions = 擴充功能
 page-themes = 主題
 description-account = 這台裝置上登入的 Discord 帳號。
-description-profile = 設定你在 Discord 各界面的呈現方式。
+description-profile = 設定你在 Discord 各處的呈現方式。
 description-general = 這台裝置的開機啟動、視窗與圖形行為。
 description-appearance = 主題、色彩、視窗效果與版面配置。
 description-chat = 訊息、媒體、連結與捲動的行為。
@@ -560,7 +560,7 @@ channel-permissions-add-allows-stickers-from-other-servers = 可使用其他伺�
 # Context: add
 channel-permissions-add-attach-files = 附加檔案
 # Context: add
-channel-permissions-add-connect = 連接
+channel-permissions-add-connect = 連線
 # Context: add
 channel-permissions-add-create-invite = 建立邀請連結
 # Context: add
@@ -1783,7 +1783,7 @@ notifications-notification-rail-unread = ，未讀
 
 ## crates/ui/src/pending.rs
 # Context: show
-pending-show-check-the-conversation-before-sending-again = 請先確認對話內容，再重新發送。
+pending-show-check-the-conversation-before-sending-again = 請先確認對話內容，再重新傳送。
 # Context: show
 pending-show-dismiss = 關閉
 # Context: show
@@ -1793,7 +1793,7 @@ pending-show-you = 你
 # Context: upload_strip
 pending-upload-strip-cancel-upload = 取消上傳
 # Context: upload_strip
-pending-upload-strip-the-message-may-already-have-reached-discord-check-the-conversation = 訊息可能已送達 Discord。請先確認對話內容，再重新發送。
+pending-upload-strip-the-message-may-already-have-reached-discord-check-the-conversation = 訊息可能已送達 Discord。請先確認對話內容，再重新傳送。
 
 ## crates/ui/src/polls.rs
 # Context: card
@@ -2777,7 +2777,7 @@ server-integrations-overview-added-by = 新增者
 # Context: overview
 server-integrations-overview-bots-and-apps = 機器人與應用程式
 # Context: overview
-server-integrations-overview-customize-your-server-with-integrations-manage-webhooks-followed-channel = 用整合打造你的伺服器。可管理 Webhook、追蹤的頻道，以及連接至此伺服器的應用程式。
+server-integrations-overview-customize-your-server-with-integrations-manage-webhooks-followed-channel = 用整合打造你的伺服器。可管理 Webhook、追蹤的頻道，以及連線至此伺服器的應用程式。
 # Context: overview
 server-integrations-overview-learn-more-about-managing-integrations = 進一步了解如何管理整合。
 # Context: overview
@@ -4258,10 +4258,10 @@ server-roles-permissions-kick-members = 移出成員
 server-roles-permissions-timeout-members = 暫停成員
 server-roles-permissions-administrator = 管理員
 server-roles-permissions-administrator-detail = 授予所有權限，並繞過頻道權限覆寫。請只授予值得信任的人。
-pending-status-sending = 發送中…
+pending-status-sending = 傳送中…
 pending-status-unknown = 無法確認是否送達
-pending-status-not-sent = 未發送
-pending-status-sent = 已發送
+pending-status-not-sent = 未傳送
+pending-status-sent = 已傳送
 profiles-friend-action-remove = 朋友 ✓ · 點擊移除
 profiles-friend-action-accept = 接受朋友邀請
 profiles-friend-action-sent = 已送出朋友邀請
@@ -4362,16 +4362,16 @@ lib-composer-onboarding-rules-pending = 同意這個伺服器的規則後才能�
 lib-composer-onboarding-incomplete = 完成加入這個伺服器，才能解鎖更多頻道。
 # Context: composer
 lib-composer-onboarding-complete = 完成新手引導
-profiles-message-placeholder = 發送訊息給 @{ $user }
-profiles-message-send = 發送訊息
+profiles-message-placeholder = 傳送訊息給 @{ $user }
+profiles-message-send = 傳送訊息
 profiles-message-sending = 正在開啟私訊…
 user-menu-contents-start-a-call = 開始通話
 verification-show-complete-the-check-to-open-this-conversation = 完成驗證後才能開啟這個對話。
 verification-show-discord-requires-a-security-check-before-you-can-message = Discord 要求先通過安全檢查，才能傳訊息給這個人。
-verification-show-complete-the-check-to-send-this-message = 完成驗證後才能發送這則訊息。
-verification-show-discord-requires-a-security-check-before-this-message = Discord 要求先通過安全檢查，才能發送這則訊息。
+verification-show-complete-the-check-to-send-this-message = 完成驗證後才能傳送這則訊息。
+verification-show-discord-requires-a-security-check-before-this-message = Discord 要求先通過安全檢查，才能傳送這則訊息。
 profiles-message-busy = 正在等待其他動作完成…
-profiles-message-offline = 請重新連線才能發送訊息
+profiles-message-offline = 請重新連線才能傳送訊息
 
 voice-recipient-ring = 再次響鈴
 voice-recipient-stop-ringing = 停止響鈴
@@ -4391,7 +4391,7 @@ public-upload-host-litterbox = 上限 1 GB · 暫存型，72 小時後刪除
 public-upload-over-limit = { $size } · 超過你的 Discord 上傳上限 { $limit }
 public-upload-uploading = 上傳至 { $host } · { $sent }／{ $total }
 public-upload-privacy = 拿到連結的人都能開啟這個檔案。內容原封不動（含後設資料）上傳到 Discord 之外，Serein 之後無法刪除。
-public-upload-review = 尚未送出任何東西。把連結加入草稿或複製後，自行發送。
+public-upload-review = 尚未送出任何東西。把連結加入草稿或複製後，自行傳送。
 public-upload-return = 請回到原對話加入這個連結。
 public-upload-preparing = 正在準備公開上傳…
 public-upload-limits = 檔案太大，或這個空間不接受它的類型
@@ -4407,7 +4407,7 @@ public-upload-error-cancelled = 公開上傳已取消；已接收的資料可能
 public-upload-error-prepare = 無法準備公開上傳
 public-upload-error-changed = 檔案已變更或無法使用；請重新選擇
 public-upload-error-failed = 公開上傳失敗；已接收的資料可能留在檔案空間
-public-upload-error-rejected = 檔案空間拒絕上傳；未發送任何 Discord 訊息
+public-upload-error-rejected = 檔案空間拒絕上傳；未傳送任何 Discord 訊息
 public-upload-error-incomplete = 公開上傳未完成；已接收的資料可能留在檔案空間
 public-upload-error-response-limit = 檔案空間的回覆超出上限
 public-upload-error-interrupted = 公開上傳中斷；已接收的資料可能留在檔案空間
@@ -4415,7 +4415,7 @@ public-upload-error-invalid-link = 檔案空間回傳了無效的連結
 public-upload-error-busy = 請等目前的附件操作完成
 public-upload-retry = 再試一次
 public-upload-error-unavailable = 這個空間無法連線或暫時不受理上傳。請改用其他空間再試。
-public-upload-oversized = 你的方案無法發送超過 { $limit } 的檔案。請移除，或改分享連結。
+public-upload-oversized = 你的方案無法傳送超過 { $limit } 的檔案。請移除，或改分享連結。
 public-upload-error-conversation = 請先回到原對話，重新檢視檔案後再公開上傳
 public-upload-error-selection = 選擇已變更；請重新檢視檔案後再公開上傳
 public-upload-error-missing = 請重新選擇檔案後再公開上傳
@@ -4480,13 +4480,13 @@ server-settings-profile-server-id-help = 機器人、審核工具與客服請求
 
 server-settings-profile-copy-id = 複製 ID
 
-server-settings-engagement-system-welcome = 有人加入這個伺服器時，隨機發送一句歡迎訊息。
+server-settings-engagement-system-welcome = 有人加入這個伺服器時，隨機傳送一句歡迎訊息。
 
 server-settings-engagement-system-welcome-sticker = 提醒成員用貼圖回覆歡迎訊息。
 
-server-settings-engagement-system-boost = 有人為這個伺服器加值時發送訊息。
+server-settings-engagement-system-boost = 有人為這個伺服器加值時傳送訊息。
 
-server-settings-engagement-system-tips = 發送協助設定伺服器的提示。
+server-settings-engagement-system-tips = 傳送協助設定伺服器的提示。
 
 server-invites-header-subtitle = 分享能讓人加入這個伺服器的連結。
 
