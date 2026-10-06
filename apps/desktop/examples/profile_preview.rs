@@ -326,9 +326,6 @@ fn extension_fixture(
 		"teal-theme" => {
 			include_bytes!("../../../extensions/themes/teal.serein-extension")
 		}
-		"emoji-sticker-images" => include_bytes!(
-			"../../../extensions/plugins/packages/emoji-sticker-images.serein-extension"
-		),
 		_ => return Err("Unknown fixture extension".into()),
 	};
 	let package = extensions::parse_package(bytes)?;
@@ -757,11 +754,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 							output.clone(),
 							&state,
 						);
-					}
-					messaging.image_sharing_enabled = output.image_sharing;
-					if output.image_sharing {
-						test_support::seed_stickers(&mut state);
-						messaging.preview_sticker_picker();
 					}
 					if output.preserve_deleted_messages {
 						let channel = state.selected.unwrap();

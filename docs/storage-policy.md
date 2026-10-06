@@ -1429,15 +1429,20 @@ or background pagination is added.
 
 ### Emoji and sticker image sharing
 
-The opt-in plugin stages public artwork as ordinary attachments only after selecting
-an emoji or sticker that cannot use its normal Discord send path.
-One host download/preparation uses generated HTTPS CDN URLs without credentials or
-redirects, capped at 8 MiB per image and 15 seconds per request. Raster preview decoding
-uses the existing 64 MiB allocation limit and 320px thumbnail edge outside rendering.
-Up to ten selected images remain in session RAM (80 MiB encoded artwork maximum),
-with no temporary files or recovery cache. Navigation/logout cancel pending preparation;
-The picker selection authorizes one send after validation; ordinary upload permissions
-and cleanup apply. Existing selected files are never included in that send.
+The built-in fallback inserts bounded named Markdown links into the ordinary draft
+without sending. Composer/message previews reuse the existing bounded media worker;
+only exact public Discord emoji/sticker routes are recognized as inline artwork.
+Explicit Send with additional text uses those links as ordinary message content.
+Artwork-only Send prepares one batch of up to ten images and retains the submitted
+draft until preparation succeeds. The preparation snapshot is capped at 8,192 bytes
+and matched to the originating generation/channel; newer drafts are preserved.
+One host preparation job downloads generated HTTPS CDN URLs without credentials or
+redirects, sequentially, capped at 8 MiB per input and 15 seconds per request.
+Prepared images total at most 8 MiB in session RAM, plus the current bounded input and
+decoder working set. Raster preview decoding uses the existing 64 MiB allocation
+limit and 320px thumbnail edge outside rendering. There are no temporary files or
+recovery caches. Navigation/logout cancel preparation; ordinary upload permissions
+and cleanup still apply. Existing selected files take the regular composer send path.
 
 
 ### Local camera settings preview

@@ -232,7 +232,7 @@ pub fn show(
 								upload_strip(ui, pending, upload, cancel);
 							});
 						}
-					} else if pending.delivery != Delivery::Confirmed {
+					} else if !sending && pending.delivery != Delivery::Confirmed {
 						if pending.delivery == Delivery::Ambiguous {
 							ui.label(
 								RichText::new(crate::i18n::translate(
