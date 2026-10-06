@@ -1830,6 +1830,9 @@ impl MessagingUi {
 						}
 					}
 				}
+				if let Some(command) = state.request_sidebar_forum_posts(self.guild) {
+					commands.push(command);
+				}
 				let select = self.channel_list(ui, state);
 				if let Some((guild, channel, user)) = self.stream_preview_request.take()
 					&& let Some(command) = state.request_stream_preview(guild, channel, user)

@@ -1869,6 +1869,12 @@ They show the latest plain preview with the author's known guild role color and 
 `50+ New` indicates that the cursor precedes the retained 50-message window. Failed
 or unavailable summaries remain explicitly unavailable until refresh or new activity;
 successful summaries are reused when returning to a forum during the same session.
+The displayed guild also fetches unopened forums serially through the existing
+bounded active-post loader (up to 200 posts per forum). An open forum takes priority.
+A guild revisit or changed parent last-post ID refreshes the sidebar; failed pages
+do not retry every frame. Counts cover loaded active posts, not a complete directory.
+Forum-level READY and acknowledgement cursors are preserved: only posts newer than
+the parent cursor with unread starters contribute to `New`; replies remain independently unread.
 Startup preserves cursors for threads loaded after READY. These changes have synthetic
 offline coverage; normal-account behavior remains unofficial and live-unverified.
 

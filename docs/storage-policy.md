@@ -1388,6 +1388,10 @@ bounded map metadata, in RAM and reuses them across forum switches. Refresh,
 disconnect and account reset release them; permission loss prunes inaccessible entries.
 No new disk cache is introduced. Startup read cursors
 for not-yet-loaded threads remain in the existing item/byte-bounded read-state map.
+Sidebar discovery reuses the single forum page loader and existing navigation budgets.
+It retains at most 200 fixed-size forum ID/last-post cursor pairs for the displayed
+guild (4,800 payload bytes plus bounded B-tree overhead), cleared on guild changes
+or disconnect. No additional response queue, message history fetch or disk cache is added.
 
 ### Stickers (schema 21)
 
