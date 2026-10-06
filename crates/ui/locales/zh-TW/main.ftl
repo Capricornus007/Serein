@@ -1661,7 +1661,7 @@ markdown-confirm-external-link-this-destination-opens-in-your-default-browser = 
 # Context: show_emoji
 markdown-show-emoji-copy-emoji = 複製表情符號
 # Context: show_run
-markdown-show-run-channel-unavailable-or-unsupported-in-this-session = 這個工作階段無法使用或不支援該頻道
+markdown-show-run-channel-unavailable-or-unsupported-in-this-session = 這個頻道在目前的工作階段無法使用或不支援
 # Context: show_run
 markdown-show-run-load-channel = 載入頻道
 # Context: show_run
@@ -4506,7 +4506,7 @@ server-emoji-empty-animated = 還沒有動態表情符號
 
 server-emoji-empty-detail = 上傳圖片即可新增。GIF 會變成動態表情符號。
 
-server-stickers-empty-detail = 上傳圖案即可新增你的第一张贴圖。
+server-stickers-empty-detail = 上傳圖片即可新增你的第一張貼圖。
 
 screen-macos-system-picker = 用 macOS 系統選擇器挑選
 

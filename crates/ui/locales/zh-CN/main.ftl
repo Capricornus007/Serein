@@ -1661,7 +1661,7 @@ markdown-confirm-external-link-this-destination-opens-in-your-default-browser = 
 # Context: show_emoji
 markdown-show-emoji-copy-emoji = 复制表情符号
 # Context: show_run
-markdown-show-run-channel-unavailable-or-unsupported-in-this-session = 这个会话不可用或不支持该频道
+markdown-show-run-channel-unavailable-or-unsupported-in-this-session = 这个频道在当前会话中不可用或不支持
 # Context: show_run
 markdown-show-run-load-channel = 加载频道
 # Context: show_run
@@ -4506,7 +4506,7 @@ server-emoji-empty-animated = 还没有动态表情符号
 
 server-emoji-empty-detail = 上传图片即可新增。GIF 会变成动态表情符号。
 
-server-stickers-empty-detail = 上传图案即可新增你的第一张贴纸。
+server-stickers-empty-detail = 上传图片即可添加你的第一张贴纸。
 
 screen-macos-system-picker = 用 macOS 系统选择器挑选
 
