@@ -1012,7 +1012,7 @@ fonts-show-none-installed = 這台系統上找不到已安裝的字型。
 # Context: show
 fonts-show-the-quick-brown-fox-jumps-over-the-lazy-dog-0123456789 = 靈巧的棕色狐狸躍過懶惰的狗。0123456789
 # Context: show
-fonts-show-ttf-or-otf-up-to-8-mib-saved-on-this = 這台裝置已安裝的字型，單一上限 8 MiB。會另存一份給 Serein 使用。程式碼仍用等寬字型。
+fonts-show-ttf-or-otf-up-to-32-mib-saved-on-this = 這台裝置已安裝的字型，單一上限 32 MiB。會另存一份給 Serein 使用。程式碼仍用等寬字型。
 # Context: show
 fonts-show-typography = 文字排版
 

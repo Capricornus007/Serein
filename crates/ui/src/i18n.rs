@@ -164,7 +164,7 @@ impl Language {
 		}
 	}
 
-	fn resolved(self) -> Self {
+	pub(crate) fn resolved(self) -> Self {
 		if self != Self::System {
 			return self;
 		}
@@ -272,7 +272,7 @@ pub fn translate_if_key(value: &str) -> String {
 		.unwrap_or_else(|| value.to_owned())
 }
 
-fn current() -> Language {
+pub(crate) fn current() -> Language {
 	let value = CURRENT.load(Ordering::Relaxed);
 	Language::ALL
 		.into_iter()
@@ -281,8 +281,7 @@ fn current() -> Language {
 }
 
 fn language_from_tag(tag: &str) -> Language {
-	// 中文的兩個變體要靠 script/region 子標區分，所以中文這條先看完整 tag；
-	// 其他語系維持原本「只看主語系子標」的行為（es-MX→es、pt-PT→pt、zh_TW.UTF-8 先去掉編碼）。
+	// Chinese uses script/region subtags; other languages keep primary-subtag matching.
 	let normalized = tag
 		.split('.')
 		.next()
@@ -290,8 +289,15 @@ fn language_from_tag(tag: &str) -> Language {
 		.to_ascii_lowercase()
 		.replace('_', "-");
 	if let Some(suffix) = normalized.strip_prefix("zh-") {
-		let region = suffix.rsplit('-').next().unwrap_or_default();
-		return if suffix.contains("hant") || matches!(region, "tw" | "hk" | "mo") {
+		let mut subtags = suffix.split('-');
+		let first = subtags.next().unwrap_or_default();
+		let (script, region) = if first.len() == 4 && first.bytes().all(|c| c.is_ascii_alphabetic())
+		{
+			(first, subtags.next().unwrap_or_default())
+		} else {
+			("", first)
+		};
+		return if script == "hant" || (script != "hans" && matches!(region, "tw" | "hk" | "mo")) {
 			Language::ChineseTraditional
 		} else {
 			Language::ChineseSimplified
@@ -333,6 +339,22 @@ mod tests {
 		);
 		assert_eq!(language_from_tag("zh-Hant"), Language::ChineseTraditional);
 		assert_eq!(language_from_tag("zh-HK"), Language::ChineseTraditional);
+		for tag in ["zh-HK-u-nu-latn", "zh-Hant-CN", "zh-MO-x-hans"] {
+			assert_eq!(
+				language_from_tag(tag),
+				Language::ChineseTraditional,
+				"{tag}"
+			);
+		}
+		for tag in [
+			"zh-Hans-x-hant",
+			"zh-Hans-TW",
+			"zh-x-hant",
+			"zh-u-rg-twzzzz",
+			"zh-foo-hk",
+		] {
+			assert_eq!(language_from_tag(tag), Language::ChineseSimplified, "{tag}");
+		}
 		assert_eq!(language_from_tag("zh-CN"), Language::ChineseSimplified);
 		assert_eq!(language_from_tag("zh"), Language::ChineseSimplified);
 		assert_eq!(
