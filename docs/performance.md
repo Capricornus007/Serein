@@ -4207,3 +4207,53 @@ three sources, 220/560/1260-point widths, light/dark themes and scales 1/2.
 The exact announcement failed on the baseline because the following text began
 at y=76 while its quote rail extended to y=216; explicit row boundaries pass.
 `cargo xtask check` and strict Clippy for the demo preview passed.
+
+## Compact message baselines — October 6, 2026
+
+Compared baseline `2423f600ad3cdb266c4c5ea8a840b2b2ade4795c` with runtime
+commit `05af1e6aee17a44f5821f8abe5d20350722121dc`. Both native previews use the
+same `--compact` harness addition, pinned Rust 1.98.1, release,
+`--no-default-features --features demo`, and separate Cargo target directories.
+The [measurements](pr-evidence/compact-message-alignment/measurements.json) record
+source/binary hashes, package sizes and raw process samples; the
+[README](pr-evidence/compact-message-alignment/README.md) gives reproduction commands.
+
+Host: Windows 11 Home 10.0.26200, Ryzen 7 7800X3D (16 logical CPUs),
+33,410,678,784 bytes RAM, NVIDIA RTX 5070 Ti / driver 591.86, native WGPU/Vulkan.
+Both processes mapped `vulkan-1.dll` and NVIDIA's `nvoglv64.dll`. Display scale is
+1.25; dark and light framebuffer captures are 1750×1125 and 950×1125 pixels.
+
+| Metric | Baseline | After | Delta |
+| --- | ---: | ---: | ---: |
+| Mean idle CPU, one logical core | 0.2172% | 1.4059% | +1.1887 percentage points |
+| Median idle CPU, one logical core | 0.00% | 0.00% | 0.00 percentage points |
+| Sampled peak / settled working set | 144,941,056 B | 149,811,200 B | +4,870,144 B (+3.36%) |
+| Standard voice-enabled executable | 84,548,096 B | 84,562,944 B | +14,848 B (+0.0176%) |
+| Installed regular files | 88,721,292 B | 88,736,140 B | +14,848 B (+0.0167%) |
+| Complete ZIP, .NET Optimal compression | 49,426,763 B | 49,432,817 B | +6,054 B (+0.0122%) |
+
+Sampling uses one fresh interactive preview per revision at 1400×900 logical
+pixels, `--demo --interactive --compact --page=member-tags`, default bottom
+position. After eight seconds of warmup, twenty approximately one-second samples
+measure process CPU time deltas and `WorkingSet64`; settled working set is the
+last five samples' median. No builds run during sampling. Observed `conhost.exe`
+children are excluded from these process-only measurements. This single launch
+pair includes five nonzero CPU intervals after and one before; it does not
+separate layout cost from input, allocator or driver variation. No performance
+improvement or causal regression is established. Full-frame p95, startup peaks,
+GPU memory and live traffic remain unmeasured.
+
+Both standard voice-inclusive packages pass `cargo xtask package` with normal
+fat LTO and no demo feature (213 installed files each). ZIPs use
+`ZipFile.CreateFromDirectory`, `CompressionLevel.Optimal`, without a base-directory
+entry. These packages precede this evidence-only documentation appendix. NSIS is
+unavailable locally, so the optional Windows installer binary is not generated.
+
+The committed captures use the same scene with `--scroll=-1200`, wide dark and
+narrow light, and show aligned compact timestamp/author/body text. They are actual
+native WGPU framebuffer exports, not OS screenshots or native-input proof; the
+Computer Use helper cannot connect to its native pipe (`os error 2`). Workspace
+tests (1,153 passed, 27 ignored), strict Clippy, policy and production checks pass.
+`cargo xtask check` remains blocked by pre-existing formatting in
+`crates/discord-api/src/forum.rs`, reproduced on the untouched baseline. Linux,
+macOS and live Discord behavior remain unverified locally.
