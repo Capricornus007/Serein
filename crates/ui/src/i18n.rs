@@ -22,6 +22,10 @@ static JAPANESE: LazyLock<LanguageIdentifier> = LazyLock::new(|| "ja".parse().un
 static POLISH: LazyLock<LanguageIdentifier> = LazyLock::new(|| "pl".parse().unwrap());
 static ITALIAN: LazyLock<LanguageIdentifier> = LazyLock::new(|| "it".parse().unwrap());
 static CZECH: LazyLock<LanguageIdentifier> = LazyLock::new(|| "cs".parse().unwrap());
+static CHINESE_TRADITIONAL: LazyLock<LanguageIdentifier> =
+	LazyLock::new(|| "zh-TW".parse().unwrap());
+static CHINESE_SIMPLIFIED: LazyLock<LanguageIdentifier> =
+	LazyLock::new(|| "zh-CN".parse().unwrap());
 static SYSTEM: LazyLock<Language> =
 	LazyLock::new(|| language_from_tag(sys_locale::get_locale().as_deref().unwrap_or("en-US")));
 static CURRENT: AtomicU8 = AtomicU8::new(Language::System as u8);
@@ -50,10 +54,12 @@ pub enum Language {
 	Polish,
 	Italian,
 	Czech,
+	ChineseTraditional,
+	ChineseSimplified,
 }
 
 impl Language {
-	pub const ALL: [Self; 12] = [
+	pub const ALL: [Self; 14] = [
 		Self::System,
 		Self::English,
 		Self::Spanish,
@@ -66,6 +72,8 @@ impl Language {
 		Self::Polish,
 		Self::Italian,
 		Self::Czech,
+		Self::ChineseTraditional,
+		Self::ChineseSimplified,
 	];
 
 	pub fn from_preference(value: Option<&str>) -> Self {
@@ -81,6 +89,8 @@ impl Language {
 			Some("pl") => Self::Polish,
 			Some("it") => Self::Italian,
 			Some("cs") => Self::Czech,
+			Some("zh-TW") => Self::ChineseTraditional,
+			Some("zh-CN") => Self::ChineseSimplified,
 			_ => Self::System,
 		}
 	}
@@ -99,6 +109,8 @@ impl Language {
 			Self::Polish => Some("pl"),
 			Self::Italian => Some("it"),
 			Self::Czech => Some("cs"),
+			Self::ChineseTraditional => Some("zh-TW"),
+			Self::ChineseSimplified => Some("zh-CN"),
 		}
 	}
 
@@ -147,6 +159,8 @@ impl Language {
 			Self::Polish => "Polski".into(),
 			Self::Italian => "Italiano".into(),
 			Self::Czech => "Čeština".into(),
+			Self::ChineseTraditional => "\u{7e41}\u{9ad4}\u{4e2d}\u{6587}".into(),
+			Self::ChineseSimplified => "\u{7b80}\u{4f53}\u{4e2d}\u{6587}".into(),
 		}
 	}
 
@@ -169,6 +183,8 @@ impl Language {
 			Self::Polish => include_str!("../locales/pl/main.ftl"),
 			Self::Italian => include_str!("../locales/it/main.ftl"),
 			Self::Czech => include_str!("../locales/cs/main.ftl"),
+			Self::ChineseTraditional => include_str!("../locales/zh-TW/main.ftl"),
+			Self::ChineseSimplified => include_str!("../locales/zh-CN/main.ftl"),
 			_ => include_str!("../locales/en-US/main.ftl"),
 		}
 	}
@@ -223,6 +239,8 @@ impl Language {
 			Self::Polish => &POLISH,
 			Self::Italian => &ITALIAN,
 			Self::Czech => &CZECH,
+			Self::ChineseTraditional => &CHINESE_TRADITIONAL,
+			Self::ChineseSimplified => &CHINESE_SIMPLIFIED,
 			_ => &ENGLISH,
 		}
 	}
@@ -263,13 +281,25 @@ fn current() -> Language {
 }
 
 fn language_from_tag(tag: &str) -> Language {
-	match tag
-		.split(['-', '_'])
+	// 中文的兩個變體要靠 script/region 子標區分，所以中文這條先看完整 tag；
+	// 其他語系維持原本「只看主語系子標」的行為（es-MX→es、pt-PT→pt、zh_TW.UTF-8 先去掉編碼）。
+	let normalized = tag
+		.split('.')
 		.next()
 		.unwrap_or_default()
 		.to_ascii_lowercase()
-		.as_str()
-	{
+		.replace('_', "-");
+	if let Some(suffix) = normalized.strip_prefix("zh-") {
+		let region = suffix.rsplit('-').next().unwrap_or_default();
+		return if suffix.contains("hant") || matches!(region, "tw" | "hk" | "mo") {
+			Language::ChineseTraditional
+		} else {
+			Language::ChineseSimplified
+		};
+	} else if normalized == "zh" {
+		return Language::ChineseSimplified;
+	}
+	match normalized.split('-').next().unwrap_or_default() {
 		"es" => Language::Spanish,
 		"fr" => Language::French,
 		"de" => Language::German,
@@ -296,6 +326,19 @@ mod tests {
 		assert_eq!(language_from_tag("pt-PT"), Language::PortugueseBrazil);
 		assert_eq!(language_from_tag("de-DE"), Language::German);
 		assert_eq!(language_from_tag("ko-KR"), Language::English);
+		assert_eq!(language_from_tag("zh-TW"), Language::ChineseTraditional);
+		assert_eq!(
+			language_from_tag("zh_TW.UTF-8"),
+			Language::ChineseTraditional
+		);
+		assert_eq!(language_from_tag("zh-Hant"), Language::ChineseTraditional);
+		assert_eq!(language_from_tag("zh-HK"), Language::ChineseTraditional);
+		assert_eq!(language_from_tag("zh-CN"), Language::ChineseSimplified);
+		assert_eq!(language_from_tag("zh"), Language::ChineseSimplified);
+		assert_eq!(
+			language_from_tag("zh_SG.UTF-8"),
+			Language::ChineseSimplified
+		);
 		for language in Language::ALL
 			.into_iter()
 			.filter(|language| !matches!(language, Language::System | Language::English))
@@ -305,6 +348,13 @@ mod tests {
 		}
 		assert_eq!(Language::Czech.text("page-general"), "Obecné");
 		assert_eq!(Language::Japanese.text("page-general"), "一般的な");
+		assert_eq!(Language::ChineseTraditional.text("page-general"), "一般");
+		assert_eq!(Language::ChineseSimplified.text("page-general"), "一般");
+		assert_eq!(
+			Language::ChineseTraditional.text("page-voice"),
+			"語音及視訊"
+		);
+		assert_eq!(Language::ChineseSimplified.text("page-voice"), "语音及视频");
 		assert_eq!(
 			Language::Czech.text("message-menu-copy"),
 			"Kopírovat zprávu"
