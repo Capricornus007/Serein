@@ -714,6 +714,18 @@ impl State {
 				|| (!emoji.animated
 					&& self.channel(channel).and_then(|target| target.guild) == Some(source)))
 	}
+	/// Any Nitro tier allows animated emoji and emoji from other servers; without one, only
+	/// the conversation's own server's static emoji are native. Entitlement is Discord's call.
+	pub fn custom_emoji_requires_nitro(
+		&self,
+		channel: Id,
+		source: Id,
+		emoji: &CustomEmoji,
+	) -> bool {
+		self.premium_type == 0
+			&& (emoji.animated
+				|| self.channel(channel).and_then(|target| target.guild) != Some(source))
+	}
 	/// Local eligibility for an emoji borrowed from `source`'s catalog. Discord still
 	/// decides account entitlements, including Nitro; this is not a send guarantee.
 	pub fn custom_emoji_unavailable_reason(

@@ -79,6 +79,29 @@ const SIGN_IN_HEADER_HEIGHT: f32 = if cfg!(target_os = "windows") {
 fn main() -> eframe::Result {
 	#[cfg(all(debug_assertions, feature = "demo"))]
 	if std::env::args().any(|arg| arg == "--demo")
+		&& std::env::args().any(|arg| arg == "--demo-check-pr565")
+	{
+		ui::debug_pr565(
+			test_support::demo_state(),
+			test_support::message(1, model::Id(20)).author,
+		);
+		avatars::debug_profile_resolution_check();
+		ui::MessagingUi::debug_call_membership_check(test_support::call_demo_state());
+		let runtime = tokio::runtime::Builder::new_current_thread()
+			.enable_all()
+			.build()
+			.unwrap();
+		uploads::debug_reservation_check(runtime.handle());
+		discord_gateway::debug_voice_state_retry_check();
+		ui::MessagingUi::debug_double_click_reaction_check(
+			test_support::demo_state(),
+			test_support::message(60_000 << 22, model::Id(20)),
+		);
+		local_store::LocalStore::debug_double_click_reaction_check();
+		return Ok(());
+	}
+	#[cfg(all(debug_assertions, feature = "demo"))]
+	if std::env::args().any(|arg| arg == "--demo")
 		&& std::env::args().any(|arg| arg == "--demo-check-window-geometry")
 	{
 		app_settings::debug_window_geometry_check();
@@ -6025,39 +6048,16 @@ impl eframe::App for Desktop {
 				.messaging
 				.voice_toggle_pressed(ctx, self.hotkeys.global_toggle_mask());
 		if voice_toggles != 0 && !self.fixture_only {
-			let mut muted = self.messaging.voice_muted;
-			let mut deafened = self.messaging.voice_deafened;
-			let mut mic_toggled = false;
-			let mut deaf_toggled = false;
+			// Toggle from the newest choice; a mute and deafen in one frame apply in order.
+			let mut latest = None;
 			if voice_toggles & 1 != 0 {
-				muted = !muted;
-				mic_toggled = true;
+				latest = Some(self.messaging.toggle_voice(false));
 			}
 			if voice_toggles & 2 != 0 {
-				deafened = !deafened;
-				deaf_toggled = true;
+				latest = Some(self.messaging.toggle_voice(true));
 			}
-			self.messaging.voice_muted = muted;
-			self.messaging.voice_deafened = deafened;
-			if deaf_toggled {
-				let cue = if deafened {
-					model::notification_preferences::Sound::Deafen
-				} else {
-					model::notification_preferences::Sound::Undeafen
-				};
-				if self.messaging.notification_options.allows(cue) {
-					self.messaging.notification_preview = Some(cue);
-				}
-			} else if mic_toggled {
-				let cue = if muted {
-					model::notification_preferences::Sound::Mute
-				} else {
-					model::notification_preferences::Sound::Unmute
-				};
-				if self.messaging.notification_options.allows(cue) {
-					self.messaging.notification_preview = Some(cue);
-				}
-			}
+			let (muted, deafened) =
+				latest.unwrap_or((self.messaging.voice_muted, self.messaging.voice_deafened));
 			if self.state.auth == AuthState::Authenticated
 				&& let Some(command) = self.state.set_call_mute(muted, deafened)
 				&& !self.state.demo
@@ -6417,6 +6417,8 @@ impl eframe::App for Desktop {
 			self.messaging.external_upload.complete(result);
 		}
 		self.messaging.upload_busy = self.uploads.busy() || self.clipboard.is_some();
+		self.messaging.attach_busy = !self.uploads.accepting();
+		self.messaging.attachment_loading = self.uploads.loading();
 		if let Some(notice) = self.uploads.take_notice() {
 			self.messaging.toasts.push(ui::design::Level::Error, notice);
 		}
@@ -6786,7 +6788,8 @@ impl eframe::App for Desktop {
 				self.messaging.attachment_previews.clear();
 			}
 			if std::mem::take(&mut self.messaging.cancel_upload_requested) {
-				self.uploads.cancel();
+				// The timeline row cancels its own upload, not files loading for the next message.
+				self.uploads.cancel_transfer();
 			}
 			if let Some((generation, channel, assets, draft)) =
 				self.messaging.image_share_requested.take()

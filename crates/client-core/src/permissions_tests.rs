@@ -477,6 +477,25 @@ fn cross_server_emoji_checks_destination_and_known_source_roles() {
 		state.custom_emoji_unavailable_reason(Id(20), local.id, local_emoji),
 		None
 	);
+	// Without Nitro only the conversation's own server's static emoji are native.
+	let local = local.id;
+	let local_emoji = model::CustomEmoji {
+		animated: false,
+		..local_emoji.clone()
+	};
+	let animated = model::CustomEmoji {
+		animated: true,
+		..local_emoji.clone()
+	};
+	assert!(!state.custom_emoji_requires_nitro(Id(20), local, &local_emoji));
+	assert!(state.custom_emoji_requires_nitro(Id(20), local, &animated));
+	assert!(state.custom_emoji_requires_nitro(Id(41), Id(40), &emoji));
+	for premium_type in [1, 2, 3] {
+		state.premium_type = premium_type;
+		assert!(!state.custom_emoji_requires_nitro(Id(20), local, &animated));
+		assert!(!state.custom_emoji_requires_nitro(Id(41), Id(40), &emoji));
+	}
+	state.premium_type = 0;
 	permission(
 		&mut state,
 		PermissionEvent::Channel {
