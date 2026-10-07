@@ -441,6 +441,31 @@ impl State {
 			.get(&guild)
 			.and_then(|guild| guild.roles.as_deref())
 	}
+	/// Prefer current member assignments over the fetched profile, including role removals.
+	pub fn profile_role_ids<'a>(&'a self, user: Id, member: &'a model::GuildProfile) -> &'a [Id] {
+		self.user
+			.as_ref()
+			.filter(|own| own.id == user)
+			.and_then(|_| self.permissions.guilds.get(&member.guild)?.member.as_ref())
+			.map(|own| own.roles.as_slice())
+			.or_else(|| {
+				self.selected
+					.and_then(|channel| self.live_member_roles(member.guild, channel, user))
+			})
+			.unwrap_or(&member.roles)
+	}
+	pub fn profile_name_colors(
+		&self,
+		user: &model::User,
+		member: &model::GuildProfile,
+	) -> Option<model::server_roles::Colors> {
+		if user.webhook {
+			return None;
+		}
+		self.display_roles(member.guild, self.profile_role_ids(user.id, member))
+			.1
+			.map(p::Role::colors)
+	}
 	pub fn message_author_color(&self, message: &model::Message) -> Option<u32> {
 		self.message_author_colors(message)
 			.map(|colors| colors.primary)
@@ -486,6 +511,10 @@ impl State {
 		self.display_roles(guild, roles).1.map(p::Role::colors)
 	}
 	fn live_author_roles(&self, guild: Id, channel: Id, user: Id) -> Option<&[Id]> {
+		self.live_member_roles(guild, channel, user)
+			.filter(|roles| !roles.is_empty())
+	}
+	fn live_member_roles(&self, guild: Id, channel: Id, user: Id) -> Option<&[Id]> {
 		let member = self
 			.members
 			.as_ref()
@@ -507,7 +536,7 @@ impl State {
 					.filter(|request| request.guild == guild && request.channel == channel)?;
 				view.rows.iter().find(|member| member.user.id == user)
 			})?;
-		(!member.roles.is_empty()).then_some(member.roles.as_slice())
+		Some(member.roles.as_slice())
 	}
 	fn display_roles(
 		&self,

@@ -31,11 +31,24 @@ pub(crate) fn galley(
 				continue;
 			}
 			let start = glyph.first_vertex as usize;
-			for vertex in &mut row.visuals.mesh.vertices[start..start + 4] {
-				let at = ((placed.pos.x + vertex.pos.x - bounds.left()) / bounds.width().max(1.0))
-					.clamp(0.0, 1.0);
-				vertex.color =
-					crate::design::role_name_color(interpolate(colors, at), background, fallback);
+			let vertices = &mut row.visuals.mesh.vertices[start..start + 4];
+			for index in 0..vertices.len() {
+				let x = vertices[index].pos.x;
+				// A glyph's top/bottom vertices share x; reuse their exact adjusted color.
+				let color = vertices[..index]
+					.iter()
+					.find(|vertex| vertex.pos.x == x)
+					.map(|vertex| vertex.color)
+					.unwrap_or_else(|| {
+						let at = ((placed.pos.x + x - bounds.left()) / bounds.width().max(1.0))
+							.clamp(0.0, 1.0);
+						crate::design::role_name_color(
+							interpolate(colors, at),
+							background,
+							fallback,
+						)
+					});
+				vertices[index].color = color;
 			}
 		}
 	}

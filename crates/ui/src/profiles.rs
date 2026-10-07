@@ -1745,10 +1745,11 @@ fn role_chips(
 	let Some(roles) = state.guild_roles(guild.guild) else {
 		return;
 	};
+	let assigned = state.profile_role_ids(user, guild);
 	let roles: Vec<_> = roles
 		.iter()
 		.rev()
-		.filter(|role| role.id != guild.guild && guild.roles.contains(&role.id))
+		.filter(|role| role.id != guild.guild && assigned.contains(&role.id))
 		.collect();
 	let max_width = ui.available_width();
 	let widths: Vec<_> = roles
@@ -3027,19 +3028,8 @@ pub fn show_with_session(
 							.unwrap_or_else(|| state.user_display_name(user));
 						let display = display.split_whitespace().collect::<Vec<_>>().join(" ");
 						let role_colors = data
-							.filter(|_| !user.webhook)
 							.and_then(|data| data.guild.as_ref())
-							.and_then(|member| {
-								state
-									.guild_roles(member.guild)?
-									.iter()
-									.filter(|role| {
-										role.id != member.guild
-											&& role.color != 0 && member.roles.contains(&role.id)
-									})
-									.max_by(|a, b| a.cmp_hierarchy(b))
-									.map(|role| role.colors())
-							});
+							.and_then(|member| state.profile_name_colors(user, member));
 						// Ordinary user payloads already carry the server identity. Keep it visible
 						// while the extended profile loads or when that optional request fails.
 						let clan = data

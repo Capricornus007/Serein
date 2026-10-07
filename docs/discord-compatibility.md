@@ -1186,6 +1186,8 @@ member names, profile names and role labels render static two-stop gradients or 
 holographic colors. Equal positions favor the lower role ID, consistent with
 [discord.py role comparison](https://github.com/Rapptz/discord.py/blob/master/discord/role.py).
 Names retain hue when readable; the theme adjusts insufficient contrast, including hover.
+Profile name colors and role chips prefer current self/member assignments, including empty
+assignments, and fall back to fetched profile roles when current membership is unavailable.
 Gradients color shaped glyph vertices without splitting Unicode text or recoloring color
 emoji. Inline mention pills and composer mention previews retain their primary color.
 `--features demo -- --demo --demo-chat --demo-role-gradients` enables synthetic gradients;
