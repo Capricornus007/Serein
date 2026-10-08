@@ -3874,7 +3874,8 @@ impl Event {
 					result: Ok(None),
 					..
 				}) | Event::UserAction(user_actions::Event::Written {
-				action: user_actions::Action::CloseDm(_),
+				action: user_actions::Action::CloseDm(_)
+					| user_actions::Action::MessageRequest { accept: false, .. },
 				result: Ok(()),
 				..
 			}) | Event::ServerAction(server_actions::Event::Written {
