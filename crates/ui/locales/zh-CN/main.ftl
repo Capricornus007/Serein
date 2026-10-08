@@ -3504,7 +3504,7 @@ settings-chat-settings-emoji = 表情符号
 settings-chat-settings-suggest-nitro-emojis = 建议需要 Nitro 的表情符号
 
 # Context: chat_settings
-settings-chat-settings-suggest-nitro-emojis-description = 没有 Nitro 也在 : 建议与选择器中提供动态及其他服务器的表情符号。关闭时会从建议中隐藏，并在选择器中显示为锁定。
+settings-chat-settings-suggest-nitro-emojis-description = 即使没有 Nitro，也在建议与选择器中提供动态及其他服务器的表情符号。关闭时会从建议中隐藏，并在选择器中显示为锁定。
 
 # Context: close_control
 settings-close-control-close-settings-esc = 关闭设置（Esc）
@@ -4589,12 +4589,12 @@ settings-convert-emoticons = 自动把消息中的颜文字转成表情符号
 
 settings-convert-emoticons-description = 发送或编辑消息时，把 :) 这类独立颜文字转成 🙂。代码和链接不变。
 
-profiles-board = Board
-profiles-board-unavailable = This profile’s board is unavailable.
-profiles-board-empty = No games on this board yet.
-profiles-board-show-more = Show more
-profiles-board-show-less = Show less
+profiles-board = 看板
+profiles-board-unavailable = 这个个人资料的看板无法使用。
+profiles-board-empty = 这个看板目前还没有游戏。
+profiles-board-show-more = 查看更多
+profiles-board-show-less = 收起
 profiles-activity-empty = 暂无共享活动。
-profiles-mutuals-empty = Nothing to show here.
+profiles-mutuals-empty = 这里没有可显示的内容。
 
-reading-double-click-reaction = Double-click reaction
+reading-double-click-reaction = 双击回应
