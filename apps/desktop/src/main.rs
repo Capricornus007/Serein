@@ -6296,7 +6296,9 @@ impl eframe::App for Desktop {
 		}
 		self.sync_tray(ctx);
 		if self.state.voice.active.is_some() {
-			ctx.request_repaint_after(std::time::Duration::from_millis(50));
+			// Speaking, notices, remote video, devices, hotkeys and deadlines each wake the UI
+			// themselves; this heartbeat only bounds a missed wake, so a call does not repaint at 20 Hz.
+			ctx.request_repaint_after(std::time::Duration::from_secs(1));
 		}
 	}
 	fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
@@ -7064,6 +7066,10 @@ impl eframe::App for Desktop {
 				{
 					self.messaging.accept_avatar(&ctx, key, None);
 				}
+			}
+			// Idle frames are freed on a pass, so an otherwise idle window wakes once for them.
+			if let Some(at) = self.messaging.avatar_release_at() {
+				ctx.request_repaint_after(at.saturating_duration_since(std::time::Instant::now()));
 			}
 			if std::mem::take(&mut self.messaging.reconnect_requested) {
 				if self.state.auth == AuthState::Authenticated {
