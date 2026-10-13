@@ -5910,7 +5910,7 @@ impl Desktop {
 				}
 			}
 			if let Some(error) = voice_failure
-				&& let Some(command) = self.voice.fail(&mut self.state, error)
+				&& let Some(command) = self.voice.fail_or_rejoin(&mut self.state, error)
 			{
 				self.command(command);
 			}
