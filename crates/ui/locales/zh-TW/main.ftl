@@ -4191,6 +4191,10 @@ voice-voice-card-section-disconnect = 中斷連線
 # Context: voice_card_section
 voice-voice-card-section-dismiss-call = 關閉通話
 # Context: voice_card_section
+voice-voice-card-section-reconnect-attempt = { $reason } · 第 { $attempt } 次嘗試，共 { $total } 次
+# Context: voice_card_section
+voice-voice-card-section-reconnecting = 正在重新連線…
+# Context: voice_card_section
 voice-voice-card-section-microphone-unavailable-a-still-connected-choose-another-input-in-audio = 麥克風無法使用 · 仍連線中。請在音訊設定改選其他輸入。
 # Context: voice_channel_button
 voice-voice-channel-button-connected = ，已連線

@@ -4159,6 +4159,10 @@ voice-voice-card-section-disconnect = Desconectar
 # Context: voice_card_section
 voice-voice-card-section-dismiss-call = Dispensar chamada
 # Context: voice_card_section
+voice-voice-card-section-reconnect-attempt = { $reason } · tentativa { $attempt } de { $total }
+# Context: voice_card_section
+voice-voice-card-section-reconnecting = Reconectando…
+# Context: voice_card_section
 voice-voice-card-section-microphone-unavailable-a-still-connected-choose-another-input-in-audio = Microfone indisponível · ainda conectado. Escolha outra entrada nas configurações de áudio.
 # Context: voice_channel_button
 voice-voice-channel-button-connected = , conectado

@@ -4159,6 +4159,10 @@ voice-voice-card-section-disconnect = Trennen
 # Context: voice_card_section
 voice-voice-card-section-dismiss-call = Anruf ablehnen
 # Context: voice_card_section
+voice-voice-card-section-reconnect-attempt = { $reason } · Versuch { $attempt } von { $total }
+# Context: voice_card_section
+voice-voice-card-section-reconnecting = Verbindung wird wiederhergestellt…
+# Context: voice_card_section
 voice-voice-card-section-microphone-unavailable-a-still-connected-choose-another-input-in-audio = Mikrofon nicht verfügbar · immer noch angeschlossen. Wählen Sie in den Audioeinstellungen einen anderen Eingang.
 # Context: voice_channel_button
 voice-voice-channel-button-connected = , verbunden

@@ -4153,6 +4153,10 @@ voice-voice-card-section-disconnect = Bağlantıyı kes
 # Context: voice_card_section
 voice-voice-card-section-dismiss-call = Aramayı reddet
 # Context: voice_card_section
+voice-voice-card-section-reconnect-attempt = { $reason } · deneme { $attempt }/{ $total }
+# Context: voice_card_section
+voice-voice-card-section-reconnecting = Yeniden bağlanılıyor…
+# Context: voice_card_section
 voice-voice-card-section-microphone-unavailable-a-still-connected-choose-another-input-in-audio = Mikrofon kullanılamıyor · hala bağlı. Ses ayarlarında başka bir giriş seçin.
 # Context: voice_channel_button
 voice-voice-channel-button-connected = , bağlı

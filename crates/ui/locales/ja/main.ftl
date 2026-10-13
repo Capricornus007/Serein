@@ -4153,6 +4153,10 @@ voice-voice-card-section-disconnect = 切断する
 # Context: voice_card_section
 voice-voice-card-section-dismiss-call = 通話を終了する
 # Context: voice_card_section
+voice-voice-card-section-reconnect-attempt = { $reason } · 再試行 { $attempt }/{ $total }
+# Context: voice_card_section
+voice-voice-card-section-reconnecting = 再接続中…
+# Context: voice_card_section
 voice-voice-card-section-microphone-unavailable-a-still-connected-choose-another-input-in-audio = マイクが使用できません · 接続されたままです。オーディオ設定で別の入力を選択します。
 # Context: voice_channel_button
 voice-voice-channel-button-connected = 、接続されています

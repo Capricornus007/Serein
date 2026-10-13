@@ -293,6 +293,28 @@ struct CameraTest {
 	picture: Arc<std::sync::Mutex<CameraPicture>>,
 }
 
+/// Waits before each automatic rejoin after joined media dropped, like Discord's client.
+/// Once these are spent the call fails and needs an explicit rejoin.
+const REJOIN_DELAYS: [Duration; voice::MAX_REJOIN_ATTEMPTS as usize] = [
+	Duration::from_secs(1),
+	Duration::from_secs(3),
+	Duration::from_secs(10),
+];
+/// A rejoined call must stay connected this long before a new drop starts from attempt one.
+const REJOIN_STABLE: Duration = Duration::from_secs(30);
+
+struct Rejoin {
+	generation: u64,
+	channel: Id,
+	attempt: u8,
+	/// When the next attempt sends its join; `None` while that attempt is negotiating.
+	at: Option<Instant>,
+	/// When the rejoined call connected.
+	recovered: Option<Instant>,
+	/// The camera was on when media dropped; it comes back with the call.
+	camera: bool,
+}
+
 #[derive(Default)]
 pub struct Voice {
 	camera_test: Option<CameraTest>,
@@ -310,6 +332,9 @@ pub struct Voice {
 	camera_scan: Option<mpsc::Receiver<Result<discord_voice::camera::DeviceList, &'static str>>>,
 	/// Remote camera textures behind `ui.voice_remote_video`, by user.
 	remote_textures: Vec<(Id, crate::gpu_video::VideoTexture)>,
+	/// A joined call failed; the next poll plays the leave cue a hangup would.
+	leave_cue: bool,
+	rejoin: Option<Rejoin>,
 }
 impl Voice {
 	pub fn stop(&mut self) {
@@ -591,6 +616,10 @@ impl Voice {
 		let call = state.voice.active.as_ref()?;
 		let (channel, request) = (call.channel, call.request);
 		let command = self.end_control(channel, request);
+		self.leave_cue |= self
+			.live
+			.as_ref()
+			.is_some_and(|live| live.cues.joined && live.generation == state.generation);
 		self.stop();
 		state.apply_voice(voice::Event::Failed {
 			channel,
@@ -598,6 +627,110 @@ impl Voice {
 			message,
 		});
 		Some(command)
+	}
+	/// Media for the active call failed. A call this device had joined rejoins automatically
+	/// within the attempt budget; anything else fails as before.
+	fn fail_or_rejoin(&mut self, state: &mut State, message: &'static str) -> Option<Command> {
+		let call = state.voice.active.as_ref()?;
+		let (channel, request, camera) = (call.channel, call.request, call.camera);
+		let joined = self.live.as_ref().is_some_and(|live| {
+			live.cues.joined && live.generation == state.generation && live.channel == channel
+		});
+		let previous = self
+			.rejoin
+			.take()
+			.filter(|rejoin| rejoin.generation == state.generation && rejoin.channel == channel);
+		let attempt = match &previous {
+			Some(rejoin) => rejoin.attempt + 1,
+			None if joined => 1,
+			None => return self.fail(state, message),
+		};
+		if message == discord_voice::DISCONNECTED_BY_DISCORD
+			|| usize::from(attempt) > REJOIN_DELAYS.len()
+		{
+			return self.give_up(state, message);
+		}
+		self.leave_cue |= joined;
+		self.stop();
+		self.rejoin = Some(Rejoin {
+			generation: state.generation,
+			channel,
+			attempt,
+			at: Some(Instant::now() + REJOIN_DELAYS[usize::from(attempt) - 1]),
+			recovered: None,
+			camera: camera || previous.is_some_and(|rejoin| rejoin.camera),
+		});
+		// Discord keeps this account in the channel meanwhile; the next join replaces it.
+		state.reconnect_call(request, attempt, message);
+		None
+	}
+	/// Rejoining is over: fail the call and leave the channel Discord still has it in.
+	fn give_up(&mut self, state: &mut State, message: &'static str) -> Option<Command> {
+		let rejoining = self.rejoin.take().is_some()
+			|| state
+				.voice
+				.active
+				.as_ref()
+				.is_some_and(|call| call.reconnecting.is_some());
+		let (channel, request) = state
+			.voice
+			.active
+			.as_ref()
+			.map(|call| (call.channel, call.request))?;
+		let command = self.fail(state, message);
+		if rejoining {
+			Some(Command::Voice(voice::Command::Leave { channel, request }))
+		} else {
+			command
+		}
+	}
+	/// Drive a pending automatic rejoin; returns its join or a restored camera.
+	fn poll_rejoin(
+		&mut self,
+		state: &mut State,
+		ui: &ui::MessagingUi,
+		ctx: &egui::Context,
+	) -> Option<Command> {
+		let rejoin = self.rejoin.as_mut()?;
+		let Some(call) = state.voice.active.as_ref().filter(|call| {
+			rejoin.generation == state.generation
+				&& call.channel == rejoin.channel
+				&& call.phase != Phase::Failed
+		}) else {
+			// Hung up, moved, replaced or signed out: nothing to rejoin.
+			self.rejoin = None;
+			return None;
+		};
+		if call.reconnecting.is_none() {
+			let recovered = *rejoin.recovered.get_or_insert_with(Instant::now);
+			if rejoin.camera && ui.voice_camera_available {
+				rejoin.camera = false;
+				return state.set_call_camera(true);
+			}
+			if recovered.elapsed() >= REJOIN_STABLE {
+				self.rejoin = None;
+			} else {
+				ctx.request_repaint_after(REJOIN_STABLE - recovered.elapsed());
+			}
+			return None;
+		}
+		let at = rejoin.at?;
+		let now = Instant::now();
+		if now < at || self.retiring.is_some() || !state.gateway_connected {
+			ctx.request_repaint_after(
+				at.saturating_duration_since(now)
+					.max(Duration::from_millis(50)),
+			);
+			return None;
+		}
+		rejoin.at = None;
+		match state.rejoin_call() {
+			Some(command) => Some(command),
+			None => self.give_up(
+				state,
+				"Voice reconnect is no longer allowed in this channel",
+			),
+		}
 	}
 	pub fn poll(
 		&mut self,
@@ -607,6 +740,13 @@ impl Voice {
 		ctx: &egui::Context,
 	) -> Option<Command> {
 		self.reap();
+		if std::mem::take(&mut self.leave_cue) && ui.notification_options.allows(Sound::UserLeave) {
+			ui.notification_preview = Some(Sound::UserLeave);
+			ctx.request_repaint();
+		}
+		if let Some(command) = self.poll_rejoin(state, ui, ctx) {
+			return Some(command);
+		}
 		ui.voice_switch_ready =
 			self.pending.is_none() && self.live.is_none() && self.retiring.is_none();
 		self.poll_mic_preview(state, ui, ctx);
@@ -706,7 +846,7 @@ impl Voice {
 				.and_then(|live| live.negotiation.as_ref())
 		}) {
 			if pending.started.elapsed() >= Duration::from_secs(30) {
-				return self.fail(
+				return self.fail_or_rejoin(
                     state,
                     "Discord did not provide voice connection details; check Connect permission and channel capacity",
                 );
@@ -733,7 +873,7 @@ impl Voice {
 			if let Err(error) =
 				self.start_media(runtime, pending, ui, ctx, listen_only, input_enabled)
 			{
-				return self.fail(state, error);
+				return self.fail_or_rejoin(state, error);
 			}
 		}
 		if self.pending.is_some() && self.retiring.is_some() {
@@ -1009,7 +1149,7 @@ impl Voice {
 			return None;
 		}
 		let command = if let Some(error) = failure {
-			self.fail(state, error)
+			self.fail_or_rejoin(state, error)
 		} else {
 			command.or_else(|| self.poll_camera(state, ui, ctx))
 		};
