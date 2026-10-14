@@ -430,7 +430,12 @@ Thread mute durations and notification levels use the unofficial
 `PATCH /channels/{id}/thread-members/@me/settings` route for followed posts.
 One bounded, session-only details snapshot is loaded on demand. Archived cards
 reuse the existing single transient channel admission without selecting the post.
-The fast-pass debug check is synthetic; live interoperability remains unverified.
+
+Rename completion accepts an already observed matching name without restoring mutable
+thread details from the REST response. A concurrent update may also change lock/archive
+state, so the next menu opening reloads those details. The single retained owner ID still
+requires current View Channel access before enabling edits. Synthetic regressions cover
+rename echoes, a later conflicting name and revoked access; live behavior remains unverified.
 
 ## Group DM calling — September 15, 2026
 

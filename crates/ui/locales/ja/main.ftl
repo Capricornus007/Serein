@@ -4715,6 +4715,8 @@ timeline-dm-intro = { $name } とのダイレクトメッセージ履歴の始�
 timeline-channel-intro-title = #{ $channel } へようこそ！
 # Context: timeline_channel_intro
 timeline-channel-intro-start = #{ $channel } チャンネルの始まりです。
+post-menu-post-action-failed = 投稿の操作に失敗しました
+post-menu-thread-action-failed = スレッドの操作に失敗しました
 
 # Context: badges
 badges-nitro = Nitro

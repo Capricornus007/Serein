@@ -596,3 +596,34 @@ the new measurements and executable hash. NSIS remains unavailable; this is an
 unsigned directory and ZIP. Final serial workspace checking reached 1,158
 passes, eight recorded baseline UI failures and 23 ignored tests. Formatting,
 strict workspace Clippy and the independent policy check passed.
+
+## Post rename review repair (2026-10-14, PR #655)
+
+Fresh standard voice-inclusive packages compare pre-repair `74ff7038` with
+runtime repair `460d7117`; both include the same main integration (`c84b5998`).
+Environment: Windows 11 x64 build 26200, Ryzen 7 7800X3D, 32 GB RAM, pinned
+Rust 1.98.1. `cargo xtask package` builds without default, demo or developer
+features. NSIS is unavailable, so these are unsigned directory packages and
+ZIP archives, not installer validation.
+
+| Metric / method | Baseline | Repair | Delta |
+| --- | ---: | ---: | ---: |
+| serein.exe file length | 87,251,456 B | 87,251,456 B | 0 B |
+| Installed payload, 216 files | 91,444,745 B | 91,444,745 B | 0 B |
+| ZIP, sorted paths / DEFLATE level 9 | 50,287,594 B | 50,287,599 B | +5 B |
+| 100,000-event reducer replay, median of five | 68.47 ms | 66.50 ms | -1.98 ms / -2.89% |
+
+Each replay executable was built once and verified through `cargo replay`,
+then run directly with one warmup and five measured samples. Both retain
+500 timeline records / 393,492..393,977 estimated bytes. The timing ranges
+overlap (67.82..73.78 ms before, 64.52..70.47 ms after); this is not evidence
+of a speed improvement. The workload measures the general synthetic reducer,
+not rename-specific latency, process RSS, UI frame timing or live compatibility.
+
+The repair retains existing bounded state and adds no dependency or cache.
+Regressions cover revoked access, rename echoes with invalidated mutable details,
+a fresh post-details reload and a later conflicting name. Full local
+`cargo xtask check` and separate fuzz formatting passed. Native GUI capture
+and owner-controlled live validation remain unavailable/unverified.
+Raw samples, source revisions and executable hashes are in
+[measurements.json](pr-evidence/post-rename-review/measurements.json).

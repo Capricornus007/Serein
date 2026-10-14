@@ -4729,6 +4729,8 @@ timeline-dm-intro = Este é o começo do seu histórico de mensagens diretas com
 timeline-channel-intro-title = Boas-vindas a #{ $channel }!
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Este é o começo do canal #{ $channel }.
+post-menu-post-action-failed = A ação da publicação falhou
+post-menu-thread-action-failed = A ação do tópico falhou
 
 # Context: badges
 badges-nitro = Nitro
