@@ -4735,3 +4735,5 @@ timeline-dm-intro = Это начало истории ваших личных �
 timeline-channel-intro-title = Добро пожаловать в #{ $channel }!
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Это начало канала #{ $channel }.
+profiles-status-edit = Изменить статус
+profiles-status-clear = Очистить статус

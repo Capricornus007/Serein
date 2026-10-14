@@ -5157,6 +5157,9 @@ impl MessagingUi {
 			{
 				commands.push(command);
 			}
+			self.profile
+				.own_status
+				.clone_from(&self.own_presence.custom_status);
 			let anchor = self.profile.anchor_or_place(&ctx, user.id);
 			self.profile.ingest_opener_rect(&ctx);
 			match profiles::show_with_session(
@@ -5248,6 +5251,8 @@ impl MessagingUi {
 						}
 					}
 				}
+				Some(profiles::Action::EditStatus) => self.open_custom_status_editor(),
+				Some(profiles::Action::ClearStatus) => self.clear_custom_status(),
 				Some(profiles::Action::Close) => {
 					self.profile.close_unless_armed(&ctx);
 				}

@@ -4715,3 +4715,5 @@ timeline-dm-intro = { $name } とのダイレクトメッセージ履歴の始�
 timeline-channel-intro-title = #{ $channel } へようこそ！
 # Context: timeline_channel_intro
 timeline-channel-intro-start = #{ $channel } チャンネルの始まりです。
+profiles-status-edit = ステータスを編集
+profiles-status-clear = ステータスを消去

@@ -4729,3 +4729,5 @@ timeline-dm-intro = Ceci est le début de votre historique de messages privés a
 timeline-channel-intro-title = Bienvenue dans #{ $channel } !
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Ceci est le début du salon #{ $channel }.
+profiles-status-edit = Modifier le statut
+profiles-status-clear = Effacer le statut
