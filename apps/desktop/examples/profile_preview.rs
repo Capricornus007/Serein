@@ -69,6 +69,12 @@ impl eframe::App for Preview {
 					slash_demo::respond(&mut self.state, request);
 					continue;
 				}
+				client_core::Command::BadgeSettings { request, settings } => {
+					client_core::Event::BadgeSettings {
+						request,
+						result: Ok(settings),
+					}
+				}
 				client_core::Command::ServerAdmin {
 					guild,
 					request,
@@ -942,8 +948,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						member(offline, "offline"),
 					],
 				});
+				let own = state.user.clone().expect("synthetic account");
 				if args.iter().any(|arg| arg == "--full") {
 					messaging.preview_full_profile(user);
+				} else if args.iter().any(|arg| arg == "--badge-directory") {
+					messaging.preview_badges(
+						own,
+						Some(model::badges::id::ACCOUNT_AGE),
+						egui::Pos2::ZERO,
+					);
+				} else if args.iter().any(|arg| arg == "--badge-customize") {
+					messaging.preview_badges(own, None, egui::pos2(1010.0, 330.0));
+				} else if args.iter().any(|arg| arg == "--own") {
+					messaging.preview_profile_popout(own);
 				} else {
 					messaging.preview_profile_popout(user);
 				}
