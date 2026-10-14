@@ -4,6 +4,64 @@ Recent synthetic/offline measurements are workload-specific. They do not establi
 performance, universal device results or application-wide memory bounds. The raw PR screenshot,
 log and per-run evidence archive has been removed; the summaries below retain the useful results.
 
+## Hover preload review repairs - October 14, 2026
+
+Compared the original PR #636 head `08a9ae01` with runtime repair `d4b27dd3`, which also
+integrates `main` at `cf5452cd`. This comparison does not isolate the five fixes from main changes.
+Both fresh unsigned Windows portable packages use Rust 1.98.1 and `cargo xtask package`
+(`--release --locked --no-default-features`, voice included), on Windows 11 Home 10.0.26200,
+Ryzen 7 7800X3D, 33,410,678,784 bytes visible RAM. Separate worktree `dist` outputs were
+preserved. Installed bytes sum all 216 files; ZIP uses Python deflate level 9 with sorted paths.
+The built release replay ran directly: one warmup and five measured runs of 100,000 events.
+
+| Metric / method | Original PR head | Review repair | Delta |
+| --- | ---: | ---: | ---: |
+| Package executable | 86,960,640 B | 87,321,088 B | +360,448 B (+0.41%) |
+| Installed tree (216 files) | 91,153,929 B | 91,514,377 B | +360,448 B (+0.40%) |
+| ZIP, deflate level 9 | 50,180,156 B | 50,312,732 B | +132,576 B (+0.26%) |
+| Reducer replay, median of 5 | 73.1705 ms | 68.7076 ms | -4.4629 ms (-6.1%) |
+| Retained timeline estimate | 393,492..393,977 B | 393,492..393,977 B | 0 |
+| Navigation revalidation requests, 10,000 reselections | 0 | 0 | 0 |
+| Hover first visits opened without waiting / requests | 12/12 / 12 | 12/12 / 12 | 0 |
+| 28-row hover sweep requests | 12 | 12 | 0 |
+
+The replay run ranges overlap (before 69.0651..76.5154 ms, after 66.9713..71.3841 ms); no speedup is claimed. Navigation retains 2 dormant windows / 150 rows / 328,148 estimated bytes on both revisions; the hover pass retains 8 windows / 983,809 estimated bytes. Core selection median/p95 is 300/300 ns on both, near timer resolution. These are bounded allocation estimates, not RSS.
+
+NSIS is unavailable, so no installer was produced. The existing OpenH264 linker debug-info
+warning appears in both builds. Native interaction capture and CPU/RSS sampling were unavailable
+(no native computer-use API, no `orca` executable). No live Discord or microphone test was used.
+The original feature screenshots are synthetic framebuffer exports, not native interaction proof.
+[Per-run outputs and executable hashes](pr-evidence/hover-preload/measurements-review.json)
+and [reproduction scenarios](pr-evidence/hover-preload/README.md) retain the evidence boundaries.
+
+## Hover preloading — October 13, 2026
+
+Release builds of baseline `2df8256c` (main) and the hover-preload branch with default features
+(voice included), Rust 1.98.1, Windows 11 (build 26200), Intel Core i9-13900K, 32 GiB RAM. The
+built `replay-bench` ran directly: one warmup and five measured runs, medians shown. These are
+synthetic reducer workloads; they count requests and core selection time, not network latency,
+display latency or RSS.
+
+| Metric / method | Baseline | Hover preload | Delta |
+| --- | ---: | ---: | ---: |
+| Package executable (`xtask package`) | 86,803,968 B | 86,869,504 B | +65,536 B (+0.08%) |
+| Installed tree (`dist/`, 216 files) | 90,997,257 B | 91,062,793 B | +65,536 B (+0.07%) |
+| Installed tree, zip deflate level 9 | 50,161,038 B | 50,183,621 B | +22,583 B (+0.05%) |
+| `replay-bench`: 100,000 events | 58.1 ms | 58.5 ms | noise (+0.6%) |
+| `replay-bench`: retained timeline | 393,492..393,977 B | 393,492..393,977 B | 0 |
+| `--navigation`: revalidation requests, 10,000 reselections of three 50-message conversations | 10,000 | 0 | −10,000 |
+| `--navigation`: select median / p95 | 200 / 300 ns | 200 / 200 ns | at timer resolution |
+| `--navigation`: dormant windows / rows / estimated bytes | 2 / 150 / 328,052 B | 2 / 150 / 328,148 B | +96 B |
+| Hover pass: first visits that opened without waiting | — | 12/12, 12 requests | new pass |
+| Hover pass: requests for a 28-row sweep without clicks | — | 12 | capped at 12/min |
+
+The baseline has no hover pass; there a first visit sends the same one request on click and waits
+for it. In the hover pass synthetic responses arrive before the click, so it shows that a click
+uses the preload without a second request, not how much latency is hidden; that depends on the
+dwell and the network round trip. The three-conversation workload keeps two dormant windows on
+both revisions, so the larger eight-window limit is not exercised here. The profile-extras cap
+(2 s to 600 ms), image connection reuse and off-coordinator disk reads were not measured: they need
+a network or disk-cache fixture this bench does not have.
 ## Embed styling review - October 14, 2026
 
 Compared the original PR #650 head `c01461ed` with the review fixes in `9354335e` on

@@ -23,6 +23,7 @@ pub mod message_actions;
 pub mod messaging_permissions;
 pub mod notifications;
 pub mod polls;
+pub mod preload;
 pub mod presence;
 pub mod profile;
 pub mod reactions;
@@ -255,6 +256,9 @@ pub enum Command {
 		after: Option<Id>,
 		request: u64,
 	},
+	/// The command a click would send, sent early on intent and answered by that command's own
+	/// event: a conversation's recent `History` page or a `Profile`.
+	Prefetch(Box<Command>),
 	Forward {
 		source: Id,
 		message: Id,
@@ -774,6 +778,7 @@ pub struct State {
 	pub timeline: Timeline,
 	pub preserve_deleted_messages: bool,
 	pub resident: resident::Windows,
+	pub preload: preload::Preload,
 	pub freshness: Freshness,
 	pub status: &'static str,
 	/// User-copyable cause of the last session failure, cleared by the next READY.
@@ -980,6 +985,7 @@ impl Default for State {
 			timeline: Timeline::default(),
 			preserve_deleted_messages: false,
 			resident: resident::Windows::default(),
+			preload: Default::default(),
 			freshness: Freshness::Stale,
 			status: "Disconnected",
 			failure_detail: None,
@@ -1173,14 +1179,18 @@ impl State {
 		self.last_viewed_channels.splice(0..0, fresh);
 	}
 	pub fn select_guild(&mut self, guild: Id) -> Option<Command> {
+		let channel = self.guild_target(guild)?;
+		self.select(channel)
+	}
+	/// The channel a server icon opens: the current one, the last viewed, or the first text one.
+	pub fn guild_target(&self, guild: Id) -> Option<Id> {
 		self.guild(guild)?;
 		let available = |id| {
 			self.channel(id).is_some_and(|channel| {
 				channel.guild == Some(guild) && navigable(channel) && self.can_view(id)
 			})
 		};
-		let channel = self
-			.selected
+		self.selected
 			.filter(|id| available(*id))
 			.or_else(|| {
 				self.last_viewed_channels
@@ -1195,8 +1205,7 @@ impl State {
 					// Prefer ordinary text/forum channels over threads or voice on first visit.
 					.min_by_key(|c| (matches!(c.kind, 2 | 10..=12), c.position, c.id))
 					.map(|c| c.id)
-			})?;
-		self.select(channel)
+			})
 	}
 	pub fn select(&mut self, channel: Id) -> Option<Command> {
 		self.cancel_invite_navigation(channel);
@@ -1275,7 +1284,7 @@ impl State {
 		}
 		self.retire_archived_thread(Some(channel));
 		self.typing.clear();
-		self.select_resident(channel);
+		let trusted = self.select_resident(channel);
 		self.history_targeted = false;
 		self.history_navigation.clear();
 		if self.shared_member_list_id(channel).is_none() {
@@ -1336,7 +1345,30 @@ impl State {
 				return Apply::Opened(Some(command));
 			}
 		}
-		Apply::Opened(Some(self.history(None)))
+		if let Some(trusted) = trusted {
+			self.cancel_history();
+			self.history_before = None;
+			self.older_exhausted = trusted.older_exhausted;
+			self.freshness = Freshness::Fresh;
+			return Apply::Opened(self.call_sync(channel));
+		}
+		let command = self.history(None);
+		if let Command::History { request, .. } = command
+			&& self
+				.preload
+				.conversations
+				.adopt(channel, request, std::time::Instant::now())
+		{
+			// The page this click needs is already on its way.
+			return Apply::Opened(self.call_sync(channel));
+		}
+		Apply::Opened(Some(command))
+	}
+	/// Opening without a page request still synchronizes a direct call's state, as the host
+	/// does alongside a recent-page request.
+	fn call_sync(&self, channel: Id) -> Option<Command> {
+		(self.channel(channel).is_some_and(|c| c.guild.is_none()) && self.can_call(channel))
+			.then_some(Command::Voice(voice::Command::Sync { channel }))
 	}
 
 	/// Return to the last available direct message, or Friends when none remains.
@@ -2309,6 +2341,33 @@ impl State {
 			self.invalidate_members();
 			return;
 		}
+		if let Command::Prefetch(command) = command {
+			// The click that adopted a rejected preload fails as its own request would.
+			match *command {
+				Command::History {
+					channel, request, ..
+				} => {
+					if let preload::Arrival::Adopted(own, _) =
+						self.preload.conversations.arrived(request, false)
+					{
+						self.command_rejected(Command::History {
+							channel,
+							before: None,
+							after: None,
+							request: own,
+						});
+					}
+				}
+				Command::Profile {
+					user,
+					guild,
+					request,
+					..
+				} => self.apply_profile(user, guild, request, Err(auth::Failure::Capacity)),
+				_ => {}
+			}
+			return;
+		}
 		if let Command::History {
 			channel, request, ..
 		} = &command
@@ -2421,6 +2480,7 @@ impl State {
 			if matches!(envelope.event, Event::Ready { .. } | Event::Resync) {
 				self.set_premium_type(0);
 			}
+			self.interrupt_preloads();
 			self.interrupt_stickers();
 			self.posts.clear_summaries();
 			self.interactions.reset();
@@ -3320,10 +3380,17 @@ impl State {
 			}
 			Event::History {
 				channel,
-				request,
+				mut request,
 				older,
 				mut messages,
 			} => {
+				if preload::is_preload(request) {
+					match self.preload.conversations.arrived(request, true) {
+						preload::Arrival::Adopted(own, _) => request = own,
+						preload::Arrival::Keep => return self.park_preloaded(channel, messages),
+						preload::Arrival::Drop => return,
+					}
+				}
 				if self.selected != Some(channel)
 					|| request != self.request
 					|| !self.history_pending
@@ -3382,6 +3449,9 @@ impl State {
 					self.newer_may_have_more = messages.len() == 50;
 				}
 				let jump = self.history_after.is_some() && self.timeline.is_empty();
+				if self.older_exhausted {
+					self.timeline.mark_start_loaded();
+				}
 				let r = self.timeline.finish_page(messages, older);
 				if r.is_ok() && jump {
 					self.search_target = self.timeline.iter().next().map(|m| m.id);
@@ -3401,13 +3471,30 @@ impl State {
 			}
 			Event::HistoryFailed {
 				channel,
-				request,
+				mut request,
 				failure,
 			} => {
+				if preload::is_preload(request) {
+					let preload::Arrival::Adopted(own, _) =
+						self.preload.conversations.arrived(request, false)
+					else {
+						return;
+					};
+					request = own;
+				}
 				if self.selected != Some(channel)
 					|| request != self.request
 					|| !self.history_pending
 				{
+					return;
+				}
+				if failure == auth::Failure::Capacity {
+					self.command_rejected(Command::History {
+						channel,
+						request,
+						before: None,
+						after: None,
+					});
 					return;
 				}
 				self.cancel_history();

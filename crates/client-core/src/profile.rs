@@ -2,6 +2,7 @@
 use crate::{
 	Command, State,
 	auth::{AuthState, Failure},
+	preload,
 };
 use model::{Id, UserProfile};
 use std::{
@@ -51,6 +52,14 @@ impl ProfileCache {
 			.map(|entry| size_of::<CachedProfile>() + entry.data.bytes())
 			.sum()
 	}
+	/// Whether an unexpired profile for `(user, guild)` is cached, without evicting anything.
+	fn contains(&self, user: Id, guild: Option<Id>, now: Instant) -> bool {
+		self.entries.iter().any(|entry| {
+			entry.user == user
+				&& entry.guild == guild
+				&& now.saturating_duration_since(entry.fetched) < CACHE_TTL
+		})
+	}
 	/// A cached, unexpired global profile, without refreshing or evicting anything.
 	fn peek(&self, user: Id, now: Instant) -> Option<&UserProfile> {
 		self.entries
@@ -78,6 +87,13 @@ impl ProfileCache {
 		self.entries.clear();
 		self.entries.shrink_to_fit();
 	}
+}
+
+/// A profile response for the requested person and server that fits its bounds.
+fn accepts(user: Id, guild: Option<Id>, data: &UserProfile) -> bool {
+	data.user.id == user
+		&& data.guild.as_ref().is_none_or(|g| Some(g.guild) == guild)
+		&& data.valid()
 }
 
 pub struct ProfileView {
@@ -365,6 +381,7 @@ impl State {
 				self.profile_cache
 					.entries
 					.retain(|entry| entry.user != user);
+				self.preload.profiles.touch(None);
 				if self.profile.as_ref().is_some_and(|view| view.user == user) {
 					self.clear_profile();
 				}
@@ -520,13 +537,26 @@ impl State {
 				.then_some("Profile unavailable while disconnected or outside this session"),
 			data: None,
 		});
-		allowed.then_some(Command::Profile {
+		// A card whose profile is already being preloaded waits for that response instead.
+		(allowed
+			&& !self
+				.preload
+				.profiles
+				.adopt((user, guild), self.profile_request, now))
+		.then(|| self.profile_command(user, guild, self.profile_request))
+	}
+	/// The request a card sends for `(user, guild)`; preloads send the same one early.
+	pub(crate) fn profile_command(&self, user: Id, guild: Option<Id>, request: u64) -> Command {
+		Command::Profile {
 			user,
 			guild,
-			request: self.profile_request,
+			request,
 			with_mutuals: self.user.as_ref().is_none_or(|own| own.id != user),
 			cosmetics: self.profile_cosmetics,
-		})
+		}
+	}
+	pub(crate) fn profile_cached(&self, user: Id, guild: Option<Id>, now: Instant) -> bool {
+		self.profile_cache.contains(user, guild, now)
 	}
 	/// Applies the device's cosmetic preference. Profiles loaded while effects or frames were
 	/// hidden lack their catalog details, so showing them drops the cache and requests the open
@@ -538,6 +568,8 @@ impl State {
 			return None;
 		}
 		self.profile_cache.clear();
+		// A profile preloaded without these details must not refill the cache.
+		self.preload.profiles.touch(None);
 		// Offline views keep what they show rather than turning into an error.
 		if self.demo || self.auth != AuthState::Authenticated || !self.gateway_connected {
 			return None;
@@ -555,7 +587,7 @@ impl State {
 		&mut self,
 		user: Id,
 		guild: Option<Id>,
-		request: u64,
+		mut request: u64,
 		result: Result<Box<UserProfile>, Failure>,
 	) {
 		if let Err(failure) = &result
@@ -564,6 +596,31 @@ impl State {
 		{
 			self.fail(*failure);
 			return;
+		}
+		let mut cacheable = true;
+		if preload::is_preload(request) {
+			match self.preload.profiles.arrived(request, result.is_ok()) {
+				preload::Arrival::Adopted(own, fresh)
+					if self
+						.profile
+						.as_ref()
+						.is_some_and(|view| view.request == own) =>
+				{
+					request = own;
+					cacheable = fresh;
+				}
+				// Not opened (yet): keep it for the click, like a card that was closed.
+				preload::Arrival::Adopted(_, true) | preload::Arrival::Keep => {
+					if let Ok(data) = result
+						&& accepts(user, guild, &data)
+					{
+						self.profile_cache
+							.insert(user, guild, *data, Instant::now());
+					}
+					return;
+				}
+				preload::Arrival::Adopted(_, false) | preload::Arrival::Drop => return,
+			}
 		}
 		let Some(view) = self
 			.profile
@@ -574,15 +631,13 @@ impl State {
 		};
 		view.loading = false;
 		match result {
-			Ok(data)
-				if data.user.id == user
-					&& data.guild.as_ref().is_none_or(|g| Some(g.guild) == guild)
-					&& data.valid() =>
-			{
+			Ok(data) if accepts(user, guild, &data) => {
 				view.error = None;
 				view.data = Some(*data);
 				let data = view.data.clone().expect("stored profile");
-				self.profile_cache.insert(user, guild, data, Instant::now());
+				if cacheable {
+					self.profile_cache.insert(user, guild, data, Instant::now());
+				}
 			}
 			Ok(_) => {
 				view.error = Some("Profile response was invalid or too large");
@@ -636,6 +691,173 @@ mod tests {
 			badge_catalog: None,
 			limited: false,
 		})
+	}
+
+	#[test]
+	fn expired_and_interrupted_profile_preloads_cannot_be_adopted() {
+		let now = Instant::now();
+		for interrupted in [false, true] {
+			let mut state = own_state();
+			let target = (Id(2), None);
+			assert!(state.preload_profile(None, Some(target), now).is_some());
+			let click = if interrupted {
+				state.interrupt_preloads();
+				now
+			} else {
+				now + Duration::from_secs(30)
+			};
+			assert!(matches!(
+				state.request_profile_at(Id(2), None, click),
+				Some(Command::Profile { user: Id(2), .. })
+			));
+		}
+		// Reconnecting the same account clears flights even without an account-id change.
+		let mut state = own_state();
+		assert!(
+			state
+				.preload_profile(None, Some((Id(2), None)), now)
+				.is_some()
+		);
+		let user = state.user.clone().unwrap();
+		state.apply(Envelope {
+			generation: state.generation,
+			event: Event::Ready {
+				user,
+				guilds: vec![],
+				channels: vec![],
+				permissions: Default::default(),
+			},
+		});
+		assert!(state.request_profile_at(Id(2), None, now).is_some());
+	}
+
+	#[test]
+	fn a_closed_adopted_profile_cannot_restore_invalidated_cosmetics() {
+		for invalidated in [false, true] {
+			let now = Instant::now();
+			let mut state = own_state();
+			state.profile_cosmetics = model::CosmeticPreferences {
+				frames: false,
+				effects: false,
+				..Default::default()
+			};
+			let Some(Command::Prefetch(command)) =
+				state.preload_profile(None, Some((Id(2), None)), now)
+			else {
+				panic!()
+			};
+			let Command::Profile { request, .. } = *command else {
+				panic!()
+			};
+			assert!(state.request_profile_at(Id(2), None, now).is_none());
+			state.clear_profile();
+			if invalidated {
+				assert!(
+					state
+						.set_profile_cosmetics(model::CosmeticPreferences {
+							frames: true,
+							effects: true,
+							..Default::default()
+						})
+						.is_none()
+				);
+			}
+			let mut data = own_data("Synthetic friend");
+			data.user.id = Id(2);
+			state.apply_profile(Id(2), None, request, Ok(data));
+			assert_eq!(
+				state.request_profile_at(Id(2), None, now).is_some(),
+				invalidated
+			);
+		}
+	}
+
+	#[test]
+	fn resting_on_a_person_preloads_their_card_once_and_a_click_uses_it() {
+		use crate::preload::PROFILE_DWELL;
+		let now = Instant::now();
+		let friend = |name| {
+			let mut data = own_data(name);
+			data.user.id = Id(2);
+			data
+		};
+		for adopt in [false, true] {
+			let mut state = own_state();
+			let target = Some((Id(2), None));
+			assert!(state.preload_profile(target, None, now).is_none());
+			let Some(Command::Prefetch(command)) =
+				state.preload_profile(target, None, now + PROFILE_DWELL)
+			else {
+				panic!("rested preload");
+			};
+			let Command::Profile {
+				user: Id(2),
+				guild: None,
+				request,
+				with_mutuals: true,
+				..
+			} = *command
+			else {
+				panic!("the card's own request");
+			};
+			if adopt {
+				assert!(
+					state.request_profile_at(Id(2), None, now).is_none(),
+					"the opened card waits for the preload"
+				);
+				assert!(state.profile.as_ref().unwrap().loading);
+			}
+			state.apply(Envelope {
+				generation: state.generation,
+				event: Event::Profile {
+					user: Id(2),
+					guild: None,
+					request,
+					result: Ok(friend("Friend")),
+				},
+			});
+			if adopt {
+				let view = state.profile.as_ref().unwrap();
+				assert!(!view.loading && view.data.is_some());
+			} else {
+				assert!(state.profile.is_none(), "a preload never opens a card");
+				assert!(
+					state.request_profile_at(Id(2), None, now).is_none(),
+					"the cached card opens at once"
+				);
+				assert!(state.profile.as_ref().unwrap().data.is_some());
+			}
+			let _ = state.clear_profile();
+			assert!(
+				state
+					.preload_profile(target, None, now + PROFILE_DWELL * 3)
+					.is_none(),
+				"a cached card is not requested again"
+			);
+		}
+		let mut state = own_state();
+		let Some(Command::Prefetch(command)) =
+			state.preload_profile(None, Some((Id(3), None)), now)
+		else {
+			panic!("pressing skips the dwell");
+		};
+		let Command::Profile { request, .. } = *command else {
+			panic!("profile request");
+		};
+		state.apply_profile(Id(3), None, request, Err(Failure::Network));
+		assert!(state.profile.is_none() && state.profile_cache.is_empty());
+		assert!(
+			state
+				.preload_profile(None, Some((Id(3), None)), now)
+				.is_some(),
+			"a failure may be tried again"
+		);
+		state.demo = true;
+		assert!(
+			state
+				.preload_profile(None, Some((Id(4), None)), now)
+				.is_none()
+		);
 	}
 	fn own_state() -> State {
 		State {

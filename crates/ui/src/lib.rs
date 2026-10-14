@@ -78,6 +78,7 @@ mod notification_settings;
 mod notifications;
 mod pending;
 mod post_menu;
+mod preload;
 mod profiles;
 mod slash_builtin;
 mod slash_commands;
@@ -226,6 +227,9 @@ pub struct MessagingUi {
 	pub language: i18n::Language,
 	forwarding: forwarding::ForwardDialog,
 	pub convert_emoticons: bool,
+	/// Device preference: request a conversation's page while the pointer rests on it.
+	pub preload_on_hover: bool,
+	preload: preload::Preload,
 	pub image_share_requested: Option<(u64, Id, Vec<model::ImageShare>, String)>,
 	pub interaction_file_request: Option<String>,
 	interaction_components: components::Components,
@@ -3402,6 +3406,7 @@ impl MessagingUi {
                         let pick = ui
                             .add_enabled_ui(!application_command && !self.ime_active && !ime_this_frame, |ui| {
                                 self.emoji_picker.hide_nitro_emojis = self.hide_nitro_emojis;
+                                self.emoji_picker.preload = self.preload_on_hover;
                                 self.emoji_picker
                                     .show(ui, state, channel, &mut self.avatars, commands)
                             })
@@ -3918,6 +3923,17 @@ impl MessagingUi {
 			}
 		}
 		cleared
+	}
+
+	/// The server a profile card opens in: the one being administered, else the open channel's.
+	fn profile_guild(&self, state: &State) -> Option<model::Id> {
+		self.server_settings.guild().or_else(|| {
+			state
+				.channels
+				.iter()
+				.find(|channel| Some(channel.id) == state.selected)
+				.and_then(|channel| channel.guild)
+		})
 	}
 
 	fn sync_profile(
@@ -5148,13 +5164,7 @@ impl MessagingUi {
 		if let Some(user) = self.profile.open_user().cloned()
 			&& !direct_verifying
 		{
-			let profile_guild = self.server_settings.guild().or_else(|| {
-				state
-					.channels
-					.iter()
-					.find(|channel| Some(channel.id) == state.selected)
-					.and_then(|channel| channel.guild)
-			});
+			let profile_guild = self.profile_guild(state);
 			self.sync_profile(state, &mut commands, &user, profile_guild);
 			// The private note uses an independent read and never locks message actions.
 			if !user.webhook
@@ -5371,6 +5381,15 @@ impl MessagingUi {
 		// Clear the title bar and channel header so a notice never sits on the chrome.
 		self.toasts
 			.show(&ctx, if self.shows_title_bar() { 96.0 } else { 60.0 });
+		self.preload.person(self.profile.take_hovered());
+		let profile_guild = self.profile_guild(state);
+		self.preload.finish(
+			&ctx,
+			state,
+			self.preload_on_hover,
+			profile_guild,
+			&mut commands,
+		);
 		if !commands.is_empty() {
 			ctx.request_repaint();
 		}
