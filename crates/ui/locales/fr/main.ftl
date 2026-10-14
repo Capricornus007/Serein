@@ -4729,5 +4729,11 @@ timeline-dm-intro = Ceci est le début de votre historique de messages privés a
 timeline-channel-intro-title = Bienvenue dans #{ $channel } !
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Ceci est le début du salon #{ $channel }.
+page-language-time = Langue et heure
+description-language-time = Langue d'affichage et format de l'heure.
+time-format-group = Format de l'heure
+time-format-auto = Automatique
+time-format-12-hour = 12 heures
+time-format-24-hour = 24 heures
 profiles-status-edit = Modifier le statut
 profiles-status-clear = Effacer le statut

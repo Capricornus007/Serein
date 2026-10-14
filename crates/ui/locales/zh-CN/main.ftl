@@ -4828,5 +4828,11 @@ timeline-dm-intro = 这是你与 { $name } 的私信记录的开头。
 timeline-channel-intro-title = 欢迎来到 #{ $channel }！
 # Context: timeline_channel_intro
 timeline-channel-intro-start = 这是 #{ $channel } 频道的开头。
+page-language-time = 语言与时间
+description-language-time = 显示语言和时间格式。
+time-format-group = 时间格式
+time-format-auto = 自动
+time-format-12-hour = 12 小时制
+time-format-24-hour = 24 小时制
 profiles-status-edit = 编辑状态
 profiles-status-clear = 清除状态

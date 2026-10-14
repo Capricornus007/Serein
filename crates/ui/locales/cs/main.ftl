@@ -4816,5 +4816,11 @@ timeline-dm-intro = Toto je začátek vaší historie přímých zpráv s uživa
 timeline-channel-intro-title = Vítejte v #{ $channel }!
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Toto je začátek kanálu #{ $channel }.
+page-language-time = Jazyk a čas
+description-language-time = Jazyk rozhraní a zobrazení času.
+time-format-group = Formát času
+time-format-auto = Automaticky
+time-format-12-hour = 12hodinový
+time-format-24-hour = 24hodinový
 profiles-status-edit = Upravit stav
 profiles-status-clear = Vymazat stav

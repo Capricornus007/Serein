@@ -76,6 +76,7 @@ impl Settings {
 			muted_users: ui.voice_user_mutes().to_vec(),
 			cosmetics: ui.cosmetics,
 			image_cache: ui.image_cache,
+			time_format: ui.time_format,
 		};
 		if value != self.current {
 			self.state.touched = true;
@@ -121,6 +122,8 @@ impl Settings {
 		ui.set_voice_user_mutes(&value.muted_users);
 		ui.cosmetics = value.cosmetics;
 		ui.image_cache = value.image_cache;
+		ui.time_format = value.time_format;
+		ui::local_time::set_format(ui.time_format, ui.language);
 	}
 }
 

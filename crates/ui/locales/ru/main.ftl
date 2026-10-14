@@ -4735,5 +4735,11 @@ timeline-dm-intro = Это начало истории ваших личных �
 timeline-channel-intro-title = Добро пожаловать в #{ $channel }!
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Это начало канала #{ $channel }.
+page-language-time = Язык и время
+description-language-time = Язык интерфейса и формат времени.
+time-format-group = Формат времени
+time-format-auto = Автоматически
+time-format-12-hour = 12-часовой
+time-format-24-hour = 24-часовой
 profiles-status-edit = Изменить статус
 profiles-status-clear = Очистить статус

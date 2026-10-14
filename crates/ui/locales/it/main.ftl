@@ -4729,5 +4729,11 @@ timeline-dm-intro = Questo è l'inizio della cronologia dei messaggi diretti con
 timeline-channel-intro-title = Benvenuto in #{ $channel }!
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Questo è l'inizio del canale #{ $channel }.
+page-language-time = Lingua e ora
+description-language-time = Lingua dell'interfaccia e formato dell'ora.
+time-format-group = Formato ora
+time-format-auto = Automatico
+time-format-12-hour = 12 ore
+time-format-24-hour = 24 ore
 profiles-status-edit = Modifica stato
 profiles-status-clear = Cancella stato

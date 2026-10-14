@@ -667,6 +667,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			| "appearance"
 			| "storage"
 			| "general"
+			| "language"
 			| "keybinds"
 			| "extensions"
 			| "server"
@@ -684,7 +685,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			| "forum-settings"
 			| "friends"
 	) {
-		return Err("Page must be profile, markdown, channel-links, channel-link-replies, profile-card, collectibles, member-tags, dm-tags, account, appearance, storage, general, keybinds, extensions, slash-commands, slash-command-search, slash-command-options, server, server-engagement, server-safety, server-emoji, server-stickers, server-members, server-roles, server-invites, server-integrations or server-audit-log".into());
+		return Err("Page must be profile, markdown, channel-links, channel-link-replies, profile-card, collectibles, member-tags, dm-tags, account, appearance, storage, general, language, keybinds, extensions, slash-commands, slash-command-search, slash-command-options, server, server-engagement, server-safety, server-emoji, server-stickers, server-members, server-roles, server-invites, server-integrations or server-audit-log".into());
 	}
 	let slash_command = value("--command=").unwrap_or("help").to_owned();
 	if !matches!(slash_command.as_str(), "help" | "weather") {

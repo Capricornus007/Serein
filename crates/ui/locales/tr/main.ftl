@@ -4718,5 +4718,11 @@ timeline-dm-intro = { $name } ile doğrudan mesaj geçmişinin başlangıcı.
 timeline-channel-intro-title = #{ $channel } kanalına hoş geldin!
 # Context: timeline_channel_intro
 timeline-channel-intro-start = #{ $channel } kanalının başlangıcı.
+page-language-time = Dil ve Saat
+description-language-time = Arayüz dili ve saatin gösterimi.
+time-format-group = Saat biçimi
+time-format-auto = Otomatik
+time-format-12-hour = 12 saat
+time-format-24-hour = 24 saat
 profiles-status-edit = Durumu düzenle
 profiles-status-clear = Durumu temizle

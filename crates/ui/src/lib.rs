@@ -68,7 +68,7 @@ mod guild_folders;
 mod highlight;
 pub mod icons;
 mod invites;
-mod local_time;
+pub mod local_time;
 mod markdown;
 mod member_search;
 mod mentions;
@@ -300,6 +300,8 @@ pub struct MessagingUi {
 	pub cosmetics: model::CosmeticPreferences,
 	/// Disk budgets and retention for downloaded images.
 	pub image_cache: model::CachePreferences,
+	/// Clock style for message times.
+	pub time_format: model::TimeFormat,
 	/// Latest disk use of the media and shared-artwork caches, once measured.
 	pub image_cache_usage: Option<[model::CacheUsage; 2]>,
 	/// An image cache partition the owner asked to empty; the desktop consumes it.

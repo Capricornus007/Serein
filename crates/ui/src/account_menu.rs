@@ -74,7 +74,7 @@ impl ClearAfter {
 			Self::Hours4 => now + time::Duration::hours(4),
 			Self::Today => now.replace_time(time::Time::MIDNIGHT) + time::Duration::days(1),
 		};
-		let clock = format!("{:02}:{:02}", at.hour(), at.minute());
+		let clock = crate::local_time::clock(at);
 		Some(if at.date() == now.date() {
 			format!(
 				"{} {clock}",
