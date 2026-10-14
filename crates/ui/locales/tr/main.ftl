@@ -4718,6 +4718,14 @@ timeline-dm-intro = { $name } ile doğrudan mesaj geçmişinin başlangıcı.
 timeline-channel-intro-title = #{ $channel } kanalına hoş geldin!
 # Context: timeline_channel_intro
 timeline-channel-intro-start = #{ $channel } kanalının başlangıcı.
+# Context: text_menu
+text-menu-cut = Kes
+text-menu-copy = Kopyala
+text-menu-paste = Yapıştır
+text-menu-select-all = Tümünü seç
+# Context: media_box
+forum-composer-attached-files = { $count } ekli dosya
+forum-composer-remove-file = { $file } dosyasını kaldır
 post-menu-post-action-failed = Gönderi işlemi başarısız oldu
 post-menu-thread-action-failed = Konu işlemi başarısız oldu
 

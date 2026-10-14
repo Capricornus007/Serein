@@ -4729,6 +4729,17 @@ timeline-dm-intro = Ceci est le début de votre historique de messages privés a
 timeline-channel-intro-title = Bienvenue dans #{ $channel } !
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Ceci est le début du salon #{ $channel }.
+# Context: text_menu
+text-menu-cut = Couper
+text-menu-copy = Copier
+text-menu-paste = Coller
+text-menu-select-all = Tout sélectionner
+# Context: media_box
+forum-composer-attached-files = { $count ->
+    [one] { $count } fichier joint
+   *[other] { $count } fichiers joints
+    }
+forum-composer-remove-file = Retirer { $file }
 post-menu-post-action-failed = L'action sur la publication a échoué
 post-menu-thread-action-failed = L'action sur le fil a échoué
 

@@ -4830,6 +4830,14 @@ timeline-dm-intro = 这是你与 { $name } 的私信记录的开头。
 timeline-channel-intro-title = 欢迎来到 #{ $channel }！
 # Context: timeline_channel_intro
 timeline-channel-intro-start = 这是 #{ $channel } 频道的开头。
+# Context: text_menu
+text-menu-cut = 剪切
+text-menu-copy = 复制
+text-menu-paste = 粘贴
+text-menu-select-all = 全选
+# Context: media_box
+forum-composer-attached-files = 已附加 { $count } 个文件
+forum-composer-remove-file = 移除 { $file }
 post-menu-post-action-failed = 贴文操作失败
 post-menu-thread-action-failed = 帖子操作失败
 

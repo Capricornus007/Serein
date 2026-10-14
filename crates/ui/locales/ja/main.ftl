@@ -4715,6 +4715,14 @@ timeline-dm-intro = { $name } とのダイレクトメッセージ履歴の始�
 timeline-channel-intro-title = #{ $channel } へようこそ！
 # Context: timeline_channel_intro
 timeline-channel-intro-start = #{ $channel } チャンネルの始まりです。
+# Context: text_menu
+text-menu-cut = 切り取り
+text-menu-copy = コピー
+text-menu-paste = 貼り付け
+text-menu-select-all = すべて選択
+# Context: media_box
+forum-composer-attached-files = 添付ファイル { $count } 件
+forum-composer-remove-file = { $file } を削除
 post-menu-post-action-failed = 投稿の操作に失敗しました
 post-menu-thread-action-failed = スレッドの操作に失敗しました
 

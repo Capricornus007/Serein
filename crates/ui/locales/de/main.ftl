@@ -4729,6 +4729,17 @@ timeline-dm-intro = Das ist der Anfang deines Direktnachrichtenverlaufs mit { $n
 timeline-channel-intro-title = Willkommen in #{ $channel }!
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Das ist der Anfang des Kanals #{ $channel }.
+# Context: text_menu
+text-menu-cut = Ausschneiden
+text-menu-copy = Kopieren
+text-menu-paste = Einfügen
+text-menu-select-all = Alles auswählen
+# Context: media_box
+forum-composer-attached-files = { $count ->
+    [one] { $count } angehängte Datei
+   *[other] { $count } angehängte Dateien
+    }
+forum-composer-remove-file = { $file } entfernen
 post-menu-post-action-failed = Beitragsaktion fehlgeschlagen
 post-menu-thread-action-failed = Thread-Aktion fehlgeschlagen
 

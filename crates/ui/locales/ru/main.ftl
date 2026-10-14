@@ -4735,6 +4735,14 @@ timeline-dm-intro = Это начало истории ваших личных �
 timeline-channel-intro-title = Добро пожаловать в #{ $channel }!
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Это начало канала #{ $channel }.
+# Context: text_menu
+text-menu-cut = Вырезать
+text-menu-copy = Копировать
+text-menu-paste = Вставить
+text-menu-select-all = Выделить всё
+# Context: media_box
+forum-composer-attached-files = Прикреплённые файлы: { $count }
+forum-composer-remove-file = Удалить { $file }
 post-menu-post-action-failed = Не удалось выполнить действие с публикацией
 post-menu-thread-action-failed = Не удалось выполнить действие с веткой
 

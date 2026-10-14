@@ -2103,7 +2103,7 @@ fn cover_uv(texture: [usize; 2], rect: egui::Rect) -> egui::Rect {
 	)
 }
 
-fn paint_cover(
+pub(crate) fn paint_cover(
 	ui: &egui::Ui,
 	rect: egui::Rect,
 	texture: (egui::TextureId, [usize; 2]),

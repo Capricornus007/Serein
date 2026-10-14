@@ -4818,6 +4818,14 @@ timeline-dm-intro = Toto je začátek vaší historie přímých zpráv s uživa
 timeline-channel-intro-title = Vítejte v #{ $channel }!
 # Context: timeline_channel_intro
 timeline-channel-intro-start = Toto je začátek kanálu #{ $channel }.
+# Context: text_menu
+text-menu-cut = Vyjmout
+text-menu-copy = Kopírovat
+text-menu-paste = Vložit
+text-menu-select-all = Vybrat vše
+# Context: media_box
+forum-composer-attached-files = Přiložené soubory: { $count }
+forum-composer-remove-file = Odebrat { $file }
 post-menu-post-action-failed = Akce s příspěvkem selhala
 post-menu-thread-action-failed = Akce s vláknem selhala
 
