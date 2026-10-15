@@ -1169,7 +1169,7 @@ The composer now displays known user mentions as `@name`, Unicode as bundled Twe
 
 Guild voice entry uses the documented [Gateway voice state update and voice allocation flow](https://docs.discord.com/developers/topics/voice-connections): guild-scoped join/mute/leave, matching owner session plus guild server update, and guild ID as voice Identify/Resume server ID. The DAVE group remains identified by channel ID. This protocol documentation is not approval or live evidence for normal-user accounts. Server channel rosters use READY, GUILD_CREATE, VOICE_STATE_UPDATE and unofficial READY_SUPPLEMENTAL/PASSIVE_UPDATE_V2 shapes from the original [discord.py-self dispatcher](https://github.com/dolfies/discord.py-self/blob/master/discord/state.py).
 
-The media engine extends the existing DAVE/Opus path to bounded group membership and simultaneous remote audio mixing. Server mute/deafen gates local media. Empty rooms wait without opening audio devices; microphone capture requires an established encrypted group. Stage channels and group DMs remain visibly unsupported. Main Gateway disconnect, channel/session moves, permission invalidation or voice server migration stop the current media session and require deliberate rejoin. A dropped media session of a joined call (unacknowledged heartbeats, failed resume, negotiation timeout) is rejoined automatically up to three times by re-sending opcode 4 for the same channel; that Discord answers this with fresh voice credentials is unverified. No automatic call or DM ringing is triggered by viewing a roster or joining a guild channel.
+The media engine extends the existing DAVE/Opus path to bounded group membership and simultaneous remote audio mixing. Server mute/deafen gates local media. Empty rooms wait without opening audio devices; microphone capture requires an established encrypted group. Stage channels and group DMs remain visibly unsupported. Main Gateway disconnect, channel/session moves, permission invalidation or voice server migration stop the current media session and require deliberate rejoin. A dropped media session of a joined call (unacknowledged heartbeats, failed resume, negotiation timeout) is rejoined automatically up to three times by re-sending opcode 4 for the same channel; that Discord answers this with fresh voice credentials is unverified. Each scheduled rejoin first asks the main Gateway to confirm its socket with a heartbeat. A rejoin waits while the Gateway is disconnected, and one whose answer was lost to a Gateway outage asks again after reconnecting without spending an attempt. No automatic call or DM ringing is triggered by viewing a roster or joining a guild channel.
 
 The implementation is tested with synthetic protocol/crypto/UI data. The owner-controlled official-client two-way audio, multi-party join/leave, permission, device and network tests in [voice.md](voice.md) remain required before claiming working live interoperability.
 
@@ -2426,8 +2426,12 @@ the Gateway to be connected. Nothing automatically replays uncertain writes.
 Refresh during reconnection, the Reconnect now button and an explicit message send
 wake the Gateway's current retry without waiting for its capped backoff. Recovery
 preserves the session/sequence for RESUME, does not reopen login or restart a REST
-write, and cannot extend the bounded initial-login attempt limit. Late recovery
-requests are consumed without interrupting an already READY/RESUMED socket.
+write, and cannot extend the bounded initial-login attempt limit. On an already
+READY/RESUMED socket a recovery request sends one immediate opcode 1 heartbeat
+instead; the socket is kept when it is acknowledged and replaced by a RESUME when
+no acknowledgement arrives within five seconds, so a network change does not wait
+for two missed timer heartbeats. That Discord acknowledges an extra heartbeat sent
+outside the timer, and how quickly a dead socket is noticed live, are unverified.
 Reconnect now is available in the account card on every platform. Refresh also
 reloads readable message history through REST during an outage; repeated Gateway
 retry notifications preserve that request. A successful RESUME still revalidates

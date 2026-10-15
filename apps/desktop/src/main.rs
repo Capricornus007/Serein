@@ -4274,6 +4274,12 @@ impl Desktop {
 		{
 			self.command(command);
 		}
+		// A heartbeat probe replaces a dead gateway socket in seconds, before the rejoin uses it.
+		if std::mem::take(&mut self.voice.gateway_check)
+			&& let Some(connection) = &self.connection
+		{
+			connection.reconnect();
+		}
 	}
 	fn poll(&mut self, ctx: &egui::Context) {
 		let mut cached = Vec::new();
