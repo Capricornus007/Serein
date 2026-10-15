@@ -638,8 +638,10 @@ Retry saving is deliberate. Closing with pending/failed writes prompts before di
 In-app preview edits are not saved; a write already requested outside preview still completes.
 The standalone --demo does not start the SQLite worker. Narrow People overlays remain
 session-local. Normal window geometry is device-local in the bounded app_preferences singleton:
-two logical size integers (1..=16,384) and an optional physical position pair
-(-131,072..=131,072). It survives account logout and introduces no new file or table.
+two logical size integers (1..=16,384), an optional physical position pair
+(-131,072..=131,072) and a maximized boolean. While maximized, the normal size and position are
+kept so un-maximizing after a restart returns to them. It survives account logout and introduces
+no new file or table.
 Notification opt-in, hidden-channel visibility, primary RGB color, audio devices (up to 1,024 bytes each),
 input profile/custom processing, push-to-talk, gain, keyboard and mouse-button bindings and the global-keybind
 switch (enabled by default) are saved in the device-wide `app_preferences`

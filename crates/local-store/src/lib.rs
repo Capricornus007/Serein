@@ -155,10 +155,14 @@ impl AppPreferences {
 
 /// Normal client size in logical pixels; outer position in physical desktop pixels.
 /// Position is absent on Wayland, where the compositor owns window placement.
+/// While maximized, size and position keep the normal geometry the window restores to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct WindowGeometry {
 	pub size: [u32; 2],
 	pub position: Option<[i32; 2]>,
+	/// Absent in older preferences, which were only saved while not maximized.
+	#[serde(default)]
+	pub maximized: bool,
 }
 impl WindowGeometry {
 	pub fn is_valid(self) -> bool {

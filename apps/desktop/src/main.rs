@@ -495,9 +495,16 @@ fn main() -> eframe::Result {
 		viewport: {
 			let builder = egui::ViewportBuilder::default()
 				.with_transparent(transparency_available)
-				.with_inner_size(window_geometry.map_or([1120.0, 760.0], |geometry| {
-					geometry.size.map(|value| value as f32)
-				}))
+				.with_inner_size(
+					window_geometry
+						.map_or(app_settings::DEFAULT_WINDOW_SIZE, |geometry| geometry.size)
+						.map(|value| value as f32),
+				)
+				// Maximize before the first configure so the first frame is not painted small.
+				.with_maximized(
+					cfg!(target_os = "linux")
+						&& window_geometry.is_some_and(|geometry| geometry.maximized),
+				)
 				.with_min_inner_size(app_settings::MIN_WINDOW_SIZE.map(|size| size as f32))
 				.with_active(!start_minimized)
 				.with_app_id("cz.viceverse.serein");
@@ -581,6 +588,8 @@ fn main() -> eframe::Result {
 			desktop.instance = instance;
 			if let Some(geometry) = window_geometry {
 				app_settings::restore_window_geometry(&desktop.window, geometry);
+				desktop.maximize_after_show =
+					geometry.maximized && app_settings::maximize_after_show(&desktop.window);
 			}
 			if start_minimized {
 				cc.egui_ctx
@@ -977,6 +986,8 @@ struct Desktop {
 	clipboard: Option<clipboard::Paste>,
 	download_close_pending: bool,
 	window: Arc<winit::window::Window>,
+	/// The saved maximized state still has to be re-applied once the window is shown.
+	maximize_after_show: bool,
 	monitor_geometry: Option<(Option<egui::Rect>, Option<f32>, Option<egui::Vec2>)>,
 	monitor_period: Option<Duration>,
 	frame_metrics: FrameMetrics,
@@ -2267,6 +2278,7 @@ impl Desktop {
 			window_blur: transparency_available
 				.then(|| platform::window_effects::Blur::new(window.clone())),
 			window,
+			maximize_after_show: false,
 			monitor_geometry: None,
 			monitor_period: None,
 			frame_metrics: FrameMetrics::new(frame_sample),
@@ -5020,29 +5032,48 @@ impl eframe::App for Desktop {
 	fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
 		// Before the pass begins, so the whole frame resolves System to the same theme.
 		self.sync_system_theme(ctx);
+		if self.maximize_after_show && self.window.is_visible() == Some(true) {
+			self.maximize_after_show = false;
+			self.window.set_maximized(true);
+		}
 		// Read native size independently of viewport rectangles: Wayland has no global position,
 		// so egui-winit cannot supply either rectangle there. Native scale excludes egui zoom.
 		if !self.fixture_only
 			&& !self.state.demo
 			&& self.app_settings.loaded
+			&& !self.maximize_after_show
 			&& let Some(viewport) = raw_input.viewports.get(&raw_input.viewport_id)
 			&& viewport.minimized != Some(true)
-			&& viewport.maximized != Some(true)
 			&& viewport.fullscreen != Some(true)
 			&& !viewport.close_requested()
 			&& self.window.is_visible() != Some(false)
 		{
-			let size = self
-				.window
-				.inner_size()
-				.to_logical::<u32>(self.window.scale_factor());
-			let geometry = local_store::WindowGeometry {
-				size: [size.width, size.height],
-				position: self
+			// While maximized, keep the normal geometry so un-maximizing after a restart returns to it.
+			let geometry = if viewport.maximized == Some(true) {
+				local_store::WindowGeometry {
+					maximized: true,
+					..self.app_settings.current.window_geometry.unwrap_or(
+						local_store::WindowGeometry {
+							size: app_settings::DEFAULT_WINDOW_SIZE,
+							position: None,
+							maximized: true,
+						},
+					)
+				}
+			} else {
+				let size = self
 					.window
-					.outer_position()
-					.ok()
-					.map(|position| [position.x, position.y]),
+					.inner_size()
+					.to_logical::<u32>(self.window.scale_factor());
+				local_store::WindowGeometry {
+					size: [size.width, size.height],
+					position: self
+						.window
+						.outer_position()
+						.ok()
+						.map(|position| [position.x, position.y]),
+					maximized: false,
+				}
 			};
 			if geometry.is_valid() && self.app_settings.current.window_geometry != Some(geometry) {
 				self.app_settings.current.window_geometry = Some(geometry);
