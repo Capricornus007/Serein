@@ -1307,7 +1307,7 @@ fn changes_active_history(state: &State, event: &Event) -> bool {
 	let channel = match event {
 		Event::History {
 			channel, request, ..
-		} if *request == state.request && state.history_pending => channel,
+		} if state.history_request(*request) == state.request && state.history_pending => channel,
 		Event::Message(message)
 		| Event::SendResult {
 			result: Ok(message),
@@ -4719,7 +4719,7 @@ impl Desktop {
 			) || matches!(&event.event, Event::RecipientRemoved { user, .. } if self.state.user.as_ref().is_some_and(|owner| owner.id == *user))
 				|| matches!(&event.event, Event::Reactions(client_core::reactions::Event::Read {channel,result:Err(Failure::Forbidden),..}) if self.state.selected==Some(*channel))
 				|| matches!(&event.event, Event::HistoryFailed { channel, request, failure: Failure::Forbidden }
-                if self.state.selected == Some(*channel) && self.state.request == *request && self.state.history_pending);
+                if self.state.selected == Some(*channel) && self.state.request == self.state.history_request(*request) && self.state.history_pending);
 			let history_changed = changes_active_history(&self.state, &event.event);
 			if history_changed {
 				match &event.event {
@@ -6218,6 +6218,7 @@ impl eframe::App for Desktop {
 			if let Some(command) = self.state.take_gif_favorites_command() {
 				commands.push(command);
 			}
+			commands.extend(self.state.take_preload_retries());
 			for command in commands {
 				self.command(command);
 			}
@@ -6619,6 +6620,35 @@ mod tests {
 		assert_eq!(state.timeline.len(), 1);
 	}
 
+	#[test]
+	fn an_adopted_preload_page_is_saved_like_the_clicks_own() {
+		let mut state = test_support::demo_state();
+		state.demo = false;
+		state.auth = AuthState::Authenticated;
+		state.gateway_connected = true;
+		let channel = model::Id(21);
+		state.observe_last_message(channel, model::Id(2_000));
+		let Some(Command::Prefetch(preload)) =
+			state.preload_conversation(None, Some(channel), std::time::Instant::now())
+		else {
+			panic!("pressed conversation preloads");
+		};
+		let Command::History { request, .. } = *preload else {
+			panic!()
+		};
+		assert!(
+			state.select(channel).is_none(),
+			"the click adopts the preload"
+		);
+		let page = |request| Event::History {
+			channel,
+			request,
+			older: false,
+			messages: vec![],
+		};
+		assert!(changes_active_history(&state, &page(request)));
+		assert!(!changes_active_history(&state, &page(request ^ 1)));
+	}
 	#[test]
 	fn cached_history_requires_current_readable_navigation_and_pending_request() {
 		let mut state = test_support::demo_state();

@@ -3477,6 +3477,7 @@ impl State {
 				mut request,
 				failure,
 			} => {
+				let mut adopted = false;
 				if preload::is_preload(request) {
 					let preload::Arrival::Adopted(own, _) =
 						self.preload.conversations.arrived(request, false)
@@ -3484,11 +3485,18 @@ impl State {
 						return;
 					};
 					request = own;
+					adopted = true;
 				}
 				if self.selected != Some(channel)
 					|| request != self.request
 					|| !self.history_pending
 				{
+					return;
+				}
+				if failure == auth::Failure::Capacity && adopted {
+					// Preloads give way to clicks and never reached the service: ask for the
+					// page as the click would have.
+					self.preload.retry = Some(self.history(None));
 					return;
 				}
 				if failure == auth::Failure::Capacity {

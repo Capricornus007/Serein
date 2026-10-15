@@ -606,6 +606,11 @@ impl State {
 						.as_ref()
 						.is_some_and(|view| view.request == own) =>
 				{
+					if matches!(result, Err(Failure::Capacity)) {
+						// Preloads give way to foreground requests: send the card's own request.
+						self.preload.profile_retry = Some(self.profile_command(user, guild, own));
+						return;
+					}
 					request = own;
 					cacheable = fresh;
 				}

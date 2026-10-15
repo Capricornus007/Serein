@@ -686,13 +686,19 @@ displayed conversation. No new disk data, database schema, worker or service req
 Resting the pointer on a conversation row, a rail DM or a server icon for 120 ms, or pressing it,
 requests that conversation's recent page early (a server icon uses the channel its click opens).
 It is the same bounded 50-message request a click sends, on its own connection slot so it never
-cancels the open conversation's reads, and it waits for the shared REST cooldown like any request.
+cancels the open conversation's reads. A preload never waits: it takes a REST permit only while
+three of the four are free and fails at once during the shared cooldown, so clicks keep two permits;
+a click that adopted such a preload sends its own request instead.
 At most one preload is in flight and at most twelve are sent per minute; a target is not requested
-again until its latest message changes, and failure or connection replacement forgets the attempt. A click on the
+again for five minutes unless its latest message changes, and failure, eviction of its preloaded
+window or connection replacement forgets the attempt. A click on the
 target while its page is less than 30 seconds old adopts that request instead of sending another, unless a live
 change to the channel arrived meanwhile; then the click sends its own request and the preloaded
 page is discarded. Otherwise the page is kept as one dormant window under the same eight-window,
-row and byte budget above, again only if no live change arrived while it was in flight. The open conversation, forums, archived
+row and byte budget above, again only if no live change arrived while it was in flight. Preloaded
+windows take at most three of the eight slots and are evicted before conversations the user opened.
+One stays current while the channel's latest known message is unchanged, also when that message
+was deleted and the page ends earlier. The open conversation, forums, archived
 threads, unreadable channels, channels without messages, an already current dormant window, the
 offline fixture and a pending conversation load are never preloaded. No disk data is written.
 

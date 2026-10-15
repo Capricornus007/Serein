@@ -430,8 +430,9 @@ its existing call-state synchronization on open.
 
 Hover/press preloading is **unofficial** behavior: it sends the same recent-history request
 a click would send, earlier, for a conversation the pointer rests on for 120 ms or presses.
-It is not a crawl: one request in flight, at most twelve per minute, no repeat for an unchanged
-conversation, no pagination, and it honors the shared REST cooldown. Hovers that never become
+It is not a crawl: one request in flight, at most twelve per minute, no repeat within five minutes
+for an unchanged conversation, no pagination. It uses only spare REST capacity and gives up
+during the shared cooldown instead of waiting, so it never delays a click. Hovers that never become
 clicks still cost requests, which the official client may not make; the owner can turn it off
 in Settings › Chat › Channel list. Resting on a person for 300 ms requests the same
 **unofficial** extended-profile route a card opens, with the same query and server context,

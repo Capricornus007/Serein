@@ -53,6 +53,13 @@ use tokio::{
 	time::{Instant, sleep_until},
 };
 
+tokio::task_local! {
+	/// Set while a hover preload runs.
+	static SPECULATIVE: ();
+}
+/// REST permits a preload must leave free for requests the user is waiting for.
+const FOREGROUND_PERMITS: usize = 2;
+
 pub struct DiscordApi {
 	interaction_session: std::sync::Mutex<Option<zeroize::Zeroizing<String>>>,
 	ack_token: Mutex<zeroize::Zeroizing<Option<String>>>,
@@ -343,15 +350,26 @@ impl DiscordApi {
 		{
 			return Err(Failure::Protocol);
 		}
-		let _permit = self
-			.requests
-			.acquire()
-			.await
-			.map_err(|_| Failure::Network)?;
+		let speculative = SPECULATIVE.try_with(|()| ()).is_ok();
+		let _permit = if speculative {
+			// A hover preload takes only spare capacity, so it never delays a click.
+			if self.requests.available_permits() <= FOREGROUND_PERMITS {
+				return Err(Failure::Capacity);
+			}
+			self.requests.try_acquire().map_err(|_| Failure::Capacity)?
+		} else {
+			self.requests
+				.acquire()
+				.await
+				.map_err(|_| Failure::Network)?
+		};
 		// Four permits bound concurrent REST work. A slow profile body must not hold the
 		// cooldown mutex and delay a message write; only service rate admission is shared.
 		loop {
 			let next = *self.cooldown.lock().await;
+			if speculative && Instant::now() < next {
+				return Err(Failure::Capacity);
+			}
 			sleep_until(next).await;
 			if Instant::now() >= *self.cooldown.lock().await {
 				break;
@@ -1278,9 +1296,11 @@ impl DiscordApi {
 				after,
 				request,
 			} => self.history(channel, before, after, request).await,
-			// The same request a click sends; it waits for the shared cooldown like one, so a
-			// click that adopted it is never left without its result.
-			Command::Prefetch(command) => Box::pin(self.execute(*command)).await,
+			// The same request a click sends, but it gives way: without spare capacity or during
+			// a cooldown it fails with Capacity at once, and a click that adopted it sends its own.
+			Command::Prefetch(command) => {
+				Box::pin(SPECULATIVE.scope((), self.execute(*command))).await
+			}
 			Command::StickerPacks => Event::StickerPacks(
 				self.request_limited(
 					Method::GET,
@@ -1865,6 +1885,45 @@ mod tests {
 		}
 	}
 
+	#[tokio::test]
+	async fn preloads_give_way_to_clicks_instead_of_waiting() {
+		let api = DiscordApi::new(Arc::new(
+			SessionSecret::from_owner_input("SYNTHETIC_PRELOAD_TOKEN".into()).unwrap(),
+		))
+		.unwrap();
+		let preload = || {
+			Command::Prefetch(Box::new(Command::History {
+				channel: model::Id(21),
+				before: None,
+				after: None,
+				request: 1 << 63,
+			}))
+		};
+		let gave_way = |event: Event| {
+			matches!(
+				event,
+				Event::Failure(Failure::Capacity)
+					| Event::HistoryFailed {
+						failure: Failure::Capacity,
+						..
+					}
+			)
+		};
+		// During a service cooldown a preload fails at once instead of waiting it out.
+		*api.cooldown.lock().await = Instant::now() + Duration::from_secs(30);
+		let event = tokio::time::timeout(Duration::from_secs(1), api.execute(preload()))
+			.await
+			.expect("a preload never waits for the cooldown");
+		assert!(gave_way(event));
+		// Without spare permits it leaves the remaining ones to requests the user waits for.
+		*api.cooldown.lock().await = Instant::now();
+		let _held = api.requests.acquire_many(2).await.unwrap();
+		let event = tokio::time::timeout(Duration::from_secs(1), api.execute(preload()))
+			.await
+			.expect("a preload never waits for a permit");
+		assert!(gave_way(event));
+		assert_eq!(api.requests.available_permits(), FOREGROUND_PERMITS);
+	}
 	#[tokio::test]
 	async fn guild_creation_posts_once_and_waits_for_gateway_state() {
 		use tokio::{
