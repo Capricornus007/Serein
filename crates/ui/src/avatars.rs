@@ -716,6 +716,18 @@ impl Avatars {
 		if !model::valid_gif_preview(&gif.preview) {
 			return None;
 		}
+		self.synthetic_gif(ctx, gif, demo);
+		self.preview_texture(ctx, &gif.preview, demo)
+	}
+	/// Loads a picker preview for a later frame without playing it.
+	pub(crate) fn warm_gif(&mut self, ctx: &egui::Context, gif: &model::Gif, demo: bool) {
+		if model::valid_gif_preview(&gif.preview) {
+			self.synthetic_gif(ctx, gif, demo);
+			self.warm_preview(&gif.preview, demo);
+		}
+	}
+	#[cfg_attr(not(any(test, feature = "demo")), allow(unused_variables))]
+	fn synthetic_gif(&mut self, ctx: &egui::Context, gif: &model::Gif, demo: bool) {
 		#[cfg(any(test, feature = "demo"))]
 		if demo && gif.preview.contains("/synthetic/") {
 			let key = self.preview_key(&gif.preview);
@@ -724,7 +736,16 @@ impl Avatars {
 				self.accept(ctx, key, Some(synthetic_gif(gif)));
 			}
 		}
-		self.preview_texture(ctx, &gif.preview, demo)
+	}
+	/// Loads provider artwork for a later frame without playing it, so a closed picker
+	/// neither advances animations nor schedules repaints.
+	pub(crate) fn warm_preview(&mut self, preview: &str, demo: bool) {
+		let key = self.preview_key(preview);
+		if let Some(entry) = self.textures.get_mut(&key) {
+			entry.0 = Instant::now();
+		} else if !demo {
+			self.request(key);
+		}
 	}
 	fn preview_key(&self, preview: &str) -> String {
 		if self.animate_gifs && (preview.ends_with(".gif") || preview.ends_with(".webp")) {

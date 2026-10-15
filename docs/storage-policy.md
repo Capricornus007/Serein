@@ -703,7 +703,8 @@ with the same server context and query, under the same one-in-flight and twelve-
 already cached or open, webhooks, and the offline fixture are skipped. Resting on the GIF button
 of a closed picker requests its home page (served from the existing ten-minute page cache when
 fresh) and the favorites sync once, and asks the image worker for the favorite preview, the first
-trending preview and the first eight category previews under the worker's existing bounds.
+trending preview and the first eight category previews under the worker's existing bounds. These
+previews are loaded but not played until the picker shows them.
 GIF home hover reads retain at most twelve timestamps and send at most twelve requests per
 minute, including failed/cleared-view retries. Cache hits consume no slot; explicit clicks and
 retries keep their normal behavior. Timestamp allocation is included in the GIF byte estimate.

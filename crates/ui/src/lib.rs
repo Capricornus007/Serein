@@ -3962,9 +3962,8 @@ impl MessagingUi {
 	fn profile_guild(&self, state: &State) -> Option<model::Id> {
 		self.server_settings.guild().or_else(|| {
 			state
-				.channels
-				.iter()
-				.find(|channel| Some(channel.id) == state.selected)
+				.selected
+				.and_then(|id| state.channel(id))
 				.and_then(|channel| channel.guild)
 		})
 	}
