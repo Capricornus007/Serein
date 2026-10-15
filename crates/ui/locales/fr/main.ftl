@@ -4809,3 +4809,7 @@ time-format-12-hour = 12 heures
 time-format-24-hour = 24 heures
 profiles-status-edit = Modifier le statut
 profiles-status-clear = Effacer le statut
+search-overlays-message-contains = Le message contient
+search-overlays-no-matching-content-types = Aucun type de contenu correspondant
+search-overlays-history = Historique
+search-overlays-clear-history = Effacer l'historique de recherche

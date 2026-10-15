@@ -1688,6 +1688,7 @@ mod tests {
 			guild: None,
 			query: String::new(),
 			before: None,
+			oldest: false,
 			offset: 0,
 			total: None,
 			pin_before: None,

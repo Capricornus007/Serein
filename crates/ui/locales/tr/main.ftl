@@ -4795,3 +4795,7 @@ time-format-12-hour = 12 saat
 time-format-24-hour = 24 saat
 profiles-status-edit = Durumu düzenle
 profiles-status-clear = Durumu temizle
+search-overlays-message-contains = Mesaj şunu içerir
+search-overlays-no-matching-content-types = Eşleşen içerik türü yok
+search-overlays-history = Geçmiş
+search-overlays-clear-history = Arama geçmişini temizle

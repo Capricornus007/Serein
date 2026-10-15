@@ -4792,3 +4792,7 @@ time-format-12-hour = 12時間制
 time-format-24-hour = 24時間制
 profiles-status-edit = ステータスを編集
 profiles-status-clear = ステータスを消去
+search-overlays-message-contains = メッセージに含まれるもの
+search-overlays-no-matching-content-types = 一致するコンテンツの種類はありません
+search-overlays-history = 履歴
+search-overlays-clear-history = 検索履歴を消去

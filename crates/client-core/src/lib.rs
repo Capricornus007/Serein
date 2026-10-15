@@ -185,6 +185,8 @@ pub enum Command {
 		query: String,
 		before: Option<Id>,
 		offset: u32,
+		/// Oldest messages first; page one then starts at the earliest match.
+		oldest: bool,
 		request: u64,
 	},
 	CancelSearch,
@@ -790,6 +792,8 @@ pub struct State {
 	pub failure_detail: Option<Box<str>>,
 	pub drafts: BTreeMap<Id, String>,
 	pub pending: Vec<Pending>,
+	/// Search results run oldest first, sorted by Discord rather than per page.
+	pub search_oldest: bool,
 	pub send_verification: verification::SendVerification,
 	pub reply: Option<Reply>,
 	pub send_sequence: u64,
@@ -998,6 +1002,7 @@ impl Default for State {
 			failure_detail: None,
 			drafts: BTreeMap::new(),
 			pending: vec![],
+			search_oldest: false,
 			send_verification: Default::default(),
 			reply: None,
 			send_sequence: 0,
@@ -3452,8 +3457,16 @@ impl State {
 							.and_then(|current| current.reactions.clone());
 					}
 				}
-				self.older_exhausted = if let Some(after) = self.history_after {
-					after.0 == 0
+				self.older_exhausted = if older {
+					// A short page of older messages is the conversation's start.
+					messages.len() < 50
+				} else if let Some(after) = self.history_after {
+					// A newer page extends the loaded window; it keeps a start already reached.
+					after.0 == 0 || (self.older_exhausted && !self.timeline.is_empty())
+				} else if self.history_targeted {
+					// A page fetched around a target can be short on its newer side, so it never
+					// proves the start; scrolling up loads older pages that do.
+					false
 				} else {
 					messages.len() < 50
 				};

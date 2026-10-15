@@ -948,9 +948,12 @@ impl DiscordApi {
 				query,
 				before,
 				offset,
+				oldest,
 				request,
 			} => {
-				let result = self.search(channel, guild, &query, before, offset).await;
+				let result = self
+					.search(channel, guild, &query, before, offset, oldest)
+					.await;
 				Event::Search {
 					channel,
 					request,
@@ -1554,6 +1557,7 @@ impl DiscordApi {
 		query: &str,
 		before: Option<model::Id>,
 		offset: u32,
+		oldest: bool,
 	) -> Result<client_core::search::Outcome, Failure> {
 		if !model::valid_search_query(query) || offset > model::MAX_SEARCH_OFFSET {
 			return Err(Failure::Protocol);
@@ -1566,10 +1570,18 @@ impl DiscordApi {
 			Some(guild) => format!("/guilds/{guild}/messages/search?"),
 			None => format!("/channels/{channel}/messages/search?"),
 		};
+		// Discord sorts the whole result set; ascending puts the earliest match on page one.
 		path.push_str(&format!(
-			"content={encoded}&limit=25&sort_by=timestamp&sort_order=desc"
+			"content={encoded}&limit=25&sort_by=timestamp&sort_order={}",
+			if oldest { "asc" } else { "desc" }
 		));
-		let mut maximum = before.map(|id| id.0);
+		// The cursor continues past the previous page's last hit: older for newest-first,
+		// newer for oldest-first.
+		let (mut maximum, mut minimum) = if oldest {
+			(None, before.map(|id| id.0))
+		} else {
+			(before.map(|id| id.0), None)
+		};
 		for (key, value) in filters {
 			if key == "channel_id" && guild.is_none() {
 				return Err(Failure::Protocol);
@@ -1577,6 +1589,9 @@ impl DiscordApi {
 			if key == "max_id" {
 				let id = value.parse::<u64>().map_err(|_| Failure::Protocol)?;
 				maximum = Some(maximum.map_or(id, |current| current.min(id)));
+			} else if key == "min_id" {
+				let id = value.parse::<u64>().map_err(|_| Failure::Protocol)?;
+				minimum = Some(minimum.map_or(id, |current| current.max(id)));
 			} else {
 				let encoded: String = value.bytes().map(|b| format!("%{b:02X}")).collect();
 				path.push_str(&format!("&{key}={encoded}"));
@@ -1584,6 +1599,9 @@ impl DiscordApi {
 		}
 		if let Some(before) = maximum {
 			path.push_str(&format!("&max_id={before}"));
+		}
+		if let Some(after) = minimum {
+			path.push_str(&format!("&min_id={after}"));
 		}
 		if offset != 0 {
 			path.push_str(&format!("&offset={offset}"));
@@ -1601,7 +1619,11 @@ impl DiscordApi {
 			return Ok(client_core::search::Outcome::Indexing);
 		}
 		reply
-			.into_page(guild.is_none().then_some(channel), maximum.map(model::Id))
+			.into_page(
+				guild.is_none().then_some(channel),
+				if oldest { minimum } else { maximum }.map(model::Id),
+				oldest,
+			)
 			.map(client_core::search::Outcome::Page)
 			.map_err(|_| Failure::Protocol)
 	}
@@ -2619,7 +2641,7 @@ mod tests {
             let server=tokio::spawn(async move {
                 for (route,status,body) in [
                     ("/guilds/2/messages/search?content=%78%26%23%3F%2E%2E&limit=25&sort_by=timestamp&sort_order=desc","200 OK",r#"{"messages":[[{"id":"9","channel_id":"1","author":{"id":"3","username":"Synthetic"},"content":"match"}]],"total_results":1}"#),
-                    ("/channels/1/messages/search?content=%78&limit=25&sort_by=timestamp&sort_order=desc&max_id=9","200 OK",r#"{"messages":[],"total_results":0}"#),
+                    ("/channels/1/messages/search?content=%78&limit=25&sort_by=timestamp&sort_order=asc&min_id=9","200 OK",r#"{"messages":[[{"id":"10","channel_id":"1","author":{"id":"3","username":"Synthetic"},"content":"next"}]],"total_results":2}"#),
                     ("/guilds/2/messages/search?content=%78&limit=25&sort_by=timestamp&sort_order=desc&max_id=8&offset=25","200 OK",r#"{"messages":[],"total_results":50}"#),
                     ("/channels/1/messages/search?content=%78&limit=25&sort_by=timestamp&sort_order=desc&offset=9975","200 OK",r#"{"messages":[],"total_results":10000}"#),
                     ("/channels/1/messages/search?content=%78&limit=25&sort_by=timestamp&sort_order=desc&max_id=9&offset=25","200 OK",r#"{"messages":[[{"id":"9","channel_id":"1","author":{"id":"3","username":"Synthetic"},"content":"outside filter"}]],"total_results":50}"#),
@@ -2638,14 +2660,15 @@ mod tests {
                     socket.write_all(format!("HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).as_bytes()).await.unwrap();
                 }
             });
-            let Event::Search {channel:Id(1),request:8,result:Ok(Outcome::Page(page))}=api.execute(Command::Search {channel:Id(1),guild:Some(Id(2)),query:"x&#?..".into(),before:None,offset:0,request:8}).await else {panic!()};
+            let Event::Search {channel:Id(1),request:8,result:Ok(Outcome::Page(page))}=api.execute(Command::Search {channel:Id(1),guild:Some(Id(2)),query:"x&#?..".into(),before:None,offset:0,oldest:false,request:8}).await else {panic!()};
             assert_eq!(page.hits[0].id,Id(9));
-            assert!(matches!(api.search(Id(1),None,"x",Some(Id(9)),0).await,Ok(Outcome::Page(p)) if p.hits.is_empty()));
-            assert!(matches!(api.search(Id(1),Some(Id(2)),"x before_id:8",Some(Id(9)),25).await,Ok(Outcome::Page(p)) if p.total == 50));
-            assert!(matches!(api.search(Id(1),None,"x",None,9975).await,Ok(Outcome::Page(p)) if p.total == 10000));
-            assert!(matches!(api.search(Id(1),None,"x before_id:9",None,25).await,Err(Failure::Protocol)));
-            assert!(matches!(api.search(Id(1),None,"x",None,9976).await,Err(Failure::Protocol)));
-            assert!(matches!(api.search(Id(1),None,"x",None,0).await,Err(Failure::Forbidden)));
+            // Oldest first, the cursor is a lower bound: the next page holds newer IDs.
+            assert!(matches!(api.search(Id(1),None,"x",Some(Id(9)),0,true).await,Ok(Outcome::Page(p)) if p.hits.len()==1 && p.hits[0].id==Id(10)));
+            assert!(matches!(api.search(Id(1),Some(Id(2)),"x before_id:8",Some(Id(9)),25,false).await,Ok(Outcome::Page(p)) if p.total == 50));
+            assert!(matches!(api.search(Id(1),None,"x",None,9975,false).await,Ok(Outcome::Page(p)) if p.total == 10000));
+            assert!(matches!(api.search(Id(1),None,"x before_id:9",None,25,false).await,Err(Failure::Protocol)));
+            assert!(matches!(api.search(Id(1),None,"x",None,9976,false).await,Err(Failure::Protocol)));
+            assert!(matches!(api.search(Id(1),None,"x",None,0,false).await,Err(Failure::Forbidden)));
             let Event::Search { channel:Id(1),request:9,result:Ok(Outcome::Pins(page)) } = api.execute(Command::Pins { channel:Id(1),before:None,request:9 }).await else {panic!()};
             assert!(page.hits[0].id == Id(9) && page.partial);
             let cursor = page.pin_cursor.unwrap();
@@ -2653,7 +2676,7 @@ mod tests {
             assert!(matches!(api.pins(Id(1),Some(cursor)).await,Err(Failure::Protocol)));
             assert!(matches!(api.pins(Id(1),Some(i128::MAX)).await,Err(Failure::Protocol)));
             assert!(matches!(api.pins(Id(1),None).await,Err(Failure::Forbidden)));
-            assert!(matches!(api.search(Id(1),None,"x",None,0).await,Ok(Outcome::Indexing)));
+            assert!(matches!(api.search(Id(1),None,"x",None,0,false).await,Ok(Outcome::Indexing)));
             assert!(*api.cooldown.lock().await>Instant::now());
             server.await.unwrap();
         }).await.unwrap();

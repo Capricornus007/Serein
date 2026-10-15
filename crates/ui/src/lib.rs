@@ -4930,7 +4930,14 @@ impl MessagingUi {
 								commands.push(command);
 							}
 							ctx.request_repaint();
-						} else if std::mem::take(&mut self.timeline.load_newer) {
+						} else if std::mem::take(&mut self.timeline.load_newer)
+							| (std::mem::take(&mut self.timeline.fill_newer)
+								// A scroll up outranks filling; it asks for older messages.
+								&& !self.timeline.load_older
+								// A history request cancels a loading search; only a scroll may.
+								&& !state.search.as_ref().is_some_and(|s| s.loading)
+								&& !state.archives.as_ref().is_some_and(|a| a.loading))
+						{
 							if let Some(command) = state.newer_history() {
 								commands.push(command);
 							}

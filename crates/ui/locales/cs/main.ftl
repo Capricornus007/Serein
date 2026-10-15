@@ -4895,3 +4895,7 @@ time-format-12-hour = 12hodinový
 time-format-24-hour = 24hodinový
 profiles-status-edit = Upravit stav
 profiles-status-clear = Vymazat stav
+search-overlays-message-contains = Zpráva obsahuje
+search-overlays-no-matching-content-types = Žádné odpovídající typy obsahu
+search-overlays-history = Historie
+search-overlays-clear-history = Vymazat historii hledání

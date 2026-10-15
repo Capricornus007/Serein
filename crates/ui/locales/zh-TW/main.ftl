@@ -4907,3 +4907,7 @@ time-format-12-hour = 12 小時制
 time-format-24-hour = 24 小時制
 profiles-status-edit = 編輯狀態
 profiles-status-clear = 清除狀態
+search-overlays-message-contains = 訊息包含
+search-overlays-no-matching-content-types = 沒有符合的內容類型
+search-overlays-history = 歷史紀錄
+search-overlays-clear-history = 清除搜尋紀錄

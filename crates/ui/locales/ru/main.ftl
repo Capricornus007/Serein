@@ -4812,3 +4812,7 @@ time-format-12-hour = 12-часовой
 time-format-24-hour = 24-часовой
 profiles-status-edit = Изменить статус
 profiles-status-clear = Очистить статус
+search-overlays-message-contains = Сообщение содержит
+search-overlays-no-matching-content-types = Нет подходящих типов содержимого
+search-overlays-history = История
+search-overlays-clear-history = Очистить историю поиска
