@@ -681,9 +681,19 @@ fn history_complete(state: &State) -> bool {
 		&& state.older_exhausted
 }
 
+/// A cached window shown while its first network page loads, already known to reach the start.
+fn cached_start(state: &State) -> bool {
+	state.freshness == model::Freshness::Loading
+		&& state.history_pending
+		&& !state.history_targeted
+		&& state.history_after.is_none()
+		&& state.older_exhausted
+		&& state.timeline.row_count() != 0
+}
+
 fn intro(state: &State, empty: bool) -> Option<Intro> {
 	let channel = state.selected.and_then(|id| state.channel(id))?;
-	if !history_complete(state) {
+	if !history_complete(state) && !cached_start(state) {
 		return None;
 	}
 	let named = |post| Intro::Channel {

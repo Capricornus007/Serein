@@ -1218,11 +1218,15 @@ fn hydrate_cached_history(
 	channel: model::Id,
 	request: u64,
 	messages: Vec<model::Message>,
+	start: bool,
 ) {
 	if wants_cached_history(state, channel, request)
 		&& messages.iter().all(|message| message.channel == channel)
 		&& state.timeline.seed_cache(messages).is_ok()
 	{
+		// The channel's introduction can lead the cached window right away; the network page
+		// replaces this once it arrives.
+		state.older_exhausted = start;
 		state.revision += 1;
 	}
 	state.enforce_resident_budget();
@@ -1232,11 +1236,12 @@ fn hydrate_cache_result(state: &mut State, safety: &cache::HistorySafety, outcom
 		channel,
 		request,
 		messages,
+		start,
 		epoch,
 	} = outcome
 		&& safety.allows(epoch)
 	{
-		hydrate_cached_history(state, channel, request, messages);
+		hydrate_cached_history(state, channel, request, messages, start);
 	}
 }
 
@@ -4905,13 +4910,19 @@ impl Desktop {
 				.filter(|m| full_window || changed_messages.contains(&m.id))
 				.cloned()
 				.collect();
+			let start = self.state.older_exhausted && !self.state.timeline.older_evicted();
 			let operation = if full_window {
-				cache::Operation::SaveChannel { channel, messages }
+				cache::Operation::SaveChannel {
+					channel,
+					messages,
+					start,
+				}
 			} else {
 				cache::Operation::SaveChanges {
 					channel,
 					messages,
 					retained: self.state.timeline.iter().map(|m| m.id).collect(),
+					start,
 				}
 			};
 			self.queue_cache(operation);
@@ -6558,6 +6569,7 @@ mod tests {
 				alpha,
 				request,
 				vec![test_support::message(1003, alpha)],
+				false,
 			);
 			assert_eq!(
 				state.timeline.row_ids().collect::<Vec<_>>(),
@@ -6591,6 +6603,7 @@ mod tests {
 		let outcome = |epoch| cache::Outcome::Channel {
 			channel,
 			request,
+			start: false,
 			epoch,
 			messages: vec![test_support::message(1000, channel)],
 		};
@@ -6618,6 +6631,7 @@ mod tests {
 			channel,
 			request,
 			vec![test_support::message(1000, channel)],
+			false,
 		);
 		assert_eq!(state.timeline.len(), 1);
 		assert_eq!(state.freshness, model::Freshness::Loading);
@@ -6631,6 +6645,7 @@ mod tests {
 			channel,
 			request,
 			vec![test_support::message(1000, channel)],
+			false,
 		);
 		assert!(
 			state.timeline.is_empty(),
@@ -6641,7 +6656,7 @@ mod tests {
 			vec![test_support::message(1001, model::Id(999))],
 			vec![test_support::message(1002, channel)],
 		] {
-			hydrate_cached_history(&mut state, channel, request.wrapping_sub(1), invalid);
+			hydrate_cached_history(&mut state, channel, request.wrapping_sub(1), invalid, false);
 			assert!(state.timeline.is_empty());
 		}
 		hydrate_cached_history(
@@ -6649,6 +6664,7 @@ mod tests {
 			channel,
 			request,
 			vec![test_support::message(1001, model::Id(999))],
+			false,
 		);
 		assert!(state.timeline.is_empty());
 		state.history_pending = false;
@@ -6657,6 +6673,7 @@ mod tests {
 			channel,
 			request,
 			vec![test_support::message(1000, channel)],
+			false,
 		);
 		assert!(state.timeline.is_empty());
 		state.history_pending = true;
@@ -6676,6 +6693,7 @@ mod tests {
 			channel,
 			request,
 			vec![test_support::message(1000, channel)],
+			false,
 		);
 		assert!(state.timeline.is_empty());
 		// Even an inconsistent queued-cache admission state cannot bypass current navigation.
@@ -6688,6 +6706,7 @@ mod tests {
 			channel,
 			request,
 			vec![test_support::message(1000, channel)],
+			false,
 		);
 		assert!(state.timeline.is_empty());
 		let mut restored = test_support::demo_state()
@@ -6702,6 +6721,7 @@ mod tests {
 			channel,
 			request,
 			vec![test_support::message(1000, channel)],
+			false,
 		);
 		assert!(state.timeline.is_empty());
 	}
