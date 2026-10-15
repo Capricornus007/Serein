@@ -986,6 +986,8 @@ struct Desktop {
 	clipboard: Option<clipboard::Paste>,
 	download_close_pending: bool,
 	window: Arc<winit::window::Window>,
+	/// The recent-page request whose cached window was already asked for.
+	cached_history_request: Option<(model::Id, u64)>,
 	/// The saved maximized state still has to be re-applied once the window is shown.
 	maximize_after_show: bool,
 	monitor_geometry: Option<(Option<egui::Rect>, Option<f32>, Option<egui::Vec2>)>,
@@ -1194,6 +1196,22 @@ fn wants_cached_history(state: &State, channel: model::Id, request: u64) -> bool
 			.channels
 			.iter()
 			.any(|c| c.id == channel && c.supports_text())
+}
+impl Desktop {
+	/// Shows the selected conversation's cached window while its recent page loads.
+	fn load_cached_history(&mut self) {
+		let (state, request) = (&self.state, self.state.request);
+		if let Some(channel) = state.selected
+			&& self.cached_history_request != Some((channel, request))
+			&& state.history_before.is_none()
+			&& state.history_after.is_none()
+			&& !state.history_targeted
+			&& wants_cached_history(state, channel, request)
+		{
+			self.cached_history_request = Some((channel, request));
+			self.queue_cache(cache::Operation::LoadChannel { channel, request });
+		}
+	}
 }
 fn hydrate_cached_history(
 	state: &mut State,
@@ -2278,6 +2296,7 @@ impl Desktop {
 			window_blur: transparency_available
 				.then(|| platform::window_effects::Blur::new(window.clone())),
 			window,
+			cached_history_request: None,
 			maximize_after_show: false,
 			monitor_geometry: None,
 			monitor_period: None,
@@ -3321,18 +3340,15 @@ impl Desktop {
 				self.messaging.camera_test_texture = None;
 			}
 		}
-		if let Command::History {
-			channel,
-			before: None,
-			after: None,
-			request,
-		} = &command
-			&& wants_cached_history(&self.state, *channel, *request)
-		{
-			self.queue_cache(cache::Operation::LoadChannel {
-				channel: *channel,
-				request: *request,
-			});
+		if matches!(
+			command,
+			Command::History {
+				before: None,
+				after: None,
+				..
+			}
+		) {
+			self.load_cached_history();
 		}
 		#[cfg(feature = "demo")]
 		if self.state.demo {
@@ -6194,6 +6210,8 @@ impl eframe::App for Desktop {
 			for command in commands {
 				self.command(command);
 			}
+			// A click that adopted a hover preload sends no request of its own.
+			self.load_cached_history();
 			if self.messaging.logout_requested {
 				self.messaging.logout_requested = false;
 				self.request_session_end(&ctx, SessionEnd::Logout);
