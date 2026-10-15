@@ -762,6 +762,9 @@ pub struct State {
 	pub direct_presence_bytes: Option<(usize, usize)>,
 	#[doc(hidden)]
 	pub direct_presence_epoch: u64,
+	/// A direct presence was dropped or evicted, or READY's presence was unavailable.
+	#[doc(hidden)]
+	pub direct_presence_lossy: bool,
 	pub member_request: u64,
 	pub guilds: Vec<Guild>,
 	pub channels: Vec<Channel>,
@@ -977,6 +980,7 @@ impl Default for State {
 			local_game_activity: Default::default(),
 			direct_presence_bytes: None,
 			direct_presence_epoch: 0,
+			direct_presence_lossy: false,
 			member_request: 0,
 			guilds: vec![],
 			channels: vec![],
@@ -2515,6 +2519,8 @@ impl State {
 		if let Event::DirectPresence(updates) = &envelope.event {
 			if envelope.event.bytes() <= MAX_MEMBER_PRESENCE_BYTES {
 				self.apply_direct_presence(updates);
+			} else {
+				self.direct_presence_lossy = true;
 			}
 			return;
 		}
@@ -2665,6 +2671,8 @@ impl State {
 				}
 				if warnings.presence {
 					self.clear_direct_presences();
+					// Without READY's presence, a missing record no longer means offline.
+					self.direct_presence_lossy = true;
 				}
 				Ok(())
 			}
@@ -3279,6 +3287,8 @@ impl State {
 				channels,
 			} => {
 				self.clear_direct_presences();
+				// READY starts a complete snapshot; a presence warning may follow it.
+				self.direct_presence_lossy = false;
 				if self
 					.user
 					.as_ref()
@@ -3805,6 +3815,8 @@ impl State {
 				self.cancel_invite_join();
 				self.cancel_guild_creation();
 				self.clear_direct_presences();
+				// Until the next READY, a missing record is unknown, not offline.
+				self.direct_presence_lossy = true;
 				self.permissions = permissions::Permissions::default();
 				self.read_state.cancel();
 				self.clear_profile();

@@ -1036,12 +1036,46 @@ fn presence_badge_metrics(rect: Rect) -> (f32, f32, egui::Pos2) {
 	};
 	(radius, ring, rect.right_bottom() - Vec2::splat(inset))
 }
-fn presence_badge_rect(rect: Rect) -> Rect {
-	let (radius, ring, center) = presence_badge_metrics(rect);
-	Rect::from_center_size(center, Vec2::splat((radius + ring) * 2.0))
+/// Like Discord, the phone shows only for someone online from a phone.
+fn shows_phone(status: &str, clients: model::ClientPlatforms) -> bool {
+	clients.mobile && status == "online"
 }
-fn pointer_on_presence(status: Option<&str>, avatar: Rect, pointer: Option<egui::Pos2>) -> bool {
-	status.is_some() && pointer.is_some_and(|pos| presence_badge_rect(avatar).contains(pos))
+/// The phone stands taller than the status disc, centred a little above it.
+fn phone_body(center: egui::Pos2, radius: f32) -> Rect {
+	Rect::from_center_size(
+		center - vec2(0.0, radius * 0.3),
+		vec2(radius * 1.8, radius * 3.0),
+	)
+}
+fn presence_badge_rect(rect: Rect, mobile: bool) -> Rect {
+	let (radius, ring, center) = presence_badge_metrics(rect);
+	let disc = Rect::from_center_size(center, Vec2::splat((radius + ring) * 2.0));
+	if mobile {
+		disc.union(phone_body(center, radius).expand(ring))
+	} else {
+		disc
+	}
+}
+fn pointer_on_presence(
+	status: Option<&str>,
+	clients: model::ClientPlatforms,
+	avatar: Rect,
+	pointer: Option<egui::Pos2>,
+) -> bool {
+	status.is_some_and(|status| {
+		pointer.is_some_and(|pos| {
+			presence_badge_rect(avatar, shows_phone(status, clients)).contains(pos)
+		})
+	})
+}
+/// Discord sends no presence for an offline friend or DM recipient, so theirs reads offline
+/// while the client knows it would have one. Anyone else without a presence shows none.
+pub(crate) fn shown_status<'a>(
+	state: &State,
+	user: Id,
+	status: Option<&'a str>,
+) -> Option<&'a str> {
+	status.or_else(|| state.absent_presence_offline(user).then_some("offline"))
 }
 pub(crate) fn presence_badge(
 	ui: &mut egui::Ui,
@@ -1051,21 +1085,70 @@ pub(crate) fn presence_badge(
 	ring: Color32,
 ) {
 	let (radius, ring_width, center) = presence_badge_metrics(rect);
-	ui.painter()
-		.circle_filled(center, radius + ring_width, ring);
-	if clients.mobile {
-		icons::paint(
-			ui.painter(),
-			Icon::DeviceMobile,
-			Rect::from_center_size(center, Vec2::splat(radius * 2.2)),
-			presence_color(status),
-		);
-	} else {
-		ui.painter()
-			.circle_filled(center, radius, presence_color(status));
-	}
-	ui.allocate_rect(presence_badge_rect(rect), egui::Sense::hover())
+	let mobile = shows_phone(status, clients);
+	paint_status(
+		ui.painter(),
+		center,
+		radius,
+		status,
+		mobile,
+		(ring, ring_width),
+	);
+	ui.allocate_rect(presence_badge_rect(rect, mobile), egui::Sense::hover())
 		.on_hover_text(presence_label(status));
+}
+
+/// Discord's status glyphs, each set in a surface-coloured `ring` around a `radius` disc: a
+/// green disc online, a yellow crescent idle, a red disc with a bar for Do Not Disturb, a
+/// grey ring offline or invisible, and a green phone for someone online from a phone.
+pub(crate) fn paint_status(
+	painter: &egui::Painter,
+	center: egui::Pos2,
+	radius: f32,
+	status: &str,
+	mobile: bool,
+	(ring, ring_width): (Color32, f32),
+) {
+	let color = presence_color(status);
+	if mobile {
+		// Discord's phone: a 3:5 rounded body, a large screen and a round home button.
+		let body = phone_body(center, radius);
+		let (width, height) = (body.width(), body.height());
+		let corner = width * 0.2;
+		painter.rect_filled(body.expand(ring_width), corner + ring_width, ring);
+		painter.rect_filled(body, corner, color);
+		let screen = Rect::from_min_max(
+			body.min + vec2(width * 0.15, height * 0.15),
+			pos2(body.max.x - width * 0.15, body.min.y + height * 0.575),
+		);
+		painter.rect_filled(screen, 0.0, ring);
+		painter.circle_filled(
+			pos2(body.center().x, body.min.y + height * 0.825),
+			height * 0.085,
+			ring,
+		);
+		return;
+	}
+	painter.circle_filled(center, radius + ring_width, ring);
+	painter.circle_filled(center, radius, color);
+	match status {
+		"idle" => {
+			// The crescent: a disc of the ring colour bites the upper left.
+			painter.circle_filled(center - Vec2::splat(radius * 0.45), radius * 0.72, ring);
+		}
+		"dnd" => {
+			painter.rect_filled(
+				Rect::from_center_size(center, vec2(radius * 1.25, radius * 0.5)),
+				radius * 0.25,
+				ring,
+			);
+		}
+		"online" => {}
+		// Offline and invisible are a hollow ring.
+		_ => {
+			painter.circle_filled(center, radius * 0.5, ring);
+		}
+	}
 }
 /// Keep known guild presence through range loads and reconnects; access loss clears the snapshot.
 pub(crate) fn presence(
@@ -2878,7 +2961,21 @@ pub fn show_with_session(
 	let (status, custom, activities, clients) = if user.webhook {
 		(None, None, [].as_slice(), model::ClientPlatforms::default())
 	} else {
-		presence(state, user.id, guild)
+		let (status, custom, activities, clients) = presence(state, user.id, guild);
+		// A guild row without a status defers to the friend's or recipient's own presence,
+		// with its platforms so the phone shows.
+		let (status, clients) = match (status, state.presence_for(user.id)) {
+			(None, Some(direct)) if direct.status.is_some() => {
+				(direct.status.as_deref(), direct.clients)
+			}
+			_ => (status, clients),
+		};
+		(
+			shown_status(state, user.id, status),
+			custom,
+			activities,
+			clients,
+		)
 	};
 	let in_voice = !user.webhook && user_in_voice(state, user.id);
 	let dm_channel = state
@@ -3035,6 +3132,7 @@ pub fn show_with_session(
 		);
 		let pointer_on_presence = pointer_on_presence(
 			status,
+			clients,
 			avatar_rect,
 			ui.input(|input| input.pointer.hover_pos()),
 		);
@@ -5516,5 +5614,24 @@ mod tests {
 				(expected, other) => panic!("{expected}: {:?}", other.is_some()),
 			}
 		}
+	}
+
+	#[test]
+	fn a_stranger_without_presence_shows_no_status() {
+		let state = State {
+			gateway_connected: true,
+			..State::default()
+		};
+		assert_eq!(shown_status(&state, Id(7), None), None);
+		assert_eq!(shown_status(&state, Id(7), Some("idle")), Some("idle"));
+	}
+
+	#[test]
+	fn phone_badge_hover_covers_the_whole_phone() {
+		let avatar = Rect::from_min_size(pos2(0.0, 0.0), Vec2::splat(32.0));
+		let (radius, ring, center) = presence_badge_metrics(avatar);
+		let top = pos2(center.x, phone_body(center, radius).top() - ring * 0.5);
+		assert!(!presence_badge_rect(avatar, false).contains(top));
+		assert!(presence_badge_rect(avatar, true).contains(top));
 	}
 }

@@ -634,6 +634,9 @@ impl State {
 			.map(|(user, _)| user)
 			.filter(|user| self.user_blocked(user.id) == Some(false))
 	}
+	pub(crate) fn friend_count(&self) -> usize {
+		self.user_actions.friends.len()
+	}
 	pub fn friends_known(&self) -> bool {
 		self.user_actions.friends_known
 	}

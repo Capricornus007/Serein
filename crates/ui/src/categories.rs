@@ -972,6 +972,8 @@ impl MessagingUi {
 										self.avatars.show(&mut inner, user, 32.0, state.demo);
 									let (status, _, _, clients) =
 										crate::profiles::presence(state, user.id, None);
+									let status =
+										crate::profiles::shown_status(state, user.id, status);
 									if channel.kind == 1
 										&& let Some(status) = status
 									{

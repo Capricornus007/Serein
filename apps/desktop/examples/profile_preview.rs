@@ -726,6 +726,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let theme_preview = args.iter().any(|arg| arg == "--theme-preview");
 	let thumbnail = args.iter().any(|arg| arg == "--thumbnail");
 	let extension = value("--extension=").map(str::to_owned);
+	let member_presence = value("--presence=").unwrap_or("online").to_owned();
 	let card_status = value("--status=").map(str::to_owned);
 	let fixture = extension.as_deref().map(extension_fixture).transpose()?;
 	let saved = Arc::new(AtomicBool::new(false));
@@ -852,7 +853,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						user,
 						nick: None,
 						roles: vec![],
-						status: Some("online".into()),
+						// `--presence=` shows another status glyph (idle, dnd, offline).
+						status: Some(member_presence.clone()),
 						custom_status: Some("Building a quieter place".into()),
 						activities: vec![],
 						clients: model::ClientPlatforms {
