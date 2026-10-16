@@ -4966,6 +4966,10 @@ impl Desktop {
 				generation: self.state.generation,
 				event: Event::Failure(failure),
 			});
+			if failure == Failure::RateLimited && self.state.failure_detail.is_none() {
+				self.state.failure_detail =
+					Some(ui::i18n::translate("main-sign-in-rate-limited-detail").into());
+			}
 			if !matches!(self.state.auth, AuthState::Expired | AuthState::Challenged) {
 				self.state.auth = AuthState::Failed;
 			}
