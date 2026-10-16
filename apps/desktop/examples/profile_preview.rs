@@ -742,6 +742,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	};
 	let member_presence = value("--presence=").unwrap_or("online").to_owned();
 	let card_status = value("--status=").map(str::to_owned);
+	let private_profile = args.iter().any(|arg| arg == "--private");
 	let fixture = extension.as_deref().map(extension_fixture).transpose()?;
 	let saved = Arc::new(AtomicBool::new(false));
 	let completed = saved.clone();
@@ -1072,6 +1073,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						},
 					}))],
 				});
+				// `--private` serves the card a private profile, as Discord sends a non-friend.
+				let guild = Some(model::Id(10));
+				if private_profile
+					&& let Some(client_core::Command::Profile { request, .. }) =
+						state.request_profile(user.id, guild)
+				{
+					let mut profile = ui::synthetic_own_profile(&user);
+					profile.private = true;
+					profile.bio.clear();
+					profile.badges.clear();
+					profile.connections.clear();
+					state.apply(client_core::Envelope {
+						generation: state.generation,
+						event: client_core::Event::Profile {
+							user: user.id,
+							guild,
+							request,
+							result: Ok(Box::new(profile)),
+						},
+					});
+					state.clear_profile();
+				}
 				messaging.preview_profile(user);
 			} else if let Some((package, invocation, result)) = fixture {
 				prime_extension_chat(&mut state);

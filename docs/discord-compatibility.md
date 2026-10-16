@@ -2546,3 +2546,16 @@ links may come from any host; this does not authorize fetching arbitrary origins
 Previews still use the existing provider/Discord media admission and bounded
 pipeline. The original share URL, including attachment signatures, is retained.
 The offline debug check is `cargo run --locked -p serein --features demo --example gif_favorites`.
+
+## Private profiles - October 15, 2026
+
+Profile Privacy ([help article](https://support.discord.com/hc/en-us/articles/38859942749463-Profile-Privacy-Setting-on-Discord))
+lets an account hide its bio, custom status, pronouns, badges, connections, widgets and
+wishlists from viewers outside its chosen audience. The profile response carries a
+top-level boolean `private`, which the official web client stores with the profile and
+reads as "private to this viewer"; this field is unofficial, taken from the public client
+bundle, and not documented. When it is true, the card shows a "Private Profile" strip and
+the official notice in place of the withheld details, and omits Member Since and the note,
+matching the official client. Roles, mutuals and the message field stay. The service
+withholds the hidden data itself; Serein never infers privacy from missing fields. No live
+private-profile response has been used as validation.

@@ -3043,12 +3043,55 @@ pub fn show_with_session(
 		} else {
 			egui::Sense::hover()
 		};
+		// Discord heads a profile that is private to this viewer with a locked strip.
+		let private = data.is_some_and(|d| d.private);
+		// The height budget starts here, so it includes the strip above the banner.
+		let header_top = ui.cursor().top();
+		if private {
+			let (strip, _) = ui.allocate_exact_size(vec2(width, 30.0), egui::Sense::hover());
+			ui.painter().rect_filled(
+				strip,
+				CornerRadius {
+					nw: RADIUS,
+					ne: RADIUS,
+					sw: 0,
+					se: 0,
+				},
+				theme.panel,
+			);
+			let label = ui.painter().layout_no_wrap(
+				crate::i18n::translate("profiles-private-profile"),
+				egui::FontId::new(13.0, design::semibold_family(ui.ctx())),
+				theme.text,
+			);
+			let lock = 14.0;
+			let start = strip.center().x - (lock + 6.0 + label.size().x) * 0.5;
+			icons::paint(
+				ui.painter(),
+				Icon::Lock,
+				Rect::from_center_size(
+					pos2(start + lock * 0.5, strip.center().y),
+					Vec2::splat(lock),
+				),
+				theme.text,
+			);
+			ui.painter().galley(
+				pos2(start + lock + 6.0, strip.center().y - label.size().y * 0.5),
+				label,
+				theme.text,
+			);
+			ui.add_space(-ui.spacing().item_spacing.y);
+		}
 		let (banner, banner_response) = ui.allocate_exact_size(vec2(width, banner_height), sense);
-		let top_corners = CornerRadius {
-			nw: RADIUS,
-			ne: RADIUS,
-			sw: 0,
-			se: 0,
+		let top_corners = if private {
+			CornerRadius::ZERO
+		} else {
+			CornerRadius {
+				nw: RADIUS,
+				ne: RADIUS,
+				sw: 0,
+				se: 0,
+			}
 		};
 		if let Some(data) = data {
 			avatars.paint_banner(ui, data, banner, top_corners, state.demo);
@@ -3603,7 +3646,7 @@ pub fn show_with_session(
 							} else {
 								divider(ui, &theme);
 							}
-							let used = ui.cursor().top() - banner.top();
+							let used = ui.cursor().top() - header_top;
 							// No floor here: a busy profile (many badges, connections, a long
 							// bio) must still fit `bounds`, or the card's rounded bottom
 							// corner renders past the window edge and looks square.
@@ -3626,6 +3669,30 @@ pub fn show_with_session(
 										state.demo,
 										(theme.chip, theme.muted),
 									);
+								}
+								if let Some(data) = data.filter(|d| d.private) {
+									// The service withheld the rest; say so, like Discord.
+									egui::Frame::new()
+										.fill(theme.chip)
+										.corner_radius(RADIUS)
+										.inner_margin(12)
+										.show(ui, |ui| {
+											ui.set_width(ui.available_width());
+											ui.add(
+												egui::Label::new(
+													RichText::new(crate::i18n::translate_args(
+														"profiles-private-notice",
+														&[(
+															"name",
+															state.user_display_name(&data.user),
+														)],
+													))
+													.size(body),
+												)
+												.wrap(),
+											);
+										});
+									sections += 1;
 								}
 								if let Some(data) = data {
 									let bio = data
@@ -3665,51 +3732,62 @@ pub fn show_with_session(
 										);
 										role_chips(ui, &theme, state, data.user.id, guild);
 									}
-									section(
-										ui,
-										&theme,
-										&mut sections,
-										"profiles-show-member-since",
-										full,
-									);
-									ui.horizontal_wrapped(|ui| {
-										ui.spacing_mut().item_spacing.x = 6.0;
-										if let Some(date) = creation_date(user.id) {
-											icons::inline(ui, Icon::Calendar, 16.0, theme.muted);
-											ui.label(RichText::new(date).size(body));
-										}
-										if let Some(joined) =
-											data.guild.as_ref().and_then(|g| g.joined_at.as_deref())
-										{
-											let server = data
+									if !data.private {
+										section(
+											ui,
+											&theme,
+											&mut sections,
+											"profiles-show-member-since",
+											full,
+										);
+										ui.horizontal_wrapped(|ui| {
+											ui.spacing_mut().item_spacing.x = 6.0;
+											if let Some(date) = creation_date(user.id) {
+												icons::inline(
+													ui,
+													Icon::Calendar,
+													16.0,
+													theme.muted,
+												);
+												ui.label(RichText::new(date).size(body));
+											}
+											if let Some(joined) = data
 												.guild
 												.as_ref()
-												.and_then(|g| {
-													state
-														.guilds
-														.iter()
-														.find(|known| known.id == g.guild)
-												})
-												.map_or_else(
-													|| {
-														crate::i18n::translate(
-															"profiles-show-server-2",
-														)
-													},
-													|g| g.name.clone(),
+												.and_then(|g| g.joined_at.as_deref())
+											{
+												let server = data
+													.guild
+													.as_ref()
+													.and_then(|g| {
+														state
+															.guilds
+															.iter()
+															.find(|known| known.id == g.guild)
+													})
+													.map_or_else(
+														|| {
+															crate::i18n::translate(
+																"profiles-show-server-2",
+															)
+														},
+														|g| g.name.clone(),
+													);
+												ui.label(
+													RichText::new("•")
+														.size(body)
+														.color(theme.muted),
 												);
-											ui.label(
-												RichText::new("•").size(body).color(theme.muted),
-											);
-											ui.label(
-												RichText::new(format!(
-													"{server} {}",
-													joined.split('T').next().unwrap_or(joined)
-												))
-												.size(body),
-											);
-										}
-									});
+												ui.label(
+													RichText::new(format!(
+														"{server} {}",
+														joined.split('T').next().unwrap_or(joined)
+													))
+													.size(body),
+												);
+											}
+										});
+									}
 									if let Some(since) =
 										state.friend_since(user.id).and_then(local_date)
 									{
@@ -3743,7 +3821,7 @@ pub fn show_with_session(
 										);
 									}
 									// Discord keeps the private note at the bottom of the profile.
-									if !own && !user.webhook {
+									if !own && !user.webhook && !data.private {
 										section(
 											ui,
 											&theme,
@@ -4233,6 +4311,7 @@ pub fn synthetic(user: &User, guild: Option<Id>) -> model::UserProfile {
         effect: Some(Box::new(synthetic_effect())),
         frame: Some(Box::new(synthetic_frame())),
         badge_catalog: Some(Box::new(crate::badges::synthetic_catalog())),
+        private: false,
         limited: false,
     }
 }
@@ -5615,6 +5694,88 @@ mod tests {
 				(expected, other) => panic!("{expected}: {:?}", other.is_some()),
 			}
 		}
+	}
+
+	#[test]
+	fn private_profiles_show_the_lock_strip_and_notice_and_hide_withheld_sections() {
+		let ctx = egui::Context::default();
+		let state = test_support::demo_state();
+		let user = state
+			.channels
+			.iter()
+			.find(|channel| channel.kind == 1)
+			.and_then(|channel| channel.recipients.first().cloned())
+			.unwrap();
+		let painted = |private: bool| {
+			let mut data = synthetic(&user, None);
+			data.private = private;
+			let view = ProfileView {
+				user: user.id,
+				guild: None,
+				request: 0,
+				loading: false,
+				error: None,
+				data: Some(data),
+			};
+			let mut session = ProfileSession::default();
+			let mut painted = Vec::new();
+			for _ in 0..2 {
+				let output = ctx.run_ui(
+					egui::RawInput {
+						screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1200.0, 900.0))),
+						..Default::default()
+					},
+					|ui| {
+						show_with_session(
+							ui,
+							&user,
+							Some(&view),
+							&state,
+							&mut Avatars::default(),
+							&mut None,
+							&mut FormatCache::default(),
+							false,
+							pos2(300.0, 60.0),
+							&mut session,
+						);
+					},
+				);
+				painted.clear();
+				fn walk(shape: &egui::Shape, out: &mut Vec<String>) {
+					match shape {
+						egui::Shape::Text(text) => out.push(text.galley.job.text.clone()),
+						egui::Shape::Vec(shapes) => {
+							shapes.iter().for_each(|shape| walk(shape, out))
+						}
+						_ => {}
+					}
+				}
+				output
+					.shapes
+					.iter()
+					.for_each(|shape| walk(&shape.shape, &mut painted));
+				output.drop_without_applying_deltas();
+			}
+			painted
+		};
+		let private = painted(true);
+		assert!(
+			private.iter().any(|text| text == "Private Profile"),
+			"{private:?}"
+		);
+		assert!(
+			private
+				.iter()
+				.any(|text| text.contains("profile is private"))
+		);
+		assert!(
+			!private
+				.iter()
+				.any(|text| text == "MEMBER SINCE" || text == "NOTE")
+		);
+		let public = painted(false);
+		assert!(!public.iter().any(|text| text == "Private Profile"));
+		assert!(public.iter().any(|text| text == "MEMBER SINCE"));
 	}
 
 	#[test]

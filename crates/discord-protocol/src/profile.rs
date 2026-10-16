@@ -58,6 +58,10 @@ struct ProfileDto {
 	mutual_guilds: Small<MutualGuild, 50>,
 	#[serde(default)]
 	mutual_friends: Small<UserDto, 50>,
+	/// Unofficial, observed in the official client: the profile is private to this viewer
+	/// (Profile Privacy), so the service withheld bio, status, badges and similar details.
+	#[serde(default)]
+	private: bool,
 }
 #[derive(Deserialize)]
 struct GameWidgetDto {
@@ -528,6 +532,7 @@ pub fn decode_profile(
 		effect: None,
 		frame: None,
 		badge_catalog: None,
+		private: dto.private,
 		limited,
 	};
 	// Discard optional board summaries first; preserve complete editable profile fields.
@@ -661,6 +666,20 @@ mod tests {
 		assert!(decode(&value, false).limited);
 		value["mutual_guilds"] = json!({});
 		assert!(decode_profile(value.to_string().as_bytes(), None, false).is_err());
+	}
+	/// The official client reads `private` from the profile response (unofficial).
+	#[test]
+	fn private_profiles_are_flagged_and_public_ones_are_not() {
+		let private = json!({"user":{"id":"1","username":"misha"},"private":true,"mutual_guilds":[{"id":"2"}]});
+		let profile = decode_profile(private.to_string().as_bytes(), None, true).unwrap();
+		assert!(profile.private);
+		assert!(profile.bio.is_empty() && profile.badges.is_empty());
+		let public = json!({"user":{"id":"1","username":"misha"}});
+		assert!(
+			!decode_profile(public.to_string().as_bytes(), None, true)
+				.unwrap()
+				.private
+		);
 	}
 	#[test]
 	fn profile_metadata_is_bounded_and_guild_identity_is_checked() {

@@ -1555,6 +1555,7 @@ mod tests {
 			effect: None,
 			frame: None,
 			badge_catalog: None,
+			private: false,
 			limited: false,
 		});
 		let guild = state.guilds[0].clone();
