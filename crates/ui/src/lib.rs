@@ -92,6 +92,7 @@ mod contact_editor;
 pub mod dialog;
 mod join_server;
 mod keybinds;
+mod name_styles;
 mod onboarding;
 mod polls;
 mod profile_edit;
@@ -1738,22 +1739,29 @@ impl MessagingUi {
 											let trailing =
 												profiles::server_tag_width(ui, server_tag)
 													+ if server_tag.is_some() { 5.0 } else { 0.0 };
-											account_badge::name(
-												ui,
-												&member.user,
-												name,
-												15.0,
-												(
-													text_color,
-													role_colors,
-													if response.hovered() || response.has_focus() {
-														colors.hover
-													} else {
-														colors.sidebar
-													},
-												),
-												egui::Sense::hover(),
-												trailing,
+											crate::name_styles::in_row(
+												response.contains_pointer() || response.has_focus(),
+												|| {
+													account_badge::name(
+														ui,
+														&member.user,
+														name,
+														15.0,
+														(
+															text_color,
+															role_colors,
+															if response.hovered()
+																|| response.has_focus()
+															{
+																colors.hover
+															} else {
+																colors.sidebar
+															},
+														),
+														egui::Sense::hover(),
+														trailing,
+													)
+												},
 											);
 											if let Some(tag) = server_tag {
 												profiles::server_tag(
@@ -2143,23 +2151,26 @@ impl MessagingUi {
 											let identity = ui
 												.vertical(|ui| {
 													ui.spacing_mut().item_spacing.y = 0.0;
-													ui.add(
-														egui::Label::new(
-															design::semibold(
-																ui,
-																state.user.as_ref().map_or_else(
-																	|| {
-																		language
-																			.text("your-account")
-																	},
-																	|u| u.name.clone(),
-																),
-																14.0,
-															)
-															.color(colors.text_strong),
-														)
-														.truncate()
-														.selectable(false),
+													let name = state.user.as_ref().map_or_else(
+														|| language.text("your-account"),
+														|u| u.name.clone(),
+													);
+													name_styles::label(
+														ui,
+														state
+															.user
+															.as_ref()
+															.and_then(name_styles::style),
+														&name,
+														egui::FontId::new(
+															14.0,
+															design::semibold_family(ui.ctx()),
+														),
+														None,
+														card_fill,
+														colors.text_strong,
+														egui::Sense::hover(),
+														true,
 													);
 													ui.add(
 														egui::Label::new(
@@ -4018,6 +4029,7 @@ impl MessagingUi {
 
 	pub fn show(&mut self, ui: &mut egui::Ui, state: &mut State) -> Vec<Command> {
 		self.avatars.cosmetics = self.cosmetics;
+		name_styles::set_enabled(self.cosmetics.name_styles);
 		let cosmetics_refresh = state.set_profile_cosmetics(self.cosmetics);
 		self.timeline.download.gif_favorites = state
 			.gifs

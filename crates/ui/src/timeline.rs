@@ -110,6 +110,8 @@ pub struct TimelineView {
 	suppressed_deleted_highlight: BTreeSet<Id>,
 	pub(super) remove_preserved: Option<Id>,
 	toolbar: Option<(Id, egui::Rect)>,
+	/// The message row the pointer was over last pass; its author's name style shows.
+	name_hover: Option<Id>,
 	copy_feedback: Option<(egui::Id, f64)>,
 	heights: BTreeMap<Id, (u64, f32)>,
 	// Heights can remain resize estimates; only these bounded active-row IDs were
@@ -2647,6 +2649,7 @@ impl TimelineView {
 				&& !egui::Popup::is_any_open(ui.ctx())
 				&& !crate::select::has_selection(ui.ctx())
 				&& !ui.input(|input| input.pointer.any_down() || input.pointer.any_released());
+			let name_hover = self.name_hover.take();
 			let mut end = first;
 			for index in first..self.rows.len() {
 				let row_id = ui.make_persistent_id(self.rows[index].0.0);
@@ -3127,14 +3130,23 @@ impl TimelineView {
 										),
 										|ui| {
 											ui.set_max_width(width);
-											let author = crate::account_badge::name(
-												ui,
-												&message.author,
-												state.message_author_name(message),
-												15.5,
-												(colors.text_strong, author_colors, colors.chat),
-												egui::Sense::click(),
-												0.0,
+											let author = crate::name_styles::in_row(
+												name_hover == Some(message.id),
+												|| {
+													crate::account_badge::name(
+														ui,
+														&message.author,
+														state.message_author_name(message),
+														15.5,
+														(
+															colors.text_strong,
+															author_colors,
+															colors.chat,
+														),
+														egui::Sense::click(),
+														0.0,
+													)
+												},
 											)
 											.on_hover_cursor(egui::CursorIcon::PointingHand);
 											if author.hovered() {
@@ -3193,18 +3205,23 @@ impl TimelineView {
 											egui::Layout::left_to_right(egui::Align::Center),
 											|ui| {
 												ui.spacing_mut().item_spacing.x = 8.0;
-												let author = crate::account_badge::name(
-													ui,
-													&message.author,
-													state.message_author_name(message),
-													15.5,
-													(
-														colors.text_strong,
-														author_colors,
-														colors.chat,
-													),
-													egui::Sense::click(),
-													48.0,
+												let author = crate::name_styles::in_row(
+													name_hover == Some(message.id),
+													|| {
+														crate::account_badge::name(
+															ui,
+															&message.author,
+															state.message_author_name(message),
+															15.5,
+															(
+																colors.text_strong,
+																author_colors,
+																colors.chat,
+															),
+															egui::Sense::click(),
+															48.0,
+														)
+													},
 												)
 												.on_hover_cursor(egui::CursorIcon::PointingHand);
 												if avatar_hot || author.hovered() {
@@ -3811,6 +3828,9 @@ impl TimelineView {
 						&& !other_toolbar_hover
 						&& !egui::Popup::is_any_open(ui.ctx())
 						&& retained_toolbar.is_none_or(|(active, _)| active == id);
+					if hovered {
+						self.name_hover = Some(id);
+					}
 					let context_menu = (ui.rect_contains_pointer(rect) || toolbar_hover)
 						&& !other_toolbar_hover
 						&& !reaction_menu && !egui::Popup::is_any_open(ui.ctx())
@@ -4201,6 +4221,10 @@ impl TimelineView {
 					row_height_key(message, previous, self.unread_boundary, state, deleted),
 					response.response.rect.height(),
 				));
+			}
+			// Names follow the hovered row a pass late; draw that pass even if the pointer stops.
+			if self.name_hover != name_hover {
+				ui.ctx().request_repaint();
 			}
 			let used: f32 = self.rows[..end].iter().map(|(_, height)| *height).sum();
 			ui.add_space((total - used).max(0.0));

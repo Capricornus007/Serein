@@ -1625,23 +1625,30 @@ impl SearchUi {
 							egui::Layout::left_to_right(egui::Align::Center),
 							|ui| {
 								ui.spacing_mut().item_spacing.x = 8.0;
-								crate::account_badge::name(
-									ui,
-									&hit.author,
-									state.user_display_name(&hit.author),
-									14.0,
-									(
-										colors.text_strong,
-										state.forum_author_colors(
-											hit.channel,
-											hit.author.id,
-											hit.author.webhook,
-											&[],
-										),
-										colors.base,
-									),
-									egui::Sense::hover(),
-									88.0,
+								crate::name_styles::in_row(
+									background
+										.as_ref()
+										.is_some_and(egui::Response::contains_pointer),
+									|| {
+										crate::account_badge::name(
+											ui,
+											&hit.author,
+											state.user_display_name(&hit.author),
+											14.0,
+											(
+												colors.text_strong,
+												state.forum_author_colors(
+													hit.channel,
+													hit.author.id,
+													hit.author.webhook,
+													&[],
+												),
+												colors.base,
+											),
+											egui::Sense::hover(),
+											88.0,
+										)
+									},
 								);
 								// Fixture IDs do not encode a real creation timestamp.
 								if hit.id.0 >= (1 << 22) {

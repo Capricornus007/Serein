@@ -245,6 +245,7 @@ pub fn synthetic_cosmetics() -> model::Cosmetics {
 			palette: model::NameplatePalette::Violet,
 			expires_at: None,
 		}),
+		name_style: None,
 	}
 }
 

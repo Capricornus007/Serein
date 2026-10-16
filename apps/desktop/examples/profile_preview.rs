@@ -726,6 +726,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let theme_preview = args.iter().any(|arg| arg == "--theme-preview");
 	let thumbnail = args.iter().any(|arg| arg == "--thumbnail");
 	let extension = value("--extension=").map(str::to_owned);
+	let name_style = value("--name-style=").and_then(|id| id.parse::<u32>().ok());
+	let name_font = value("--name-font=").and_then(|id| id.parse::<u32>().ok());
+	// `--name-style=` and `--name-font=` give the previewed user a synthetic Nitro name style;
+	// a font alone uses the solid effect.
+	let styled = name_style.is_some() || name_font.is_some();
+	let style_name = |user: &mut model::User| {
+		if styled {
+			user.cosmetics.get_or_insert_default().name_style = Some(model::NameStyle {
+				font: name_font.unwrap_or(0),
+				effect: model::NameEffect::from_id(name_style.unwrap_or(1)),
+				colors: vec![0xff7ab8, 0x7a5cff, 0x34d6ff, 0xffd166],
+			});
+		}
+	};
 	let member_presence = value("--presence=").unwrap_or("online").to_owned();
 	let card_status = value("--status=").map(str::to_owned);
 	let fixture = extension.as_deref().map(extension_fixture).transpose()?;
@@ -835,10 +849,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				prime_channel_link_replies(&mut state);
 			}
 			if page == "profile" {
+				if let Some(own) = state.user.as_mut() {
+					style_name(own);
+				}
 				prime_profile(&mut state);
 			}
 			if page == "member-tags" {
-				let user = test_support::message(1, model::Id(20)).author;
+				let mut user = test_support::message(1, model::Id(20)).author;
+				style_name(&mut user);
 				state.members = Some(model::MemberList {
 					channel: model::Id(20),
 					guild: Some(model::Id(10)),
@@ -909,6 +927,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				let _ = state.select(model::Id(26));
 			}
 			let mut messaging = ui::MessagingUi::default();
+			if styled {
+				messaging.cosmetics.name_styles = true;
+			}
 			if args.iter().any(|arg| arg == "--compact") {
 				messaging.apply_reading_preferences(
 					&cc.egui_ctx,
@@ -970,7 +991,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				// Synthetic cosmetics: the UI draws their artwork locally, offline. They are
 				// opt-in, so this page turns all four on.
 				messaging.cosmetics = model::CosmeticPreferences::SHOWN;
-				let user = test_support::message(1, model::Id(20)).author;
+				let mut user = test_support::message(1, model::Id(20)).author;
+				style_name(&mut user);
+				if let Some(own) = state.user.as_mut() {
+					style_name(own);
+				}
 				let mut offline = test_support::message(2, model::Id(20)).author;
 				offline.id = model::Id(3);
 				offline.name = "Sky (synthetic)".into();
@@ -1021,7 +1046,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			} else if page == "profile-card" {
 				state.demo = false;
 				state.gateway_connected = true;
-				let user = test_support::message(1, model::Id(20)).author;
+				let mut user = test_support::message(1, model::Id(20)).author;
+				style_name(&mut user);
 				state.members = Some(model::MemberList {
 					channel: model::Id(20),
 					guild: Some(model::Id(10)),

@@ -4904,3 +4904,5 @@ game-mentions-header = GAMES MATCHING @{ $query }
 game-mentions-unavailable = Games are unavailable.
 game-mentions-empty = No matching games.
 game-mentions-retry = Retry
+settings-cosmetics-name-styles = Name styles
+settings-cosmetics-name-styles-description = Nitro display name fonts, colours and effects.

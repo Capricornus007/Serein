@@ -3346,26 +3346,27 @@ pub fn show_with_session(
 								),
 								egui::Layout::left_to_right(egui::Align::Center),
 								|ui| {
-									let name = ui.add(
-										egui::Label::new(crate::role_names::galley(
-											ui,
-											&display,
-											egui::FontId::new(
-												if full { 26.0 } else { 20.0 },
-												design::semibold_family(ui.ctx()),
-											),
-											// Like Discord, the profile name stays neutral; roles show as chips.
-											None,
-											if full { theme.card } else { theme.panel },
-											theme.text,
-											ui.available_width(),
-										))
-										.truncate()
-										.sense(if full || user.webhook {
+									// Like Discord, the profile name stays neutral (roles show as
+									// chips) unless the account wears a Nitro name style.
+									let name = crate::name_styles::label(
+										ui,
+										crate::name_styles::style(
+											data.map_or(user, |data| &data.user),
+										),
+										&display,
+										egui::FontId::new(
+											if full { 26.0 } else { 20.0 },
+											design::semibold_family(ui.ctx()),
+										),
+										None,
+										if full { theme.card } else { theme.panel },
+										theme.text,
+										if full || user.webhook {
 											egui::Sense::hover()
 										} else {
 											egui::Sense::click()
-										}),
+										},
+										true,
 									);
 									if !full
 										&& !user.webhook && name

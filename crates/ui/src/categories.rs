@@ -1071,15 +1071,17 @@ impl MessagingUi {
 											let trailing =
 												crate::profiles::server_tag_width(ui, server_tag)
 													+ if server_tag.is_some() { 5.0 } else { 0.0 };
-											crate::account_badge::name(
-												ui,
-												user,
-												&label,
-												15.0,
-												(name_color, None, colors.sidebar),
-												egui::Sense::hover(),
-												trailing,
-											);
+											crate::name_styles::in_row(hovered, || {
+												crate::account_badge::name(
+													ui,
+													user,
+													&label,
+													15.0,
+													(name_color, None, colors.sidebar),
+													egui::Sense::hover(),
+													trailing,
+												)
+											});
 											if let Some(tag) = server_tag {
 												crate::profiles::server_tag(
 													ui,
