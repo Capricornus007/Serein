@@ -5448,6 +5448,26 @@ impl MessagingUi {
 			commands.push(command);
 		}
 		self.verification.show(&ctx, state);
+		// Discord's notice for a rate-limited send; the messages stay queued and go out on their own.
+		if state.send_throttled {
+			let result = dialog::Dialog::new(
+				"send-throttled",
+				crate::i18n::translate("send-throttled-title"),
+			)
+			.subtitle(crate::i18n::translate("send-throttled-body"))
+			.width(400.0)
+			.show(&ctx, |d| {
+				let mut close = false;
+				d.footer(|ui| {
+					close = dialog::action(ui, "send-throttled-dismiss", dialog::Action::Primary)
+						.clicked();
+				});
+				close
+			});
+			if result.inner || result.close {
+				state.dismiss_send_throttle();
+			}
+		}
 		self.onboarding.show(&ctx, state, &mut commands);
 		self.scroll.clear_if_unbound(&ctx);
 		self.scroll.paint(&ctx);

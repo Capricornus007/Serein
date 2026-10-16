@@ -443,9 +443,13 @@ impl DiscordApi {
 			.get("retry-after")
 			.and_then(|v| v.to_str().ok())
 			.and_then(|s| s.parse::<f64>().ok());
-		if exhausted || status == StatusCode::TOO_MANY_REQUESTS {
+		// A 429 without wait headers takes its body's `retry_after` below, not a default, even
+		// when the bucket also reports itself exhausted.
+		let limited = status == StatusCode::TOO_MANY_REQUESTS;
+		let wait = reset.or(retry_header);
+		if (exhausted || limited) && (wait.is_some() || !limited) {
 			let mut next = self.cooldown.lock().await;
-			*next = (*next).max(Instant::now() + safe_delay(reset.or(retry_header))?);
+			*next = (*next).max(Instant::now() + safe_delay(wait)?);
 		}
 		if status == StatusCode::UNAUTHORIZED {
 			self.stop();
@@ -699,6 +703,52 @@ impl DiscordApi {
 		}
 	}
 	/// Runs one typed command and returns its typed event.
+	/// [`Self::execute`] for the write queue. Like the official client, a message Discord
+	/// rate-limits (documented: a 429 request is not processed, so nothing was created) stays
+	/// pending and is resent with the same nonce once the service's wait has passed; `execute`
+	/// sleeps out that shared cooldown first. `throttled` hears each wait. Ambiguous outcomes are
+	/// never resent.
+	pub async fn execute_write(&self, command: Command, mut throttled: impl FnMut(&str)) -> Event {
+		/// Resends of one message, each after the wait Discord asked for.
+		const MAX_SEND_RETRIES: usize = 30;
+		let resend = match &command {
+			Command::Send {
+				sticker,
+				channel,
+				content,
+				nonce,
+				reply,
+			} => Some((*sticker, *channel, content.clone(), nonce.clone(), *reply)),
+			_ => None,
+		};
+		let mut event = self.execute(command).await;
+		let Some((sticker, channel, content, nonce, reply)) = resend else {
+			return event;
+		};
+		for _ in 0..MAX_SEND_RETRIES {
+			if !matches!(
+				event,
+				Event::SendResult {
+					result: Err(Failure::RateLimited),
+					..
+				}
+			) || self.stopped()
+			{
+				break;
+			}
+			throttled(&nonce);
+			event = self
+				.execute(Command::Send {
+					sticker,
+					channel,
+					content: content.clone(),
+					nonce: nonce.clone(),
+					reply,
+				})
+				.await;
+		}
+		event
+	}
 	pub async fn execute(&self, command: Command) -> Event {
 		match command {
 			Command::ApplicationCommands {
@@ -3123,6 +3173,100 @@ mod tests {
 			.unwrap();
 		api.ring_call(model::Id(2), None, true).await.unwrap();
 		server.await.unwrap();
+	}
+	/// A message Discord rate-limits is resent with its nonce after the wait, not failed.
+	#[tokio::test]
+	async fn rate_limited_sends_wait_and_resend_with_the_same_nonce() {
+		let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+		let address = listener.local_addr().unwrap();
+		let server = tokio::spawn(async move {
+			let mut nonces = Vec::new();
+			for response in [
+				(
+					"429 Too Many Requests",
+					r#"{"message":"You are being rate limited.","retry_after":0.05,"global":false}"#,
+				),
+				(
+					"200 OK",
+					r#"{"id":"6","channel_id":"2","author":{"id":"1","username":"Synthetic"},"content":"e","nonce":"spam"}"#,
+				),
+			] {
+				let (mut socket, _) = listener.accept().await.unwrap();
+				let mut request = Vec::new();
+				let payload = loop {
+					let mut bytes = [0; 1024];
+					let n = socket.read(&mut bytes).await.unwrap();
+					assert!(n > 0);
+					request.extend_from_slice(&bytes[..n]);
+					assert!(request.len() < 8192);
+					if let Some(end) = request.windows(4).position(|w| w == b"\r\n\r\n") {
+						let header = std::str::from_utf8(&request[..end]).unwrap();
+						assert!(header.starts_with("POST /channels/2/messages HTTP/1.1\r\n"));
+						let length: usize = header
+							.lines()
+							.find_map(|line| {
+								line.to_ascii_lowercase()
+									.strip_prefix("content-length: ")
+									.map(str::to_owned)
+							})
+							.unwrap()
+							.parse()
+							.unwrap();
+						if request.len() >= end + 4 + length {
+							break serde_json::from_slice::<serde_json::Value>(
+								&request[end + 4..end + 4 + length],
+							)
+							.unwrap();
+						}
+					}
+				};
+				nonces.push(payload["nonce"] == "spam");
+				let (status, body) = response;
+				// An exhausted bucket without wait headers still waits only the body's delay.
+				let exhausted = if status.starts_with("429") {
+					"X-RateLimit-Remaining: 0\r\n"
+				} else {
+					""
+				};
+				socket
+					.write_all(
+						format!(
+							"HTTP/1.1 {status}\r\n{exhausted}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+							body.len()
+						)
+						.as_bytes(),
+					)
+					.await
+					.unwrap();
+			}
+			nonces
+		});
+		let mut api = DiscordApi::new(Arc::new(
+			SessionSecret::from_owner_input("SYNTHETIC_SECRET_MARKER".into()).unwrap(),
+		))
+		.unwrap();
+		api.base = format!("http://{address}");
+		let mut throttled = Vec::new();
+		let started = Instant::now();
+		let event = tokio::time::timeout(
+			Duration::from_secs(5),
+			api.execute_write(
+				Command::Send {
+					sticker: None,
+					channel: model::Id(2),
+					content: "e".into(),
+					nonce: "spam".into(),
+					reply: None,
+				},
+				|nonce| throttled.push(nonce.to_owned()),
+			),
+		)
+		.await
+		.unwrap();
+		assert!(matches!(event, Event::SendResult { result: Ok(_), .. }));
+		assert!(started.elapsed() < Duration::from_millis(900));
+		assert_eq!(throttled, ["spam"]);
+		assert_eq!(server.await.unwrap(), [true, true]);
 	}
 	#[tokio::test]
 	async fn local_http_checks_redirect_expiry_rate_limits_and_response_cap() {

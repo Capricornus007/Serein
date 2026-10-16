@@ -643,6 +643,11 @@ pub enum Event {
 		nonce: String,
 		result: Result<Message, auth::Failure>,
 	},
+	/// Discord rate-limited this message (documented: a 429 request is not processed). The
+	/// writer resends it after the service's wait, so it stays pending like on Discord.
+	SendThrottled {
+		nonce: String,
+	},
 	/// The service asked the user to solve a captcha before accepting this text message.
 	SendChallenge {
 		nonce: String,
@@ -792,6 +797,11 @@ pub struct State {
 	pub failure_detail: Option<Box<str>>,
 	pub drafts: BTreeMap<Id, String>,
 	pub pending: Vec<Pending>,
+	/// Discord rate-limited a send; the UI shows "sending too quickly" until dismissed.
+	pub send_throttled: bool,
+	/// The notice was dismissed for this burst; it returns only after the queue drains.
+	#[doc(hidden)]
+	pub send_throttle_seen: bool,
 	/// Search results run oldest first, sorted by Discord rather than per page.
 	pub search_oldest: bool,
 	pub send_verification: verification::SendVerification,
@@ -1002,6 +1012,8 @@ impl Default for State {
 			failure_detail: None,
 			drafts: BTreeMap::new(),
 			pending: vec![],
+			send_throttled: false,
+			send_throttle_seen: false,
 			search_oldest: false,
 			send_verification: Default::default(),
 			reply: None,
@@ -1800,6 +1812,12 @@ impl State {
 		}
 		let before = self.timeline.row_ids().next()?;
 		Some(self.history(Some(before)))
+	}
+	/// Closes the "sending too quickly" notice for the rest of this burst.
+	pub fn dismiss_send_throttle(&mut self) {
+		self.send_throttled = false;
+		// A drained queue already ended the burst; the next one must be told again.
+		self.send_throttle_seen = self.pending.iter().any(|p| p.delivery == Delivery::Sending);
 	}
 	pub fn prepare_send(&mut self) -> Option<Command> {
 		self.prepare_send_with_attachment(None)
@@ -3762,7 +3780,23 @@ impl State {
 					}
 				}
 				self.pending.retain(|p| p.delivery != Delivery::Confirmed);
+				if !self.pending.iter().any(|p| p.delivery == Delivery::Sending) {
+					self.send_throttle_seen = false;
+				}
 				reconciliation
+			}
+			Event::SendThrottled { nonce } => {
+				// Once per burst, like Discord: a dismissed notice stays away until every queued
+				// message has gone out.
+				if !self.send_throttle_seen
+					&& self
+						.pending
+						.iter()
+						.any(|p| p.nonce == nonce && p.delivery == Delivery::Sending)
+				{
+					self.send_throttled = true;
+				}
+				Ok(())
 			}
 			Event::SendChallenge {
 				nonce,
@@ -4443,6 +4477,7 @@ impl Event {
 				Self::SendChallenge {
 					nonce, challenge, ..
 				} => nonce.capacity() + challenge.bytes(),
+				Self::SendThrottled { nonce } => nonce.capacity(),
 				_ => 0,
 			}
 	}
@@ -4509,6 +4544,89 @@ mod tests {
 					.collect(),
 			})
 			.unwrap();
+	}
+	#[test]
+	fn rate_limited_sends_stay_pending_and_raise_the_slow_down_notice() {
+		let mut state = State {
+			channels: vec![Channel {
+				id: Id(1),
+				guild: None,
+				parent_id: None,
+				kind: 1,
+				name: "Synthetic DM".into(),
+				position: 0,
+				recipients: vec![],
+				last_message: None,
+				icon: None,
+				member_list_id: None,
+				tags: None,
+				message_count: None,
+			}],
+			selected: Some(Id(1)),
+			auth: auth::AuthState::Authenticated,
+			freshness: Freshness::Fresh,
+			gateway_connected: true,
+			..State::default()
+		};
+		let mut queue = || {
+			state.drafts.insert(Id(1), "e".into());
+			let Command::Send { nonce, .. } = state.prepare_send().unwrap() else {
+				panic!()
+			};
+			nonce
+		};
+		let (first, second) = (queue(), queue());
+		let throttle = |nonce: &str| Event::SendThrottled {
+			nonce: nonce.into(),
+		};
+		apply(&mut state, throttle(&first));
+		assert!(state.send_throttled);
+		assert_eq!(state.pending[0].delivery, Delivery::Sending);
+		// Dismissed once, the notice stays away for the rest of the burst.
+		state.dismiss_send_throttle();
+		apply(&mut state, throttle(&second));
+		assert!(!state.send_throttled);
+		// A throttle for a message that is no longer pending raises nothing.
+		apply(&mut state, throttle("gone"));
+		assert!(!state.send_throttled);
+		// Once the queue drains, the next burst is told again.
+		state.user = Some(tests::message(1).author);
+		for (id, nonce) in [(10, &first), (11, &second)] {
+			let mut sent = tests::message(id);
+			sent.nonce = Some(nonce.clone());
+			apply(
+				&mut state,
+				Event::SendResult {
+					nonce: nonce.clone(),
+					result: Ok(sent),
+				},
+			);
+		}
+		assert!(state.pending.is_empty());
+		state.drafts.insert(Id(1), "e".into());
+		let Command::Send { nonce: third, .. } = state.prepare_send().unwrap() else {
+			panic!()
+		};
+		apply(&mut state, throttle(&third));
+		assert!(state.send_throttled);
+		// Closing a notice after its burst has drained does not hide the next burst's notice.
+		let mut sent = tests::message(12);
+		sent.nonce = Some(third.clone());
+		apply(
+			&mut state,
+			Event::SendResult {
+				nonce: third,
+				result: Ok(sent),
+			},
+		);
+		assert!(state.pending.is_empty());
+		state.dismiss_send_throttle();
+		state.drafts.insert(Id(1), "e".into());
+		let Command::Send { nonce: fourth, .. } = state.prepare_send().unwrap() else {
+			panic!()
+		};
+		apply(&mut state, throttle(&fourth));
+		assert!(state.send_throttled);
 	}
 	#[test]
 	fn rejected_sends_do_not_invalidate_a_healthy_conversation() {
