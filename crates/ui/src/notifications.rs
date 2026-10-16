@@ -295,6 +295,10 @@ impl MessagingUi {
 					egui::WidgetInfo::selected(egui::Role::Button, true, home, label.clone())
 				});
 				design::rail_name(&response, &label);
+				response.context_menu(|ui| {
+					ui.set_width(232.0);
+					self.server_menu.all_read_item(ui, state);
+				});
 				if response.clicked() {
 					self.guild = None;
 					if let Some(command) = state.open_messages() {

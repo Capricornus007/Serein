@@ -3022,6 +3022,8 @@ server-menu-header-server-menu = 服务器菜单
 server-menu-leave-item-leave-server = 离开服务器
 # Context: read_item
 server-menu-read-item-mark-as-read = 标为已读
+# Context: all_read_item
+server-menu-all-read-item-mark-all-as-read = 全部标为已读
 # Context: settings_item
 server-menu-settings-item-server-settings = 服务器设置
 # Context: show

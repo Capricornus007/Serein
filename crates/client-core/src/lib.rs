@@ -64,6 +64,8 @@ pub const MAX_PREMIUM_CONTENT: usize = 4000;
 /// Discord accepts at most ten attachments per message.
 pub const MAX_ATTACHMENTS: usize = 10;
 pub const MAX_NAV: usize = model::account::MAX_ENTRIES;
+/// Mark-all-read pairs per command (16 KiB); the rest stay unread for another choice.
+pub const MAX_BULK_ACK: usize = 1024;
 const MAX_VIEWED_SERVERS: usize = 1024;
 pub const MAX_MEMBER_PRESENCE_BYTES: usize = 128 * 1024;
 pub const MAX_EVENT_BYTES: usize = 4 * 1024 * 1024;
@@ -216,6 +218,11 @@ pub enum Command {
 	MarkGuildRead {
 		guild: Id,
 		request: u64,
+	},
+	/// Latest message per unread channel, at most `MAX_BULK_ACK`.
+	MarkAllRead {
+		request: u64,
+		channels: Vec<(Id, Id)>,
 	},
 	Reactions(reactions::Command),
 	Profile {
@@ -2238,6 +2245,14 @@ impl State {
 			let _ = self.apply_read_state(read_state::Event::GuildAck {
 				guild,
 				request,
+				result: Err(auth::Failure::RateLimited),
+			});
+			return;
+		}
+		if let Command::MarkAllRead { request, .. } = command {
+			let _ = self.apply_read_state(read_state::Event::AllAck {
+				request,
+				acked: 0,
 				result: Err(auth::Failure::RateLimited),
 			});
 			return;

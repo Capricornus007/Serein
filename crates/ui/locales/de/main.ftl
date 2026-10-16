@@ -2991,6 +2991,8 @@ server-menu-header-server-menu = Servermenü
 server-menu-leave-item-leave-server = Verlassen Sie den Server
 # Context: read_item
 server-menu-read-item-mark-as-read = Als gelesen markieren
+# Context: all_read_item
+server-menu-all-read-item-mark-all-as-read = Alles als gelesen markieren
 # Context: settings_item
 server-menu-settings-item-server-settings = Servereinstellungen
 # Context: show

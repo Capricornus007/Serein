@@ -1120,6 +1120,14 @@ impl DiscordApi {
 					result,
 				})
 			}
+			Command::MarkAllRead { request, channels } => {
+				let (acked, result) = self.mark_all_read(&channels).await;
+				Event::ReadState(client_core::read_state::Event::AllAck {
+					request,
+					acked,
+					result,
+				})
+			}
 			Command::Polls(command) => {
 				use client_core::polls::{Action, Event as E};
 				let channel = command.channel;
@@ -1649,6 +1657,42 @@ impl DiscordApi {
 		self.request_limited(Method::POST, &format!("/guilds/{guild}/ack"), None, 4096)
 			.await
 			.map(|_| ())
+	}
+	/// Unofficial normal-user bulk acknowledgement in 100-channel requests (unverified limit).
+	/// Returns how many leading channels were confirmed, even when a later request fails.
+	async fn mark_all_read(
+		&self,
+		channels: &[(model::Id, model::Id)],
+	) -> (usize, Result<(), Failure>) {
+		if channels.len() > client_core::MAX_BULK_ACK {
+			return (0, Err(Failure::Protocol));
+		}
+		let mut acked = 0;
+		for chunk in channels.chunks(100) {
+			let read_states = chunk
+				.iter()
+				.map(|(channel, message)| {
+					serde_json::json!({
+						"channel_id": channel.to_string(),
+						"message_id": message.to_string(),
+						"read_state_type": 0,
+					})
+				})
+				.collect::<Vec<_>>();
+			if let Err(failure) = self
+				.request_limited(
+					Method::POST,
+					"/read-states/ack-bulk",
+					Some(serde_json::json!({ "read_states": read_states })),
+					4096,
+				)
+				.await
+			{
+				return (acked, Err(failure));
+			}
+			acked += chunk.len();
+		}
+		(acked, Ok(()))
 	}
 }
 impl DiscordApi {

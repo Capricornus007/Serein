@@ -2992,6 +2992,8 @@ server-menu-header-server-menu = サーバーメニュー
 server-menu-leave-item-leave-server = サーバーから離れる
 # Context: read_item
 server-menu-read-item-mark-as-read = 既読としてマーク
+# Context: all_read_item
+server-menu-all-read-item-mark-all-as-read = すべて既読にする
 # Context: settings_item
 server-menu-settings-item-server-settings = サーバー設定
 # Context: show
