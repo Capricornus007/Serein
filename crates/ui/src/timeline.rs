@@ -619,7 +619,7 @@ fn starter_row(
 									.size(12.0)
 									.color(colors.muted),
 							)
-							.on_hover_text_with(|| format!("{time} UTC"));
+							.on_hover_text_with(|| crate::local_time::full(time));
 						},
 					);
 					ui.add(
@@ -1858,7 +1858,7 @@ fn show_system(
 						.size(12.0)
 						.color(colors.muted),
 				)
-				.on_hover_text_with(|| format!("{time} UTC"));
+				.on_hover_text_with(|| crate::local_time::full(time));
 			surface.exclude(stamp.rect);
 		});
 	}
@@ -3118,7 +3118,9 @@ impl TimelineView {
 														.size(12.0)
 														.color(colors.muted),
 												)
-												.on_hover_text_with(|| format!("{} UTC", time));
+												.on_hover_text_with(|| {
+													crate::local_time::full(time)
+												});
 											surface.exclude(time.rect);
 										},
 									);
@@ -3257,7 +3259,9 @@ impl TimelineView {
 														.size(12.0)
 														.color(colors.muted),
 													)
-													.on_hover_text_with(|| format!("{} UTC", time));
+													.on_hover_text_with(|| {
+														crate::local_time::full(time)
+													});
 												surface.exclude(time.rect);
 											},
 										);
@@ -3869,7 +3873,7 @@ impl TimelineView {
 								ui.scope_id().with("timestamp"),
 								egui::Sense::hover(),
 							)
-							.on_hover_text_with(|| format!("{} UTC", time));
+							.on_hover_text_with(|| crate::local_time::full(time));
 						}
 						let own = state
 							.user
