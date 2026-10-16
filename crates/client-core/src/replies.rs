@@ -246,6 +246,7 @@ impl State {
 			return;
 		};
 		let deletion = (message.channel, target);
+		self.forget_pending_replies(message.channel, &[target]);
 		// Only one message or an already validated <=50-message history page calls this.
 		if !self.reply_deletions.0.contains(&deletion) && self.reply_deletions.0.len() < 50 {
 			self.reply_deletions.0.push(deletion);
@@ -765,6 +766,7 @@ mod tests {
 						nonce: "synthetic".into(),
 						delivery: Delivery::Ambiguous,
 						confirmed: None,
+						reply: None,
 					});
 				}
 				let mut source = deleted_source(101, 50, 1);
@@ -791,6 +793,7 @@ mod tests {
 				nonce: "synthetic".into(),
 				delivery: Delivery::Ambiguous,
 				confirmed: None,
+				reply: None,
 			});
 			let mut source = deleted_source(101, 50, 1);
 			source.reply_deleted = false;
@@ -819,6 +822,7 @@ mod tests {
 				nonce: "other".into(),
 				delivery: Delivery::Ambiguous,
 				confirmed: None,
+				reply: None,
 			});
 			apply(
 				&mut state,
@@ -870,6 +874,7 @@ mod tests {
 				nonce: "synthetic".into(),
 				delivery: Delivery::Ambiguous,
 				confirmed: None,
+				reply: None,
 			});
 			let request = state.request;
 			let revision = state.revision;
