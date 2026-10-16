@@ -726,7 +726,7 @@ and owner-controlled live validation remain unavailable/unverified.
 Raw samples, source revisions and executable hashes are in
 [measurements.json](pr-evidence/post-rename-review/measurements.json).
 
-## URL underscore parsing (2026-10-14, issue #656)
+## URL markup parsing (2026-10-14, issue #656)
 
 [Measurements and source hashes](pr-evidence/url-underscores/measurements.json)
 compare `fbcbbad3` with the URL protection change on Windows 11 x64 build 26200,
@@ -751,7 +751,11 @@ is then run directly, with one warmup and five samples of 10,000 parses for each
 synthetic message. This measures parsing, not native frame latency, idle CPU,
 RSS or live Discord behavior. Native desktop automation is unavailable here.
 
-Protection adds temporary passes only for candidate URLs containing underscores;
-messages without underscores use an early return. Source remains capped at
-8 KiB, each pass at 512 events, and stored links at 16. No dependency or retained
-cache is added.
+These numbers were measured on the underscore-only revision `e6f92b0f`. Protection
+was later generalized to `*`, `~` and `&` entities, plus a trailing-opener check of
+at most four passes. That revision was not re-measured.
+
+Protection adds temporary passes only for candidate URLs containing `_`, `*`, `~`
+or `&`; other messages use an early return. Source remains capped at 8 KiB, each
+pass at 512 events (exhaustion falls back to bounded literal text), and stored
+links at 16. No dependency or retained cache is added.
