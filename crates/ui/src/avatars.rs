@@ -705,6 +705,10 @@ impl Avatars {
 		}
 		response
 	}
+	/// Whether GIFs animate right now: animation is on and the window has focus.
+	pub(crate) fn gifs_playing(&self, ctx: &egui::Context) -> bool {
+		self.animate_gifs && ctx.input(|input| input.focused)
+	}
 	/// Picker preview texture; a small GIF preview plays, never the full-size original.
 	/// Synthetic previews are painted locally.
 	pub(crate) fn gif_texture(
