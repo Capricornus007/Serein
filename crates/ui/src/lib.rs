@@ -491,6 +491,8 @@ pub struct MessagingUi {
 	edit_sent: Option<SubmittedEdit>,
 	deleting: Option<(Id, Id)>,
 	ime_active: bool,
+	/// The composer claimed Tab last frame, so egui left it in the input for a suggestion menu.
+	composer_claims_tab: bool,
 	mention_menu: mentions::Menu,
 	slash_commands: slash_commands::Menu,
 	slash_direct: Option<slash_builtin::PendingMessage>,
@@ -3285,6 +3287,11 @@ impl MessagingUi {
 		} else {
 			None
 		};
+		if std::mem::take(&mut self.composer_claims_tab) && ctx.memory(|m| m.has_focus(composer_id))
+		{
+			// A menu that closed this frame must not leave Tab for the editor to indent with.
+			ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Tab));
+		}
 		let mut editing = if editing_here {
 			self.editing.take()
 		} else {
@@ -3730,6 +3737,14 @@ impl MessagingUi {
                             output.state.clone().store(ctx, composer_id);
                             output.response.request_focus();
                             mention_changed = true;
+                        }
+                        // egui moves focus on unclaimed Tab before any menu can consume it.
+                        self.composer_claims_tab = mention_enabled
+                            && (self.mention_menu.claims_tab() || (!editing_here && self.slash_commands.claims_tab(ctx)));
+                        if self.composer_claims_tab {
+                            ctx.memory_mut(|m| m.set_focus_lock_filter(composer_id, egui::EventFilter {
+                                tab: true, horizontal_arrows: true, vertical_arrows: true, escape: editing_here,
+                            }));
                         }
                         if text_menu::show(&mut output.response, composer_id, draft, paste_allowed, selection) {
                             self.menu_paste = Some(composer_id);
