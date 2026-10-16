@@ -788,10 +788,13 @@ impl Avatars {
 		corner: egui::CornerRadius,
 		demo: bool,
 	) {
+		// A profile theme decides the banner, as on Discord; the legacy accent is a fallback.
 		let color = profile
-			.accent_color
-			.or(profile.theme_colors.map(|c| c[0]))
-			.map(|rgb| egui::Color32::from_rgb((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8))
+			.theme_colors
+			.map(crate::profiles::Theme::banner)
+			.or(profile
+				.accent_color
+				.map(|rgb| egui::Color32::from_rgb((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8)))
 			.unwrap_or(crate::design::palette(ui).accent.gamma_multiply(0.4));
 		ui.painter().rect_filled(rect, corner, color);
 		if ui.is_rect_visible(rect)
