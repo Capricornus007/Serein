@@ -30,7 +30,7 @@ pub mod profile;
 pub mod reactions;
 pub mod read_state;
 mod replies;
-pub use replies::{HistoryNavigation, Reply, ReplyDeletions};
+pub use replies::{HistoryNavigation, ParkedReplies, Reply, ReplyDeletions};
 pub mod group_actions;
 pub mod onboarding;
 pub mod resident;
@@ -823,6 +823,9 @@ pub struct State {
 	pub search_oldest: bool,
 	pub send_verification: verification::SendVerification,
 	pub reply: Option<Reply>,
+	/// Reply targets of conversations left before sending; at most 64, session RAM only.
+	#[doc(hidden)]
+	pub parked_replies: ParkedReplies,
 	pub send_sequence: u64,
 	pub request: u64,
 	pub history_before: Option<Id>,
@@ -1034,6 +1037,7 @@ impl Default for State {
 			search_oldest: false,
 			send_verification: Default::default(),
 			reply: None,
+			parked_replies: ParkedReplies::default(),
 			send_sequence: 0,
 			request: 0,
 			history_before: None,
@@ -1314,6 +1318,7 @@ impl State {
 		if let Some(previous) = self.selected {
 			self.remember_channel(previous);
 		}
+		let parked_reply = self.swap_parked_reply(channel);
 		self.remember_channel(channel);
 		if self
 			.channel(channel)
@@ -1343,7 +1348,7 @@ impl State {
 		let scope = self.application_command_scope(channel);
 		self.application_commands.retain(scope);
 		self.older_exhausted = false;
-		self.reply = None;
+		self.restore_reply(channel, parked_reply);
 		self.revision += 1;
 		if self.channel(channel).is_some_and(|c| !c.supports_text()) {
 			self.cancel_history();
@@ -1427,6 +1432,7 @@ impl State {
 
 	/// Open Friends / Home. Does not clear the timeline or emit a command.
 	pub fn open_home(&mut self) {
+		self.park_reply();
 		self.last_viewed_dm = None;
 		self.application_commands.clear();
 		self.selected = None;
@@ -1474,6 +1480,7 @@ impl State {
 			};
 			let apply = match place {
 				Place::Home => {
+					self.park_reply();
 					self.application_commands.clear();
 					self.selected = None;
 					self.history_navigation.clear();
@@ -3741,6 +3748,7 @@ impl State {
 				}
 			}
 			Event::Delete { channel, id } => {
+				self.parked_replies.forget_targets(channel, &[id]);
 				self.read_state.activity.delete(channel, id);
 				self.forget_pending_replies(channel, &[id]);
 				if let Some(channel) = self
@@ -3781,6 +3789,7 @@ impl State {
 				Ok(())
 			}
 			Event::DeleteBulk { channel, ids } => {
+				self.parked_replies.forget_targets(channel, &ids);
 				if ids.len() <= 100 {
 					for id in &ids {
 						self.read_state.activity.delete(channel, *id);
@@ -4123,6 +4132,7 @@ impl State {
 			self.archived_thread = None;
 		}
 		self.channels.retain(|c| !removed.contains(&c.id));
+		self.parked_replies.forget_channels(removed);
 		self.permissions.forget_channels(removed);
 		for id in removed {
 			self.permissions.channels.remove(id);
