@@ -1041,6 +1041,13 @@ struct Desktop {
 	/// Written under the account's own entry on every READY, including a launch restore, so
 	/// the switcher can always get back to an account it lists.
 	pending_account_save: Option<Arc<SessionSecret>>,
+	/// Current login, sharing the connection allocation, so enabling plaintext storage
+	/// can save it without another authentication, including after disabling/re-enabling.
+	current_login: Option<Arc<SessionSecret>>,
+	/// The plaintext fallback choice last handed to the credential worker.
+	plaintext_login: bool,
+	/// Active/per-account fallback saves waiting for bounded credential-queue capacity.
+	plaintext_save_pending: [bool; 2],
 	account_presences: std::collections::BTreeMap<model::Id, model::OwnPresence>,
 	presence_load_pending: bool,
 	deferred_connect: Option<(SessionSecret, bool)>,
@@ -1489,6 +1496,14 @@ impl Desktop {
 			.worker_threads(2)
 			.enable_all()
 			.build()?;
+		// Configured before the worker's first read, so a plaintext login restores on launch.
+		let plaintext_login = !demo
+			&& preferences
+				.as_ref()
+				.is_ok_and(|preferences| preferences.plaintext_login);
+		if !demo {
+			platform::plaintext_login::configure(plaintext_login_dir(), plaintext_login);
+		}
 		let mut store = (!demo).then(|| credentials::Store::start(cc.egui_ctx.clone()));
 		let cache = (!demo).then(|| cache::Cache::start(cc.egui_ctx.clone()));
 		#[cfg(all(debug_assertions, feature = "demo"))]
@@ -2362,6 +2377,9 @@ impl Desktop {
 			variant_changed: false,
 			pending_save: None,
 			pending_account_save: None,
+			current_login: None,
+			plaintext_login,
+			plaintext_save_pending: [false; 2],
 			account_presences: std::collections::BTreeMap::new(),
 			presence_load_pending,
 			deferred_connect: None,
@@ -2436,6 +2454,58 @@ impl Desktop {
 		}
 		false
 	}
+	/// Hands the owner's plaintext saved-login choice to the credential worker, in order with
+	/// its other writes, and saves a login that failed earlier for want of a keyring.
+	fn sync_plaintext_login(&mut self) {
+		let enabled = self.messaging.plaintext_login;
+		let (Some(store), Some(directory)) = (&self.store, plaintext_login_dir()) else {
+			return;
+		};
+		if enabled != self.plaintext_login {
+			let operation = credentials::Operation::SetPlaintext { directory, enabled };
+			if store
+				.send
+				.try_send((self.state.generation, credentials::Request::NONE, operation))
+				.is_err()
+			{
+				return; // Retried after the worker wakes the UI.
+			}
+			self.plaintext_login = enabled;
+			self.plaintext_save_pending = [enabled; 2];
+		}
+		if !enabled || self.state.auth != AuthState::Authenticated {
+			return;
+		}
+		let Some(secret) = self.current_login.clone() else {
+			return;
+		};
+		if self.plaintext_save_pending[0]
+			&& store
+				.send
+				.try_send((
+					self.state.generation,
+					credentials::Request::NONE,
+					credentials::Operation::Save(secret.clone()),
+				))
+				.is_ok()
+		{
+			self.plaintext_save_pending[0] = false;
+		}
+		if self.plaintext_save_pending[1]
+			&& let Some(account) = self.state.user.as_ref().map(|user| user.id)
+			&& store
+				.send
+				.try_send((
+					self.state.generation,
+					credentials::Request::NONE,
+					credentials::Operation::SaveAccount(account, secret),
+				))
+				.is_ok()
+		{
+			self.plaintext_save_pending[1] = false;
+		}
+	}
+
 	fn save_app_preferences(&mut self) {
 		if self.fixture_only || self.state.demo {
 			return;
@@ -4459,7 +4529,14 @@ impl Desktop {
 						self.queue_cache_for(*account, cache::Operation::Forget);
 					}
 					match roster {
-						Ok(accounts) => self.messaging.accounts = accounts.clone(),
+						Ok(accounts) => {
+							self.messaging.accounts = accounts.clone();
+							if let Some(store) = &mut self.store {
+								store.retain_accounts(
+									accounts.iter().map(|account| account.id).collect(),
+								);
+							}
+						}
 						Err(_) => {
 							self.roster_failed = true;
 							self.cache_error = true;
@@ -4571,10 +4648,14 @@ impl Desktop {
 			}
 		}
 		self.retry_history_clears();
+		self.sync_plaintext_login();
 		let mut results = Vec::new();
 		if let Some(store) = &mut self.store {
 			for _ in 0..4 {
-				match store.poll(std::time::Instant::now()) {
+				match store.poll(
+					std::time::Instant::now(),
+					self.state.user.as_ref().map(|user| user.id),
+				) {
 					Some(result) => results.push(result),
 					None => break,
 				}
@@ -4584,7 +4665,11 @@ impl Desktop {
 			}
 		}
 		for (generation, outcome) in results {
-			if generation != self.state.generation {
+			if generation != self.state.generation
+				&& !matches!(
+					outcome,
+					credentials::Outcome::PlaintextSet(..) | credentials::Outcome::Reconciled(..)
+				) {
 				continue;
 			}
 			match outcome {
@@ -4630,13 +4715,20 @@ impl Desktop {
 							"Could not save this account for the switcher; sign in again to retry";
 					}
 				}
-				credentials::Outcome::Saved(Ok(())) => {
-					self.credential_status = "Login saved in the OS credential store"
+				credentials::Outcome::Saved(Ok(saved)) => {
+					self.credential_status = match saved {
+						platform::Saved::CredentialStore => {
+							"Login saved in the OS credential store"
+						}
+						platform::Saved::Plaintext => {
+							"Login saved in plaintext because no OS keyring is available"
+						}
+					}
 				}
 				credentials::Outcome::Saved(Err(platform::CredentialError::NoStore)) => {
 					self.messaging.toasts.push(
 						ui::design::Level::Warning,
-						"No OS keyring found, so you will need to sign in again next launch",
+						"No OS keyring found, so you will need to sign in again next launch. Settings › Storage can save it in plaintext instead.",
 					);
 				}
 				credentials::Outcome::Saved(Err(_)) => {
@@ -4649,6 +4741,24 @@ impl Desktop {
 							ui::design::Level::Error,
 							"Could not remove that account's saved login from the OS credential store",
 						);
+					}
+				}
+				credentials::Outcome::Reconciled(result) => {
+					if result.is_err() {
+						self.messaging.toasts.push(
+							ui::design::Level::Error,
+							"Could not remove orphaned plaintext saved logins",
+						);
+					}
+				}
+				credentials::Outcome::PlaintextSet(enabled, result) => {
+					if result.is_err() {
+						self.messaging.toasts.push(
+							ui::design::Level::Error,
+							"Could not delete the plaintext saved logins in Serein's data folder",
+						);
+					} else if !enabled {
+						self.credential_status = "Plaintext saved logins deleted";
 					}
 				}
 				credentials::Outcome::Forgotten(result) => {
@@ -4881,6 +4991,7 @@ impl Desktop {
 					// A token the owner just supplied replaces whatever was stored before.
 					let fresh_token = self.pending_save.is_some();
 					if let Some(secret) = self.pending_save.take() {
+						self.current_login = Some(secret.clone());
 						queued &= store
 							.send
 							.try_send((
@@ -4974,6 +5085,7 @@ impl Desktop {
 			self.state.interrupt_gif_favorites();
 			self.connection = None;
 			self.pending_save = None;
+			self.current_login = None;
 			self.pending_account_save = None;
 			self.voice.stop();
 			self.messaging.camera_test_requested = false;
@@ -6483,6 +6595,13 @@ impl eframe::App for Desktop {
 		self.frame_metrics.reflows = self.messaging.timeline_reflows();
 		self.frame_metrics.finish();
 	}
+}
+
+/// Holds owner-enabled plaintext logins, inside the private local data directory.
+fn plaintext_login_dir() -> Option<std::path::PathBuf> {
+	local_store::data_dir()
+		.ok()
+		.map(|root| root.join("plaintext-login"))
 }
 
 #[cfg(test)]
