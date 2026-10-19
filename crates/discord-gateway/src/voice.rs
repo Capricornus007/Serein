@@ -804,6 +804,12 @@ impl Calls {
 					emit,
 				)?;
 			}
+			"STREAM_UPDATE" => {
+				// Only the count drives the viewer cue; a malformed refresh is ignored.
+				if let Ok(update) = decode::<stream::Update>(data) {
+					self.emit_stream(screen::Event::Viewers(update.viewers), emit)?;
+				}
+			}
 			"STREAM_DELETE" => {
 				let Ok(deleted) = decode::<stream::Deleted>(data) else {
 					return self.emit_stream(
@@ -954,7 +960,7 @@ impl Calls {
 		emit: &impl Fn(Event) -> Result<(), Failure>,
 	) -> Result<(), Failure> {
 		match kind {
-			"STREAM_CREATE" | "STREAM_SERVER_UPDATE" | "STREAM_DELETE" => {
+			"STREAM_CREATE" | "STREAM_SERVER_UPDATE" | "STREAM_UPDATE" | "STREAM_DELETE" => {
 				self.stream_dispatch(kind, data, emit)?;
 			}
 			"CALL_CREATE" | "CALL_UPDATE" | "CALL_DELETE" => {
@@ -2497,6 +2503,30 @@ mod tests {
 				..
 			})
 		));
+		for key in ["guild:10:20:2", "guild:10:20:1"] {
+			calls
+				.dispatch(
+					"STREAM_UPDATE",
+					format!(r#"{{"stream_key":"{key}","viewer_ids":["4","5"],"paused":false}}"#)
+						.as_bytes(),
+					Some(Id(1)),
+					&emit,
+				)
+				.unwrap();
+		}
+		assert!(matches!(
+			events.lock().unwrap().remove(3),
+			Event::Voice(voice::Event::Stream {
+				stream_request: 8,
+				event: screen::Event::Viewers(2),
+				..
+			})
+		));
+		assert_eq!(
+			events.lock().unwrap().len(),
+			3,
+			"other streams' viewers are ignored"
+		);
 
 		let Frame::Text(delete) = calls
 			.stream_packet(

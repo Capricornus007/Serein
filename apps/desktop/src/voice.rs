@@ -182,6 +182,8 @@ struct Live {
 struct CallCues {
 	joined: bool,
 	peers: Option<[u64; voice::MAX_PARTICIPANTS]>,
+	/// Peers announcing Go Live in the last snapshot; the local share cues itself.
+	streamers: Option<[u64; voice::MAX_PARTICIPANTS]>,
 }
 impl CallCues {
 	fn poll(
@@ -202,13 +204,33 @@ impl CallCues {
 			return cue;
 		}
 		let mut peers = [0; voice::MAX_PARTICIPANTS];
+		let mut streamers = [0; voice::MAX_PARTICIPANTS];
+		let mut streaming = streamers.iter_mut();
 		for (slot, participant) in peers.iter_mut().zip(
 			participants
 				.iter()
 				.filter(|participant| participant.user != owner),
 		) {
 			*slot = participant.user.0;
+			if participant.streaming
+				&& let Some(stream) = streaming.next()
+			{
+				*stream = participant.user.0;
+			}
 		}
+		let previous_streamers = self
+			.streamers
+			.replace(streamers)
+			.unwrap_or([0; voice::MAX_PARTICIPANTS]);
+		// Discord ranks a new stream above membership changes made in the same update.
+		let stream_cue = self
+			.peers
+			.is_some_and(|_| {
+				streamers
+					.iter()
+					.any(|user| *user != 0 && !previous_streamers.contains(user))
+			})
+			.then_some(Sound::ScreenShareOn);
 		// ponytail: membership scans are capped at 64 IDs; no per-frame set allocation.
 		let membership_cue = self.peers.replace(peers).and_then(|previous| {
 			if previous
@@ -223,7 +245,7 @@ impl CallCues {
 					.then_some(Sound::UserJoin)
 			}
 		});
-		cue.or(membership_cue)
+		cue.or(stream_cue).or(membership_cue)
 	}
 }
 /// Remote cameras kept as textures at once; matches the transport's source limit.
@@ -1876,13 +1898,45 @@ pub fn debug_call_cues_check() {
 		Some(Sound::UserLeave)
 	);
 	assert_eq!(cues.poll(true, true, owner.user, &[owner]), None);
+	// Another participant going live is announced once; the local share cues itself.
+	let mut streaming_peer = peer;
+	streaming_peer.streaming = true;
+	let mut streaming_owner = owner;
+	streaming_owner.streaming = true;
+	assert_eq!(
+		cues.poll(true, true, owner.user, &[owner, peer]),
+		Some(Sound::UserJoin)
+	);
+	assert_eq!(
+		cues.poll(true, true, owner.user, &[streaming_owner, peer]),
+		None
+	);
+	assert_eq!(
+		cues.poll(true, true, owner.user, &[owner, streaming_peer]),
+		Some(Sound::ScreenShareOn)
+	);
+	assert_eq!(
+		cues.poll(true, true, owner.user, &[owner, streaming_peer]),
+		None
+	);
+	assert_eq!(cues.poll(true, true, owner.user, &[owner, peer]), None);
+	// Streams already live when this device joins or resynchronises are not announced.
+	assert_eq!(cues.poll(true, false, owner.user, &[]), None);
+	assert_eq!(
+		cues.poll(true, true, owner.user, &[owner, streaming_peer]),
+		None
+	);
+	assert_eq!(
+		CallCues::default().poll(true, true, owner.user, &[owner, streaming_peer]),
+		Some(Sound::UserJoin)
+	);
 	assert_eq!(
 		CallCues::default().poll(true, true, owner.user, &[owner]),
 		Some(Sound::UserJoin),
 		"a new explicitly started call has its own join cue"
 	);
 	println!(
-		"Call cue debug check passed: local/remote joins, departures, rekeying and reconnect suppression. No audio devices opened."
+		"Call cue debug check passed: local/remote joins, departures, remote streams, rekeying and reconnect suppression. No audio devices opened."
 	);
 }
 
