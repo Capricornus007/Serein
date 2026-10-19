@@ -3793,6 +3793,7 @@ impl MessagingUi {
 		let colors = design::palette(ui);
 		let phase = call.phase;
 		let channel_id = call.channel;
+		let guild_id = call.guild;
 		let camera = call.camera;
 		let connected = matches!(phase, Phase::Connected | Phase::Waiting);
 		let error = call.error;
@@ -3891,13 +3892,30 @@ impl MessagingUi {
 									.truncate()
 									.selectable(false),
 								);
-								ui.add(
-									egui::Label::new(
-										RichText::new(detail).size(12.0).color(colors.muted),
-									)
-									.truncate()
-									.selectable(false),
+								let response = ui.add(
+								    egui::Label::new(
+        								RichText::new(detail).size(12.0).color(colors.muted),
+    								)
+  									.truncate()
+   									.selectable(false)
+   									.sense(egui::Sense::click()),
 								);
+
+								if response.clicked() {
+    								self.guild = guild_id;
+
+    								if state.selected != Some(channel_id)
+        								&& let Some(command) = state.select(channel_id)
+    								{
+        								commands.push(command);
+    								}
+
+    									self.navigation_channel = Some(channel_id);
+								}
+								
+								response
+   									.on_hover_cursor(egui::CursorIcon::PointingHand)
+    								.on_hover_text("Switch to this voice channel");
 							});
 						});
 					});
