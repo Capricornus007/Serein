@@ -591,6 +591,8 @@ pub enum Event {
 	},
 	Members(MemberList),
 	DirectPresence(Vec<presence::Update>),
+	/// Guild-scoped presence for DM recipients who are not friends.
+	SharedGuildPresence(Vec<presence::Update>),
 	MemberPresence {
 		guild: Id,
 		channel: Id,
@@ -789,6 +791,9 @@ pub struct State {
 	/// A direct presence was dropped or evicted, or READY's presence was unavailable.
 	#[doc(hidden)]
 	pub direct_presence_lossy: bool,
+	/// Users whose `direct_presences` record came from shared-guild presence, not the direct feed.
+	#[doc(hidden)]
+	pub shared_presence_users: BTreeSet<Id>,
 	pub member_request: u64,
 	pub guilds: Vec<Guild>,
 	pub channels: Vec<Channel>,
@@ -1015,6 +1020,7 @@ impl Default for State {
 			direct_presence_bytes: None,
 			direct_presence_epoch: 0,
 			direct_presence_lossy: false,
+			shared_presence_users: BTreeSet::new(),
 			member_request: 0,
 			guilds: vec![],
 			channels: vec![],
@@ -2653,6 +2659,13 @@ impl State {
 			}
 			return;
 		}
+		if let Event::SharedGuildPresence(updates) = &envelope.event {
+			// Only a fallback: an oversized batch is dropped without marking friends lossy.
+			if envelope.event.bytes() <= MAX_MEMBER_PRESENCE_BYTES {
+				self.apply_shared_guild_presence(updates);
+			}
+			return;
+		}
 		// Preserve the running total through channel-create/permission bursts at guild admission.
 		if !matches!(
 			&envelope.event,
@@ -2951,7 +2964,20 @@ impl State {
 				self.apply_messaging_permissions(request, result);
 				Ok(())
 			}
-			Event::UserAction(event) => self.apply_user_action(event),
+			Event::UserAction(event) => {
+				let friendship = matches!(
+					&event,
+					user_actions::Event::Friends(_)
+						| user_actions::Event::Friend { .. }
+						| user_actions::Event::Relationship { .. }
+				);
+				let result = self.apply_user_action(event);
+				// A new friend's direct presence is authoritative; drop any shared-guild stand-in.
+				if friendship && !self.shared_presence_users.is_empty() {
+					self.prune_direct_presence();
+				}
+				result
+			}
 			Event::ServerAction(event) => self.apply_server_action(event),
 			Event::ChannelAction(event) => self.apply_channel_action(event),
 			Event::ServerSettings(event) => self.apply_server_settings(event),
@@ -3340,7 +3366,9 @@ impl State {
 				}
 				Ok(())
 			}
-			Event::MemberPresence { .. } | Event::DirectPresence(_) => {
+			Event::MemberPresence { .. }
+			| Event::DirectPresence(_)
+			| Event::SharedGuildPresence(_) => {
 				unreachable!("presence handled before timeline revision")
 			}
 			Event::MemberSearch { request, result } => {
@@ -4525,7 +4553,7 @@ impl Event {
 							.map(MemberPresence::heap_bytes)
 							.sum::<usize>()
 				}
-				Self::DirectPresence(updates) => {
+				Self::DirectPresence(updates) | Self::SharedGuildPresence(updates) => {
 					updates.capacity() * size_of::<presence::Update>()
 						+ updates
 							.iter()

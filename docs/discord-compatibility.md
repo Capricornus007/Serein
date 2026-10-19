@@ -1474,6 +1474,20 @@ and rich text alongside presence. Only received activity metadata is displayed; 
 unavailable. Offline status clears activity. Disconnect hides cached DM presence; a successful resume restores it and applies replayed changes. Fresh READY, resync and session reset discard the cache.
 Join/spectate actions and progress timers remain unsupported.
 
+DM recipients who are not friends (October 17, 2026): Discord subscribes a normal account
+to the presence of users it has an open DM with, but reports non-friends through guilds:
+READY `guilds[].presences`, READY_SUPPLEMENTAL `merged_presences.guilds` and guild-scoped
+PRESENCE_UPDATE. Serein previously read none of these for DMs, so such a recipient stayed
+Offline whatever their status. These guild sources now stand in for DM recipients who are
+not friends only, batched separately within the same 100-ms window and limits; friends keep
+using only the direct feed. The gateway drops guild updates for anyone else before batching,
+tracking DM recipients and friends (up to 4,096 each) as channels and relationships change, and
+sends the READY guild bootstrap after Startup. A shared status is discarded once that recipient
+becomes a friend. As before, a DM recipient without any report is Offline, matching
+the unofficial description that only non-offline users are sent. These shapes come from the
+[unofficial gateway documentation](https://docs.discord.food/topics/gateway-events) and were
+not validated against a live session.
+
 Startup correction: Identify does not enable `DEDUPE_USER_OBJECTS`, so initial friend presence
 arrives in `READY.presences` with `user.id`. The bootstrap now accepts that format as well as
 `merged_presences.friends` with `user_id`; both use the same recipient filter and byte/item limits.
