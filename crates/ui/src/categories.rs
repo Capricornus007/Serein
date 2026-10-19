@@ -1040,7 +1040,7 @@ impl MessagingUi {
 								(dm_list && channel.kind == 3).then(|| {
 									format!(
 										"{} {}",
-										channel.recipients.len().max(1),
+										channel.recipients.len() + 1,
 										language.text("members-count")
 									)
 								})
