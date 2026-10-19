@@ -1536,13 +1536,34 @@ for its MP3-labeled card; a separate original MP3 fixture checks real MP3 decodi
 Live CDN/account interoperability and native output on other OSes remain unverified.
 
 The streaming player no longer rejects encoded attachments above 20 MiB. It reads
-validated 16 KiB HTTP ranges into a one-second PCM queue instead of retaining the
-file. The shared original-attachment validator still admits at most 100 MiB.
+validated HTTP ranges into a one-second PCM queue instead of retaining the
+file. Since October 17, 2026, startup still fetches one 16 KiB range, but sequential
+ranges double up to 256 KiB and the next one is fetched in the background once reading
+passes half of the current one, so at most two ranges (512 KiB) are held. Output starts
+after a quarter second of decoded audio (or the end of a shorter clip), and after an
+underrun it resumes only once a fifth of a second is queued again. A synthetic local
+range server decodes a 4 MiB WAV in at most 24 requests, where 16 KiB reads needed 256.
+Seeking still replays decoding from the start, but each clip keeps up to 16 MiB of its
+downloaded ranges (from the start of the file) until it stops or another clip starts, so
+replaying a cached clip makes no further requests. The shared original-attachment validator still admits at most 100 MiB.
 The separate 64 MiB cumulative decoded-audio and ten-minute limits remain;
 servers without range support require external playback. The offline
 `--demo --demo-check-audio` debug command checks public admission and decodes an entire
 24 MiB WAV over synthetic local HTTP ranges, without retaining the decoded clip,
 opening an audio device or contacting Discord.
+
+M4A, AAC and FLAC (October 17, 2026): `.m4a`, `.aac` and `.flac` attachments, and the
+`audio/mp4`, `audio/x-m4a`, `audio/aac` and `audio/flac` MIME families, now use the inline audio
+player. An audio extension takes precedence over a `video/*` MIME type, which can be reported for
+MP4-family audio; Serein previously sent such files to the video player, which showed an empty
+stage. Symphonia's ISO MP4, AAC-LC, ALAC and FLAC readers decode them. The bounded source
+keeps its rule that demuxers never parse attachment metadata: FLAC forwards only STREAMINFO and
+skips tag, picture and padding blocks unread; MP4 validates the top-level layout, reads a movie
+index of at most 8 MiB and renames its `udta`/`meta` boxes and unknown top-level boxes to `free`
+in place. MP4 is the one seekable layout, because its index can follow the audio and sample
+offsets are absolute. HE-AAC and fragmented MP4 remain unsupported (Download/Open original).
+Synthetic 0.2-second fixtures cover AAC with a trailing index, ALAC and FLAC; live CDN delivery
+of these types is unverified.
 
 ### Unknown Gateway variants (September 10, 2026)
 
