@@ -356,6 +356,15 @@ impl Voice {
 			self.retiring = Some(live.audio.shutdown());
 		}
 	}
+	/// Hang up this device's call. A call it had joined plays the leave cue on the next poll,
+	/// mirroring its local join cue; a call still connecting ends silently.
+	pub fn hang_up(&mut self, state: &State) {
+		self.leave_cue |= self
+			.live
+			.as_ref()
+			.is_some_and(|live| live.cues.joined && live.generation == state.generation);
+		self.stop();
+	}
 	pub fn stop_camera(&mut self) {
 		if let Some(camera) = &self.camera {
 			camera.stop();
@@ -2157,8 +2166,12 @@ mod tests {
 		assert!(!pending.ring);
 		assert!(manager.live.is_none());
 		state.leave_call();
-		manager.stop();
+		manager.hang_up(&state);
 		assert!(manager.pending.is_none());
+		assert!(
+			!manager.leave_cue,
+			"a call that never connected ends silently"
+		);
 	}
 	#[test]
 	fn a_failed_rejoin_leaves_the_channel_and_plays_the_leave_cue() {

@@ -3414,7 +3414,7 @@ impl Desktop {
 				self.messaging.voice_camera_preview = None;
 			}
 			if matches!(control, client_core::voice::Command::Leave { .. }) {
-				self.voice.stop();
+				self.voice.hang_up(&self.state);
 				self.messaging.camera_test_requested = false;
 				self.messaging.camera_test_texture = None;
 			}
