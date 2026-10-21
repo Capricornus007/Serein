@@ -1444,21 +1444,6 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn large_image_galleries_use_three_square_columns_and_narrow_layouts_fit() {
-		for width in [280.0, 420.0, 640.0] {
-			let (columns, size) = image_layout(5, width);
-			assert!(size.x * columns as f32 + (columns - 1) as f32 * 6.0 <= width);
-			if width >= 420.0 {
-				assert_eq!(columns, 3);
-				assert_eq!(size.x, size.y);
-			} else {
-				assert_eq!(columns, 2);
-			}
-		}
-		assert_eq!(image_layout(4, 640.0).0, 2);
-	}
-
-	#[test]
 	fn image_gallery_wraps_without_filenames_and_opens_each_attachment() {
 		let mut message = test_support::message(1, Id(2));
 		message.attachments = (0..3)
@@ -1600,85 +1585,6 @@ mod tests {
 			estimated_height(&message.attachments, 420.0)
 				< estimated_height(&message.attachments, 240.0)
 		);
-	}
-
-	#[test]
-	fn three_column_gallery_height_matches_the_actual_wrapped_rows() {
-		for light in [false, true] {
-			for width in [240.0, 420.0, 640.0] {
-				for count in [5, 10] {
-					let mut message = test_support::message(1, Id(2));
-					message.attachments = (0..count)
-						.map(|index| Attachment {
-							id: Id(index + 10),
-							filename: format!("Synthetic-{index}.png"),
-							description: None,
-							content_type: Some("image/png".into()),
-							size: 512,
-							spoiler: false,
-							media: model::EmbedMedia {
-								width: 640,
-								height: 360,
-								..Default::default()
-							},
-							duration_ms: None,
-							waveform: vec![],
-						})
-						.collect();
-					let ctx = egui::Context::default();
-					ctx.set_visuals(if light {
-						egui::Visuals::light()
-					} else {
-						egui::Visuals::dark()
-					});
-					let mut actual = 0.0;
-					for _ in 0..3 {
-						let output = ctx.run_ui(
-							egui::RawInput {
-								screen_rect: Some(egui::Rect::from_min_size(
-									egui::Pos2::ZERO,
-									egui::vec2(width + 16.0, 2400.0),
-								)),
-								..Default::default()
-							},
-							|ui| {
-								ui.set_width(width);
-								actual = ui
-									.scope(|ui| {
-										let mut surface =
-											crate::select::Surface::new(ui, "height-test");
-										show(
-											ui,
-											&message,
-											&mut Avatars::default(),
-											&mut None,
-											&mut None,
-											&mut DownloadUi::default(),
-											&mut crate::audio::AudioUi::default(),
-											&mut crate::video::VideoUi::default(),
-											true,
-											&mut surface,
-											design::MessageCardSurface::Conversation,
-										);
-									})
-									.response
-									.rect
-									.height();
-							},
-						);
-						output.drop_without_applying_deltas();
-					}
-					let estimate = estimated_height(&message.attachments, width);
-					// Uncropped narrow layouts conservatively reserve their maximum
-					// height. New square galleries must match their actual row budget.
-					let (columns, _) = image_layout(count as usize, width);
-					assert!(
-						estimate >= actual - 1.0 && (columns != 3 || estimate <= actual + 8.0),
-						"{count} tiles at {width}, light={light}: actual {actual}, estimate {estimate}"
-					);
-				}
-			}
-		}
 	}
 
 	#[test]

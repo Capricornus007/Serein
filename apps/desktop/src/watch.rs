@@ -542,31 +542,4 @@ mod tests {
 		assert_eq!(picture.data.len(), 1920 * 1080 * 3 / 2);
 		assert!(picture.data.capacity() <= 1920 * 1080 * 3 / 2);
 	}
-
-	/// Run this test executable directly under `/usr/bin/time -l` for process peak RSS.
-	/// The synthetic 1080p I420 input is stored as the decoder sink does; no device or
-	/// transport starts.
-	#[test]
-	#[ignore = "synthetic release CPU/RSS workload; run with --release --ignored --nocapture"]
-	fn watch_frame_memory_workload() {
-		let planes = i420(1920, 1080, 128);
-		let mut samples = Vec::new();
-		for run in 0..6 {
-			let mut slot = None;
-			let started = Instant::now();
-			for _ in 0..120 {
-				assert!(store_frame(&mut slot, frame(1920, 1080, &planes)));
-				std::hint::black_box(&slot);
-			}
-			if run > 0 {
-				samples.push(started.elapsed().as_secs_f64() * 1000.0);
-			}
-		}
-		samples.sort_by(f64::total_cmp);
-		println!(
-			"watch_frame_memory_workload frames=120 samples_ms={samples:?} median_ms={:.3} frame_bytes={}",
-			samples[2],
-			planes.len()
-		);
-	}
 }

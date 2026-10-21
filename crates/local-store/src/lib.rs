@@ -1807,51 +1807,6 @@ mod tests {
 	}
 
 	#[test]
-	#[ignore = "manual release benchmark; synthetic in-memory SQLite, not disk or UI latency"]
-	fn benchmark_changed_row_save() {
-		use std::{hint::black_box, time::Instant};
-		let mut store = LocalStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
-		let content = "x".repeat(7000);
-		for id in 1..=500 {
-			store.0.execute("INSERT INTO messages(account,channel,id,author,name,content,edited,unsupported) VALUES('1','2',?1,'4','Synthetic',?2,0,0)", params![id.to_string(), content]).unwrap();
-		}
-		let messages = store.load_channel(Id(1), Id(2)).unwrap();
-		assert_eq!(messages.len(), 500);
-		let window_bytes = messages.iter().map(Message::bytes).sum::<usize>();
-		assert!(window_bytes <= MAX_WINDOW_BYTES);
-		let retained: Vec<_> = messages.iter().map(|message| message.id).collect();
-		let mut changed = messages[250].clone();
-		drop(messages);
-		let mut samples = Vec::new();
-		for run in 0..6 {
-			let start = Instant::now();
-			for _ in 0..200 {
-				changed.edited = !changed.edited;
-				store
-					.save_changes(
-						Id(1),
-						Id(2),
-						black_box(std::slice::from_ref(&changed)),
-						black_box(&retained),
-						false,
-					)
-					.unwrap();
-			}
-			if run != 0 {
-				samples.push(start.elapsed());
-			}
-		}
-		samples.sort_unstable();
-		println!(
-			"200 changed-row saves, 500 rows / {window_bytes} estimated bytes: median {:?}, samples {:?}",
-			samples[2], samples
-		);
-		let loaded = store.load_channel(Id(1), Id(2)).unwrap();
-		assert_eq!(loaded.len(), 500);
-		assert!(loaded[250] == changed);
-	}
-
-	#[test]
 	fn channel_order_index_upgrades_existing_cache_and_preserves_unsigned_ids() {
 		let store = LocalStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
 		let ids = [9, 10, 99, 100, i64::MAX as u64 + 1, u64::MAX];
@@ -1890,37 +1845,6 @@ mod tests {
 			!plan.iter().any(|step| step.contains("TEMP B-TREE")),
 			"{plan:?}"
 		);
-	}
-
-	#[test]
-	#[ignore = "manual release benchmark; synthetic in-memory SQLite, not disk or UI latency"]
-	fn benchmark_channel_load() {
-		use std::{hint::black_box, time::Instant};
-		let store = LocalStore::initialize(Connection::open_in_memory().unwrap()).unwrap();
-		for count in [1, 50, 500] {
-			for id in 1..=count {
-				store.0.execute("INSERT INTO messages(account,channel,id,author,name,content,edited,unsupported) VALUES('1',?1,?2,'4','Synthetic','synthetic benchmark message',0,0)", rusqlite::params![count.to_string(), id.to_string()]).unwrap();
-			}
-			let mut samples = Vec::new();
-			for run in 0..6 {
-				let start = Instant::now();
-				for _ in 0..200 {
-					let loaded = store
-						.load_channel(black_box(Id(1)), black_box(Id(count)))
-						.unwrap();
-					assert_eq!(loaded.len(), count as usize);
-					black_box(loaded);
-				}
-				if run != 0 {
-					samples.push(start.elapsed());
-				}
-			}
-			samples.sort_unstable();
-			println!(
-				"200 channel loads, {count} rows: median {:?}, samples {:?}",
-				samples[2], samples
-			);
-		}
 	}
 
 	#[test]

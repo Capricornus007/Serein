@@ -4625,34 +4625,6 @@ impl Event {
 #[cfg(test)]
 mod tests {
 
-	#[test]
-	#[ignore = "manual release timing; run with --release --ignored --nocapture"]
-	fn guild_lookup_benchmark() {
-		let state = State {
-			guilds: (1..=1_000)
-				.map(|id| Guild {
-					default_message_notifications: None,
-					stickers: None,
-					id: Id(id),
-					name: "Synthetic".into(),
-					icon: None,
-					emojis: None,
-				})
-				.collect(),
-			..State::default()
-		};
-		for run in 0..6 {
-			let start = std::time::Instant::now();
-			for _ in 0..10_000 {
-				assert!(std::hint::black_box(state.guild(std::hint::black_box(Id(500)))).is_some());
-				assert!(
-					std::hint::black_box(state.guild(std::hint::black_box(Id(1_001)))).is_none()
-				);
-			}
-			println!("guild lookup run {run} (0 = warmup): {:?}", start.elapsed());
-		}
-	}
-
 	pub(crate) fn grant_permissions(state: &mut State) {
 		let Some(user) = &state.user else {
 			return;

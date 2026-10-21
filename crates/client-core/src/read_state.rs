@@ -1135,50 +1135,6 @@ mod navigation_tests {
 		}
 	}
 	#[test]
-	#[ignore = "synthetic release workload; run directly after building"]
-	fn timeline_cursor_workload() {
-		use std::{hint::black_box, time::Instant};
-		for deleted_tail in [false, true] {
-			let mut state = state(Some(Id(500)));
-			state.channels[0].last_message = Some(Id(501));
-			state.timeline.clear();
-			state.set_preserve_deleted_messages(true);
-			for id in 1..=500 {
-				state.timeline.insert(message(id), false, false).unwrap();
-			}
-			if deleted_tail {
-				for id in 491..=500 {
-					state.timeline.delete(Id(id)).unwrap();
-				}
-			}
-			let expected = Some(Id(if deleted_tail { 490 } else { 500 }));
-			assert_eq!(state.forward_cursor(), expected);
-			assert_eq!(state.live_edge_latest(), Some(Id(501)));
-			assert_eq!(state.unread(Id(1)), Some(false));
-			let mut times = Vec::with_capacity(5);
-			for batch in 0..6 {
-				let started = Instant::now();
-				for _ in 0..100_000 {
-					black_box(black_box(&state).live_edge_latest());
-					black_box(black_box(&state).forward_cursor());
-					black_box(black_box(&state).unread(Id(1)));
-				}
-				let elapsed = started.elapsed();
-				if batch != 0 {
-					times.push(elapsed);
-				}
-			}
-			let range = (*times.iter().min().unwrap(), *times.iter().max().unwrap());
-			times.sort_unstable();
-			println!(
-				"Synthetic timeline cursors: 100000 live-edge/forward/unread query triples, 500 rows, read marker 500/latest metadata 501, retained deleted tail {deleted_tail}; median {:?}, range {:?}; {} estimated timeline bytes. Excludes rendering, process RSS and live compatibility.",
-				times[2],
-				range,
-				state.timeline.retained_bytes()
-			);
-		}
-	}
-	#[test]
 	fn marking_a_dm_or_group_unread_restores_the_badge_count() {
 		{
 			for kind in [1, 3] {

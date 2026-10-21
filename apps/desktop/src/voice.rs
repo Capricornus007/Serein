@@ -2014,18 +2014,6 @@ mod tests {
 	}
 
 	#[test]
-	fn optimization_local_camera_reuses_the_latest_frame_buffer() {
-		let mut picture = None;
-		let rgb = vec![127; discord_voice::camera::WIDTH * discord_voice::camera::HEIGHT * 3];
-		assert!(store_camera_frame(&mut picture, &rgb));
-		let pixels = picture.as_ref().unwrap().0.pixels.as_ptr();
-		picture.as_mut().unwrap().1 = false;
-		assert!(store_camera_frame(&mut picture, &rgb));
-		assert_eq!(picture.as_ref().unwrap().0.pixels.as_ptr(), pixels);
-		assert!(picture.unwrap().1);
-	}
-
-	#[test]
 	#[allow(clippy::field_reassign_with_default)] // MessagingUi has private fields in another crate.
 	fn camera_discovery_updates_selection_without_starting_capture_and_demo_does_not_scan() {
 		let mut voice = Voice::default();

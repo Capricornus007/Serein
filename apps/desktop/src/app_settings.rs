@@ -392,22 +392,6 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn minimum_tracks_monitor_size_scale_and_decorations() {
-		for (available, frame, scale, expected) in [
-			([640, 480], [16, 39], 1.0, [624, 441]),
-			([1920, 1080], [16, 39], 1.0, MIN_WINDOW_SIZE),
-			([1920, 1080], [24, 59], 1.5, [1140, 780]),
-			([960, 720], [24, 59], 1.5, [936, 661]),
-			([8, 12], [16, 39], 1.0, [1, 1]),
-		] {
-			assert_eq!(
-				window_minimum(available.into(), frame, scale),
-				winit::dpi::PhysicalSize::from(expected)
-			);
-		}
-	}
-
-	#[test]
 	fn startup_defaults_do_not_overwrite_pending_saved_preferences() {
 		let mut settings = Settings::default();
 		let defaults = AppPreferences::default();

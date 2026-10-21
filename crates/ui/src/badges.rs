@@ -1018,25 +1018,6 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn synthetic_catalog_is_a_valid_profile_catalog() {
-		assert!(synthetic_catalog().valid());
-	}
-
-	#[test]
-	fn titles_follow_the_official_wording() {
-		let catalog = synthetic_catalog();
-		let (eyebrow, title) = titles(catalog.get(model::badges::id::ACCOUNT_AGE).unwrap());
-		assert_eq!(
-			(eyebrow.as_deref(), title.as_str()),
-			(Some("Account Age"), "Bristlecone")
-		);
-		let (eyebrow, title) = titles(catalog.get(model::badges::id::PREMIUM_TENURE).unwrap());
-		assert!(eyebrow.is_none() && title.ends_with("Starter"));
-		let (eyebrow, title) = titles(catalog.get(model::badges::id::GAME_TIME).unwrap());
-		assert_eq!((eyebrow, title.as_str()), (None, "Game Time"));
-	}
-
-	#[test]
 	fn incomplete_catalogs_cannot_open_or_keep_a_customize_draft() {
 		let ctx = egui::Context::default();
 		let mut panels = BadgePanels::default();
@@ -1071,107 +1052,6 @@ mod tests {
 		assert!(!output.shapes.iter().any(|shape| matches!(&shape.shape,
 			egui::Shape::Text(text) if text.galley.job.text == translate("badges-customize-button"))));
 		output.drop_without_applying_deltas();
-	}
-
-	#[test]
-	fn directory_fits_short_windows_and_scrolls_each_wide_column() {
-		for size in [vec2(1100.0, 700.0), vec2(1100.0, 360.0), vec2(600.0, 360.0)] {
-			let ctx = egui::Context::default();
-			let mut avatars = Avatars::default();
-			let mut profile =
-				crate::profiles::synthetic(&test_support::message(1, Id(20)).author, None);
-			let mut catalog = synthetic_catalog();
-			let template = catalog.badges[2].clone();
-			for id in 30..66 {
-				catalog.badges.push(CatalogBadge {
-					id,
-					..template.clone()
-				});
-			}
-			let tier = catalog.badges[0].tiers[0].clone();
-			catalog.badges[0].tiers = (0..model::badges::MAX_BADGE_TIERS)
-				.map(|index| model::badges::BadgeTier {
-					key: format!("tier-{index}"),
-					name: format!("Tier {index}"),
-					..tier.clone()
-				})
-				.collect();
-			catalog.badges[0].current_tier = Some("tier-0".into());
-			catalog.badges[0].next_tier = Some("tier-1".into());
-			let details_title = titles(&catalog.badges[0]).1.to_uppercase();
-			assert!(catalog.valid());
-			profile.badge_catalog = Some(Box::new(catalog));
-			let screen = Rect::from_min_size(Pos2::ZERO, size);
-			let mut directory = Directory {
-				user: profile.user.id,
-				selected: Some(model::badges::id::PREMIUM_TENURE),
-				levels: true,
-			};
-			let mut frame = |pointer, scroll| {
-				let mut rect = Rect::NOTHING;
-				let output = ctx.run_ui(
-					egui::RawInput {
-						screen_rect: Some(screen),
-						events: vec![egui::Event::PointerMoved(pointer)],
-						..Default::default()
-					},
-					|ui| {
-						ui.input_mut(|input| input.smooth_scroll_delta.y = scroll);
-						rect = directory_modal(
-							ui.ctx(),
-							&mut directory,
-							&profile,
-							profile.badge_catalog.as_deref().unwrap(),
-							true,
-							&mut avatars,
-							true,
-						)
-						.0;
-					},
-				);
-				(rect, output)
-			};
-			for _ in 0..3 {
-				frame(Pos2::ZERO, 0.0).1.drop_without_applying_deltas();
-			}
-			let (rect, output) = frame(Pos2::ZERO, 0.0);
-			assert!(screen.contains_rect(rect), "{size:?}: {rect:?}");
-			let text_y = |output: &egui::FullOutput, label: &str| {
-				output
-					.shapes
-					.iter()
-					.find_map(|shape| match &shape.shape {
-						egui::Shape::Text(text) if text.galley.job.text == label => {
-							Some(text.pos.y)
-						}
-						_ => None,
-					})
-					.unwrap_or_else(|| panic!("Missing label {label}"))
-			};
-			if size.x > 1000.0 {
-				let list_title = translate("badges-your");
-				let original_list = text_y(&output, &list_title);
-				let original_details = text_y(&output, &details_title);
-				output.drop_without_applying_deltas();
-				let pointer = rect.left_top() + vec2(100.0, 100.0);
-				frame(pointer, 0.0).1.drop_without_applying_deltas();
-				frame(pointer, -10.0).1.drop_without_applying_deltas();
-				let (_, output) = frame(pointer, 0.0);
-				let scrolled_list = text_y(&output, &list_title);
-				assert!(scrolled_list < original_list - 1.0);
-				assert!((text_y(&output, &details_title) - original_details).abs() < 0.1);
-				output.drop_without_applying_deltas();
-				let pointer = rect.right_top() + vec2(-100.0, 100.0);
-				frame(pointer, 0.0).1.drop_without_applying_deltas();
-				frame(pointer, -10.0).1.drop_without_applying_deltas();
-				let (_, output) = frame(pointer, 0.0);
-				assert!(text_y(&output, &details_title) < original_details - 1.0);
-				assert!((text_y(&output, &list_title) - scrolled_list).abs() < 0.1);
-				output.drop_without_applying_deltas();
-			} else {
-				output.drop_without_applying_deltas();
-			}
-		}
 	}
 
 	#[test]

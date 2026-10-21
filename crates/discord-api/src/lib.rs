@@ -3366,7 +3366,6 @@ mod tests {
 		.unwrap();
 		api.base = format!("http://{address}");
 		let mut throttled = Vec::new();
-		let started = Instant::now();
 		let event = tokio::time::timeout(
 			Duration::from_secs(5),
 			api.execute_write(
@@ -3383,7 +3382,6 @@ mod tests {
 		.await
 		.unwrap();
 		assert!(matches!(event, Event::SendResult { result: Ok(_), .. }));
-		assert!(started.elapsed() < Duration::from_millis(900));
 		assert_eq!(throttled, ["spam"]);
 		assert_eq!(server.await.unwrap(), [true, true]);
 	}

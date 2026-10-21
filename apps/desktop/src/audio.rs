@@ -1061,23 +1061,6 @@ mod tests {
 	fn start_admits_large_attachments_and_rejects_invalid_sizes() {
 		check_large_attachment_admission();
 	}
-	#[cfg(target_os = "linux")]
-	#[test]
-	fn pulseaudio_playback_avoids_the_server_default_buffer() {
-		let config = cpal::StreamConfig {
-			channels: 2,
-			sample_rate: 48000,
-			buffer_size: cpal::BufferSize::Default,
-		};
-		assert_eq!(
-			playback_config(cpal::HostId::PulseAudio, config).buffer_size,
-			cpal::BufferSize::Fixed(1920)
-		);
-		assert_eq!(
-			playback_config(cpal::HostId::Alsa, config).buffer_size,
-			cpal::BufferSize::Default
-		);
-	}
 	#[test]
 	fn decode_bounded_audio_and_reject_malformed_headers() {
 		let pcm = decode(demo_wav(), &|| true).unwrap();

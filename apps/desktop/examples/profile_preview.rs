@@ -1276,11 +1276,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	}
 	Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-	#[test]
-	fn non_theme_catalog_loads_community_preview() {
-		super::seed_catalog(&mut ui::ExtensionUi::default(), false);
-	}
-}

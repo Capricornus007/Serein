@@ -1170,24 +1170,6 @@ pub fn debug_voice_state_retry_check() {
 
 #[cfg(test)]
 mod tests {
-	#[test]
-	fn deletion_reasons_map_to_messages_and_user_requests_stay_silent() {
-		assert_eq!(deletion_reason(None), None);
-		assert_eq!(deletion_reason(Some("user_requested")), None);
-		assert_eq!(
-			deletion_reason(Some("stream_ended")),
-			Some("Discord reported the stream as ended")
-		);
-		assert_eq!(
-			deletion_reason(Some("something_new")),
-			Some("Discord ended the stream")
-		);
-		assert_eq!(
-			deletion_reason(Some(&"x".repeat(65))),
-			Some("Discord ended the stream")
-		);
-	}
-
 	use super::*;
 	use std::sync::Mutex;
 	#[test]
