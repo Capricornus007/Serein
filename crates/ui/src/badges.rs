@@ -719,7 +719,8 @@ fn badge_details(
 	demo: bool,
 ) {
 	let colors = design::palette(ui);
-	ui.spacing_mut().item_spacing.y = 6.0;
+	// The split directory zeroes horizontal spacing; the side-by-side cards need a gap.
+	ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
 	ui.vertical_centered(|ui| {
 		ui.add_space(12.0);
 		avatars.show_icon(ui, entry.art().map(art_key), 112.0, demo, &entry.name);
@@ -818,7 +819,7 @@ fn badge_details(
 						)
 						.color(colors.text_strong),
 					);
-					let fraction = entry.progress.as_ref().map_or(0.0, |p| p.fraction());
+					let fraction = entry.next_fraction();
 					let (bar, _) = ui.allocate_exact_size(vec2(bar_width, 6.0), Sense::hover());
 					ui.painter().rect_filled(bar, 3, colors.hover);
 					ui.painter().rect_filled(
@@ -997,6 +998,26 @@ pub fn synthetic_catalog() -> BadgeCatalog {
 				hidden: true,
 				info: Some("120 hours streamed".into()),
 				..badge(id::STREAMING, "Streaming")
+			},
+			CatalogBadge {
+				description:
+					"Play more detectable PC games with Discord open to level up this badge.".into(),
+				info: Some("45 games played".into()),
+				rarity: None,
+				tiers: vec![
+					tier(
+						"explorer",
+						"Explorer",
+						"10 games",
+						10.0,
+						BadgeRarity::Common,
+					),
+					tier("voyager", "Voyager", "25 games", 25.0, BadgeRarity::Rare),
+					tier("maverick", "Maverick", "50 games", 50.0, BadgeRarity::Epic),
+				],
+				current_tier: Some("voyager".into()),
+				next_tier: Some("maverick".into()),
+				..badge(id::GAME_VARIETY, "Game Variety")
 			},
 			CatalogBadge {
 				owned: false,
