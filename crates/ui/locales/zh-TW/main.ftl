@@ -4925,3 +4925,27 @@ search-overlays-no-matching-content-types = 沒有符合的內容類型
 search-overlays-history = 歷史紀錄
 search-overlays-clear-history = 清除搜尋紀錄
 main-sign-in-rate-limited-detail = Discord 正在限制此次登入。請稍候再試。過早重試可能會延長等待時間。
+# Context: game_mentions
+game-mentions-loading = 正在載入遊戲…
+# Context: game_mentions
+game-mentions-header = 符合「@{ $query }」的遊戲
+# Context: game_mentions
+game-mentions-unavailable = 遊戲目前無法使用。
+# Context: game_mentions
+game-mentions-empty = 沒有符合的遊戲。
+# Context: game_mentions
+game-mentions-retry = 重試
+# Context: storage_settings
+settings-storage-page-saved-login = 已儲存的登入
+# Context: storage_settings
+settings-storage-page-plaintext-login = 以純文字儲存登入（不使用金鑰環）
+# Context: storage_settings
+settings-storage-page-plaintext-login-description = 僅在作業系統金鑰環（GNOME Keyring、KWallet、Keychain 或 Credential Manager）都無法使用時才會用到。令牌會以未加密的形式存放在 Serein 資料夾內的私人檔案中，任何能存取你使用者帳戶的人都能讀取。關閉此選項會刪除這些檔案。
+# Context: voice_member
+voice-server-mute = 伺服器靜音
+# Context: voice_member
+voice-server-unmute = 取消伺服器靜音
+# Context: voice_member
+voice-move-to = 移動至
+# Context: voice_member
+voice-disconnect-member = 中斷連線
