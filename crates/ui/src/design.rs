@@ -241,6 +241,21 @@ pub struct Palette {
 	/// Alias of `sidebar`, kept for older call sites.
 	pub surface: Color32,
 }
+/// Dark themes' default danger red, tuned for red text and outlines on dark surfaces.
+const DARK_DANGER: Color32 = rgb(0xef5561);
+/// Discord's solid count-badge and LIVE-pill red, deeper so white text stays crisp.
+const BADGE_RED: Color32 = rgb(0xd22d39);
+impl Palette {
+	/// Fill for solid badges and pills carrying white text. A theme's own danger color is
+	/// kept; the dark default text red would read washed out as a fill.
+	pub fn badge_fill(&self) -> Color32 {
+		if self.danger == DARK_DANGER {
+			BADGE_RED
+		} else {
+			self.danger
+		}
+	}
+}
 const fn rgb(value: u32) -> Color32 {
 	Color32::from_rgb((value >> 16) as u8, (value >> 8) as u8, value as u8)
 }
@@ -290,7 +305,7 @@ fn dark_common(
 		accent_text: Color32::WHITE,
 		positive: rgb(0x2fb87a),
 		warning: rgb(0xe8a33d),
-		danger: rgb(0xef5561),
+		danger: DARK_DANGER,
 		mention_bg: MENTION_BG,
 		mention_text: rgb(0xbcd9ff),
 		backdrop: None,
@@ -1775,6 +1790,22 @@ fn contrast(a: Color32, b: Color32) -> f32 {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn solid_badges_use_discord_red_unless_the_theme_changed_danger() {
+		for variant in Variant::ALL {
+			let dark = builtin_colors(true, variant);
+			assert_eq!(dark.badge_fill(), BADGE_RED, "{variant:?}");
+			// Red text keeps its lighter, readable shade.
+			assert_eq!(dark.danger, DARK_DANGER);
+		}
+		let light = builtin_colors(false, Variant::Standard);
+		assert_eq!(light.badge_fill(), light.danger);
+		let mut custom = builtin_colors(true, Variant::Standard);
+		custom.danger = rgb(0x00ff00);
+		assert_eq!(custom.badge_fill(), custom.danger);
+	}
+
 	#[test]
 	fn compositing_surfaces_preserves_custom_border_alpha() {
 		let authored = extensions::ThemePalette {
