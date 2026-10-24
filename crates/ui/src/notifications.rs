@@ -127,7 +127,7 @@ fn badge_scaled(ui: &egui::Ui, center: egui::Pos2, count: u32, ring: Color32, sc
 	ui.painter()
 		.rect_filled(rect.expand(2.0 * scale), (11.0 * scale) as u8, ring);
 	ui.painter()
-		.rect_filled(rect, (9.0 * scale) as u8, colors.danger);
+		.rect_filled(rect, (9.0 * scale) as u8, colors.badge_fill());
 	// A fixed text size keeps the pop-in from laying out glyphs at every intermediate size.
 	if scale < 0.8 {
 		return;

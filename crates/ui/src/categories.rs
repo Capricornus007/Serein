@@ -2227,7 +2227,7 @@ mod tests {
 					.unwrap_or((egui::Pos2::ZERO, egui::Color32::TRANSPARENT));
 				let near = |rect: egui::Rect| (rect.center().y - pos.y).abs() < 20.0;
 				let badge = rects.iter().any(|(rect, fill)| {
-					*fill == colors.danger && near(*rect) && rect.height() >= 16.0
+					*fill == colors.badge_fill() && near(*rect) && rect.height() >= 16.0
 				});
 				let pill = rects.iter().any(|(rect, fill)| {
 					*fill == colors.text_strong
