@@ -1706,7 +1706,9 @@ impl MessagingUi {
 								)
 							});
 							let row = rect.shrink2(egui::vec2(0.0, 1.0));
-							let focused = response.hovered() || response.has_focus();
+							// The avatar is its own widget on top; hovering it still highlights the row.
+							let pointer_over = ui.rect_contains_pointer(rect);
+							let focused = pointer_over || response.has_focus();
 							if focused {
 								ui.painter().rect_filled(
 									row,
@@ -1729,7 +1731,7 @@ impl MessagingUi {
 									.layout(egui::Layout::left_to_right(egui::Align::Center)),
 							);
 							inner.spacing_mut().item_spacing.x = 12.0;
-							let animate_avatar = ui.rect_contains_pointer(rect);
+							let animate_avatar = pointer_over;
 							inner.push_id(member.user.id.0, |ui| {
 								let avatar = self
 									.avatars
