@@ -1054,6 +1054,7 @@ mod tests {
 							tertiary_color: None,
 							position: 0,
 							hoist: false,
+							managed: false,
 						},
 						p::Role {
 							id: Id(10),
@@ -1064,6 +1065,7 @@ mod tests {
 							tertiary_color: None,
 							position: 0,
 							hoist: false,
+							managed: false,
 						},
 						p::Role {
 							id: Id(11),
@@ -1074,6 +1076,7 @@ mod tests {
 							tertiary_color: None,
 							position: 0,
 							hoist: false,
+							managed: false,
 						},
 					]),
 					member: Some(p::Member {

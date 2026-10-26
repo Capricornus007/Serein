@@ -6976,6 +6976,7 @@ mod tests {
 							tertiary_color: None,
 							position: 0,
 							hoist: false,
+							managed: false,
 							bits: p::VIEW_CHANNEL | p::READ_MESSAGE_HISTORY,
 						}]),
 					})

@@ -1392,6 +1392,7 @@ mod tests {
 				tertiary_color: None,
 				position: 0,
 				hoist: false,
+				managed: false,
 				bits: VIEW_CHANNEL | MANAGE_ROLES,
 			}]);
 			guild.member = Some(model::permissions::Member {
@@ -1507,6 +1508,7 @@ mod tests {
 			tertiary_color: None,
 			position: 0,
 			hoist: false,
+			managed: false,
 			bits: VIEW_CHANNEL,
 		}]);
 		guild.member = Some(model::permissions::Member {
@@ -1950,6 +1952,7 @@ mod tests {
 				tertiary_color: None,
 				position: 0,
 				hoist: false,
+				managed: false,
 			},
 			p::Role {
 				id: Id(10),
@@ -1960,6 +1963,7 @@ mod tests {
 				tertiary_color: None,
 				position: 1,
 				hoist: false,
+				managed: false,
 			},
 		]);
 		guild.member = Some(p::Member {
@@ -2040,6 +2044,7 @@ mod tests {
 				tertiary_color: None,
 				position: 0,
 				hoist: false,
+				managed: false,
 			},
 			p::Role {
 				id: Id(10),
@@ -2050,6 +2055,7 @@ mod tests {
 				tertiary_color: None,
 				position: 1,
 				hoist: false,
+				managed: false,
 			},
 		]);
 		guild.member = Some(p::Member {

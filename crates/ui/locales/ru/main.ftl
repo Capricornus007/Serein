@@ -4021,6 +4021,8 @@ user-menu-contents-profile = Профиль
 # Context: contents
 user-menu-contents-remove-this-conversation-from-your-dm-list-messages-are-kept = Удалите этот разговор из списка личных сообщений. Сообщения сохраняются.
 # Context: contents
+user-menu-contents-roles = Роли
+# Context: contents
 user-menu-contents-unblock = Разблокировать
 # Context: contents
 user-menu-contents-unmute-conversation = Включить звук разговора

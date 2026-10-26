@@ -317,6 +317,8 @@ pub struct MessagingUi {
 	profile: profiles::ProfileSession,
 	profile_image: Option<ProfileImage>,
 	user_action: Option<user_menu::Action>,
+	/// A context menu role change is in flight; its failure becomes a toast.
+	menu_role_change: bool,
 	pending_mention: Option<Id>,
 	contact_editor: contact_editor::ContactEditor,
 	profile_link: Option<String>,
@@ -5288,7 +5290,18 @@ impl MessagingUi {
 		{
 			self.apply_shortcut(state, intent);
 		}
+		if self.menu_role_change && !state.server_admin.pending {
+			self.menu_role_change = false;
+			if let Some(error) = state.server_admin.error {
+				self.toasts.push(design::Level::Error, error);
+			}
+			// Settings own the admin state while open; otherwise drop the reload fence.
+			if !self.server_settings.is_open() {
+				state.close_server_admin();
+			}
+		}
 		if let Some(action) = self.user_action.take().or(self.timeline.user_action.take()) {
+			let role_change = matches!(action, user_menu::Action::SetRole { .. });
 			let command = match action {
 				user_menu::Action::Message(user) => {
 					self.open_user_direct(state, user, user_direct::Intent::Message, &mut commands);
@@ -5320,6 +5333,7 @@ impl MessagingUi {
 				action => user_menu::prepare(action, state),
 			};
 			if let Some(command) = command {
+				self.menu_role_change |= role_change;
 				commands.push(command);
 			}
 		}
@@ -8211,6 +8225,7 @@ mod composer_tests {
 					tertiary_color: None,
 					position: 1,
 					hoist: true,
+					managed: false,
 				}]),
 			},
 		);
