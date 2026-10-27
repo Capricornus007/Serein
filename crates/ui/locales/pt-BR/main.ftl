@@ -4733,6 +4733,8 @@ composer-placeholder-direct = Conversar com @{ $name }
 
 # Context: timeline_dm_intro
 timeline-dm-intro = Este é o começo do seu histórico de mensagens diretas com { $name }.
+# Context: timeline_group_intro
+timeline-group-intro = Boas-vindas ao início do grupo { $name }.
 
 # Context: timeline_channel_intro
 timeline-channel-intro-title = Boas-vindas a #{ $channel }!
@@ -4830,3 +4832,12 @@ search-overlays-no-matching-content-types = Nenhum tipo de conteúdo corresponde
 search-overlays-history = Histórico
 search-overlays-clear-history = Limpar histórico de pesquisa
 main-sign-in-rate-limited-detail = O Discord está limitando este login. Aguarde antes de tentar novamente. Outra tentativa antes disso pode aumentar a espera.
+
+# New message
+new-message-title = Nova mensagem
+new-message-subtitle = Mensagens de grupo podem ter até 10 membros.
+new-message-search = Pesquisar
+new-message-hint = Adicione amigos para iniciar uma mensagem direta ou um grupo.
+new-message-no-people-found = Ninguém corresponde a essa pesquisa.
+new-message-create = Criar mensagem
+new-message-cancel = Cancelar
