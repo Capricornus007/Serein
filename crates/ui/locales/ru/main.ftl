@@ -85,6 +85,7 @@ hide-chat = Скрыть чат
 show-chat = Показать чат
 search-conversation = Искать этот разговор
 show-member-list = Показать список участников
+show-user-profile = Показать профиль пользователя
 pinned-messages = Закрепленные сообщения
 threads = Темы
 
@@ -4021,6 +4022,8 @@ user-menu-contents-profile = Профиль
 # Context: contents
 user-menu-contents-remove-this-conversation-from-your-dm-list-messages-are-kept = Удалите этот разговор из списка личных сообщений. Сообщения сохраняются.
 # Context: contents
+user-menu-contents-roles = Роли
+# Context: contents
 user-menu-contents-unblock = Разблокировать
 # Context: contents
 user-menu-contents-unmute-conversation = Включить звук разговора
@@ -4736,6 +4739,8 @@ composer-placeholder-direct = Написать @{ $name }
 
 # Context: timeline_dm_intro
 timeline-dm-intro = Это начало истории ваших личных сообщений с { $name }.
+# Context: timeline_group_intro
+timeline-group-intro = Добро пожаловать в начало группы { $name }.
 
 # Context: timeline_channel_intro
 timeline-channel-intro-title = Добро пожаловать в #{ $channel }!
@@ -4830,3 +4835,12 @@ search-overlays-no-matching-content-types = Нет подходящих типо
 search-overlays-history = История
 search-overlays-clear-history = Очистить историю поиска
 main-sign-in-rate-limited-detail = Discord ограничивает этот вход. Подождите, прежде чем пытаться снова. Повторная попытка раньше времени может продлить ожидание.
+
+# New message
+new-message-title = Новое сообщение
+new-message-subtitle = В групповых личных сообщениях может быть до 10 участников.
+new-message-search = Поиск
+new-message-hint = Добавьте друзей, чтобы начать личное сообщение или группу.
+new-message-no-people-found = Никто не найден.
+new-message-create = Создать сообщение
+new-message-cancel = Отмена

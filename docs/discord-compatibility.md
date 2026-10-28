@@ -2602,3 +2602,34 @@ the official notice in place of the withheld details, and omits Member Since and
 matching the official client. Roles, mutuals and the message field stay. The service
 withholds the hidden data itself; Serein never infers privacy from missing fields. No live
 private-profile response has been used as validation.
+
+## Member list on a return visit — October 25, 2026
+
+On large servers Discord remembers which member-list rows a client asked for, even after the
+pane moves to another server. On a return visit Serein asked for the same rows again; Discord
+saw no change and never re-sent the list, so it stayed on "Loading people…". Serein now first
+asks for a different row window, then the real one, which Discord treats as new and answers.
+Clearing the rows with an empty list is not an option: Discord disconnects with code 4002.
+
+This behaviour is unofficial and inferred from owner traces; a loopback test models it, and
+the owner confirmed the fix in a debug build.
+
+## New message picker - October 27, 2026
+
+The DM list header carries the official client's "New Message" action: a picker that lists
+friends, searches them by display name or handle, and opens either one direct message or a
+group. One chosen person reuses the existing DM path (`GET` selection when the conversation
+is already loaded, otherwise `POST /users/@me/channels` with `recipient_id`). Two to nine
+people send one `POST /users/@me/channels` with `recipients`; the service adds this
+account as the owner, so ten people is the whole group.
+
+The group request and its answer are bounded like the rest of the account writes: no retry,
+one request at a time, and the response is admitted only when it is a group channel whose
+recipients cover everyone that was asked for. The created channel is opened the same way a
+newly opened DM is, and navigation made while the request was in flight wins over it.
+Failures report the service label instead of leaving the picker open.
+
+`POST /users/@me/channels` is a documented route, but sending `recipients` from a normal
+account is an unofficial request shape, inferred from the official client and live-unverified:
+loopback tests cover the request shape and response validation, and the owner's release-build
+pass exercised the picker but not live group creation.
