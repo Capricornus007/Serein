@@ -13,4 +13,15 @@ ignore = [
     "RUSTSEC-2026-0370", # zvariant
     "RUSTSEC-2026-0371", # zbus_names
     "RUSTSEC-2026-0372", # zvariant_derive
+    # crypto-bigint 0.5.5 timing variability (RUSTSEC-2026-0387, patched >= 0.7.6).
+    # The p256 0.13 -> elliptic-curve 0.13 -> crypto-bigint 0.5.5 path is what the
+    # Discord voice stack uses (vendor/davey pins `p256 = "0.13"` and
+    # hpke-rs-rust-crypto 0.6.1 also requires 0.13). The fix requires
+    # crypto-bigint >= 0.7.6, i.e. p256 0.14 / elliptic-curve 0.14, which is a
+    # breaking API change: upgrading here alone would break davey and the hpke
+    # provider. The advisory is a local timing side channel on secret-dependent
+    # arithmetic; in a desktop client the attacker has to time our own process,
+    # so exposure is limited compared to a network-facing service.
+    # Drop this ignore as soon as davey/hpke-rs move to p256 0.14.
+    "RUSTSEC-2026-0387",
 ]
