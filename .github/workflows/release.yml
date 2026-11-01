@@ -60,65 +60,7 @@ jobs:
             Cargo.toml
             Cargo.lock
             fuzz/Cargo.lock
-            packaging/macos/Info.plist
             target/release-plan.json
-          if-no-files-found: error
-          retention-days: 14
-
-  build:
-    needs: prepare
-    if: needs.prepare.outputs.release == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, windows-11-arm]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
-    env:
-      TAG: ${{ needs.prepare.outputs.tag }}
-      VERSION: ${{ needs.prepare.outputs.version }}
-      PACKAGE_ROOT: dist
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v8.0.1
-        with:
-          name: release-manifests
-          path: .
-      - uses: dtolnay/rust-toolchain@1.98.1
-        with:
-          components: rustfmt, clippy
-      - name: Install NSIS
-        if: runner.os == 'Windows'
-        run: choco install nsis --no-progress -y
-      - name: Offline checks
-        run: cargo xtask check
-      - uses: oven-sh/setup-bun@v2.2.0
-        with:
-          bun-version: 1.4.2
-      - run: bun tests/login-handoff.cjs
-      - name: Package app
-        run: |
-          cargo xtask package
-          mkdir release-assets
-          echo "ASSET=serein-$TAG-$RUNNER_OS-$RUNNER_ARCH" >> "$GITHUB_ENV"
-      - name: Archive Windows package
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Compress-Archive -Path "$env:PACKAGE_ROOT/*" -DestinationPath "release-assets/$env:ASSET.zip"
-          $installer = Get-ChildItem -Path "dist-installer/*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($installer) {
-            Copy-Item -LiteralPath $installer.FullName -Destination "release-assets/$env:ASSET-Setup.exe"
-          }
-      - uses: actions/upload-artifact@v7.0.1
-        with:
-          name: ${{ env.ASSET }}
-          path: release-assets/*
           if-no-files-found: error
           retention-days: 14
 
@@ -131,7 +73,7 @@ jobs:
       tag: ${{ needs.prepare.outputs.tag }}
 
   publish:
-    needs: [prepare, build, linux]
+    needs: [prepare, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -167,7 +109,7 @@ jobs:
         run: bun .github/release/release.mjs publish
 
   repositories:
-    needs: [prepare, build, linux, publish]
+    needs: [prepare, linux, publish]
     if: needs.prepare.outputs.release == 'true'
     permissions:
       contents: read
