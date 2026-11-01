@@ -456,6 +456,10 @@ impl Drop for Hotkeys {
 	}
 }
 
+// 八個參數（上限 7）：這裡每個 Arc 都是不同種子的原子槽，硬湊成結構體反而要把
+// 呼叫端的生命週期拆開來管。本倉已有同樣的取捨（ui/role_names.rs:31、
+// ui/emoji_picker.rs:955、discord-gateway/src/lib.rs:1214），跟著用 allow。
+#[allow(clippy::too_many_arguments)]
 #[cfg(target_os = "linux")]
 async fn portal(
 	bindings: Vec<(KeybindAction, KeyChord)>,
