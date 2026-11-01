@@ -2,7 +2,7 @@
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState, hotkey::HotKey};
 use model::{KeyChord, KeybindAction, Keybinds, keybinds::is_mouse_button};
 #[cfg(target_os = "linux")]
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
 const READY: &str = "Global voice keybinds are enabled.";
@@ -17,6 +17,9 @@ const INVALID: &str = "One or more voice bindings cannot be registered globally;
 const MODIFIER_REQUIRED: &str = "Add Ctrl, Alt, Shift, or Command to use a voice binding globally; it still works while Serein is focused.";
 
 /// Mouse poller identities, kept out of the range `global-hotkey` assigns to real hotkeys.
+/// 只有 Windows 的輪詢模組用得到它（`mod mouse` 是 `cfg(target_os = "windows")`），
+/// Linux/macOS 下不標就會被 `-D warnings` 判 dead_code。
+#[cfg(target_os = "windows")]
 const MOUSE_ID: u32 = 1 << 31;
 
 static NATIVE_INPUTS: Mutex<Vec<Weak<NativeInput>>> = Mutex::new(Vec::new());
