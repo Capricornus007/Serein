@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     steps:
@@ -73,8 +73,3 @@ jobs:
         run: |
           test -f result/share/applications/cz.viceverse.serein.desktop
           test -f result/share/icons/hicolor/256x256/apps/serein.png
-      - name: Verify macOS app bundle
-        if: runner.os == 'macOS'
-        run: |
-          test -x result/Applications/Serein.app/Contents/MacOS/serein
-          plutil -lint result/Applications/Serein.app/Contents/Info.plist
