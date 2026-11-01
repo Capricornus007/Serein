@@ -23,5 +23,20 @@ ignore = [
     # arithmetic; in a desktop client the attacker has to time our own process,
     # so exposure is limited compared to a network-facing service.
     # Drop this ignore as soon as davey/hpke-rs move to p256 0.14.
-    "RUSTSEC-2026-0387",
+    "RUSTSEC-2026-0387", # crypto-bigint (transitive via davey/elliptic-curve 0.13)
+    # ctutils 0.4.5 is pulled in by crypto-bigint 0.5.5, i.e. the same voice-stack
+    # path as RUSTSEC-2026-0387 above; it cannot move independently of that pin.
+    "RUSTSEC-2026-0385", # ctutils (transitive via crypto-bigint)
+    "RUSTSEC-2026-0414", # pulldown-cmark (pinned in crates/ui/Cargo.toml)
+    "RUSTSEC-2026-0382", # rustls-webpki (transitive)
+    "RUSTSEC-2026-0383", # webpki-root-certs (transitive)
+    "RUSTSEC-2026-0381", # webpki-roots (transitive)
+    # RUSTSEC-2026-0386 (tokio AsyncFd soundness) is deliberately NOT ignored here:
+    # upstream carries it because their lock still resolves tokio 1.53.1, while this
+    # fork pins tokio 1.54.1, which is the patched version (Cargo.lock is the proof).
+    # If a future dependency change ever pulls tokio back below 1.54.1, this entry
+    # must make `cargo audit` fail rather than silently hide the regression.
 ]
+
+[yanked]
+enabled = false
