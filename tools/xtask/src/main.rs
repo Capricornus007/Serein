@@ -1,6 +1,6 @@
 use std::{
 	path::PathBuf,
-	process::{Command, ExitCode, Stdio},
+	process::{Command, ExitCode},
 };
 fn run(args: &[&str]) -> Result<(), String> {
 	run_tool("cargo", args)
@@ -186,54 +186,6 @@ fn copy_directory(source: &std::path::Path, destination: &std::path::Path) -> Re
 	}
 	Ok(())
 }
-#[allow(dead_code)]
-fn package_windows(root: &std::path::Path) -> Result<(), String> {
-	let nsis_candidates = [
-		PathBuf::from("makensis"),
-		PathBuf::from("makensis.exe"),
-		PathBuf::from(r"C:\Program Files (x86)\NSIS\makensis.exe"),
-		PathBuf::from(r"C:\Program Files\NSIS\makensis.exe"),
-	];
-
-	let makensis = nsis_candidates.iter().find(|cmd| {
-		Command::new(cmd)
-			.arg("/VERSION")
-			.stdout(Stdio::null())
-			.stderr(Stdio::null())
-			.status()
-			.is_ok_and(|s| s.success())
-	});
-
-	if let Some(makensis) = makensis {
-		let installer_dir = PathBuf::from("dist-installer");
-		std::fs::create_dir_all(&installer_dir).map_err(|e| e.to_string())?;
-		let version = env!("CARGO_PKG_VERSION");
-		let status = Command::new(makensis)
-			.args([
-				"-NOCD",
-				&format!("-DVERSION={version}"),
-				&format!("-DDIST_DIR={}", root.display()),
-				&format!("-DOUTPUT_DIR={}", installer_dir.display()),
-				"packaging/windows/installer.nsi",
-			])
-			.status()
-			.map_err(|e| e.to_string())?;
-		if !status.success() {
-			return Err("NSIS installer compilation failed".into());
-		}
-		println!(
-			"Windows installer created: {}",
-			installer_dir
-				.join(format!("serein-{version}-setup.exe"))
-				.display()
-		);
-	} else {
-		println!(
-			"makensis not found; skipping Windows installer binary creation (installer script available at packaging/windows/installer.nsi)"
-		);
-	}
-	Ok(())
-}
 fn package() -> Result<(), String> {
 	let options: Vec<String> = std::env::args().skip(2).collect();
 	let format = match options.as_slice() {
@@ -262,43 +214,13 @@ fn package() -> Result<(), String> {
 	run(&arguments)?;
 	let root = PathBuf::from("dist");
 	std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
-	let exe = if cfg!(windows) {
-		"serein.exe"
-	} else {
-		"serein"
-	};
-	let destination = if cfg!(target_os = "macos") {
-		let app = root.join("Serein.app/Contents");
-		std::fs::create_dir_all(app.join("MacOS")).map_err(|e| e.to_string())?;
-		std::fs::copy("packaging/macos/Info.plist", app.join("Info.plist"))
-			.map_err(|e| e.to_string())?;
-		app.join("MacOS").join(exe)
-	} else {
-		root.join(exe)
-	};
-	if cfg!(windows) {
-		std::fs::copy(
-			"packaging/windows/install-notifications.ps1",
-			root.join("install-notifications.ps1"),
-		)
-		.map_err(|e| e.to_string())?;
-	}
+	let exe = "serein";
+	let destination = root.join(exe);
 	let source = std::env::var_os("CARGO_TARGET_DIR")
 		.map_or_else(|| PathBuf::from("target"), PathBuf::from)
 		.join("release")
 		.join(exe);
-	if cfg!(target_os = "macos") {
-		// macOS caches code signatures by inode. Replace the executable rather
-		// than overwrite a previously launched, signed file in place.
-		let staging = destination.with_extension("staging");
-		match std::fs::remove_file(&staging) {
-			Ok(()) => {}
-			Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-			Err(error) => return Err(error.to_string()),
-		}
-		std::fs::copy(&source, &staging).map_err(|e| e.to_string())?;
-		std::fs::rename(&staging, &destination).map_err(|e| e.to_string())?;
-	} else {
+	{
 		std::fs::copy(&source, &destination).map_err(|e| e.to_string())?;
 	}
 	for file in [
@@ -309,21 +231,7 @@ fn package() -> Result<(), String> {
 	] {
 		std::fs::copy(file, root.join(file)).map_err(|e| e.to_string())?;
 	}
-	let resources = if cfg!(target_os = "macos") {
-		root.join("Serein.app/Contents/Resources")
-	} else {
-		root.clone()
-	};
-	if cfg!(target_os = "macos") {
-		let status = std::process::Command::new("sh")
-			.arg("packaging/macos/compile-icon.sh")
-			.arg(&resources)
-			.status()
-			.map_err(|e| e.to_string())?;
-		if !status.success() {
-			return Err("macOS app icon compilation failed".into());
-		}
-	}
+	let resources = root.clone();
 	std::fs::create_dir_all(resources.join("licenses")).map_err(|e| e.to_string())?;
 	std::fs::copy(
 		"assets/sounds/README.md",
@@ -409,24 +317,6 @@ fn package() -> Result<(), String> {
 	] {
 		std::fs::copy(file, resources.join(file)).map_err(|e| e.to_string())?;
 	}
-	if cfg!(target_os = "macos") {
-		// Seal only after every bundle resource has been staged. Ad-hoc signing
-		// needs no identity and makes no Developer ID or notarization claim.
-		let bundle = root.join("Serein.app");
-		let bundle = bundle.to_str().ok_or("Invalid bundle path")?;
-		// An ad-hoc signature's identity is its own hash, so it changes with every build and
-		// macOS keychain grants ("Always Allow") never survive one. A locally configured
-		// Developer ID identity keeps that trust stable across rebuilds; releases are signed
-		// and notarized separately by packaging/macos/sign-release.sh, which overrides this.
-		let identity = std::env::var("SEREIN_SIGNING_IDENTITY").unwrap_or_default();
-		let identity = if identity.trim().is_empty() {
-			"-".to_owned()
-		} else {
-			identity
-		};
-		run_tool("codesign", &["--force", "--sign", &identity, bundle])?;
-		run_tool("codesign", &["--verify", "--strict", bundle])?;
-	}
 	if cfg!(target_os = "linux") {
 		let mut arguments = vec![
 			if format == "appimage" {
@@ -442,16 +332,8 @@ fn package() -> Result<(), String> {
 		}
 		run_tool("python3", &arguments)?;
 	}
-	if cfg!(windows) {
-		package_windows(&root)?;
-	}
 	println!(
-		"{} package executable: {} ({} bytes)",
-		if cfg!(target_os = "macos") {
-			"Locally ad-hoc signed (not notarized)"
-		} else {
-			"Unsigned"
-		},
+		"Unsigned package executable: {} ({} bytes)",
 		destination.display(),
 		std::fs::metadata(&destination)
 			.map_err(|e| e.to_string())?
