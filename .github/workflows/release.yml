@@ -105,20 +105,4 @@ jobs:
       - name: Commit versions and publish semantic release with notes and assets
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: bun .github/release/release.mjs publish
-
-  repositories:
-    needs: [prepare, linux, publish]
-    if: needs.prepare.outputs.release == 'true'
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: ./.github/workflows/package-repositories.yml
-    with:
-      tag: ${{ needs.prepare.outputs.tag }}
-      channel: ${{ inputs.channel || 'nightly' }}
-      base_url: https://viceverse-cz.github.io/Serein
-      deploy: true
-    secrets: inherit

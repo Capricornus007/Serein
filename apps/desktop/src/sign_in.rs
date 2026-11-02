@@ -26,6 +26,7 @@ impl Desktop {
 		if let Some(store) = &mut self.store {
 			store.cancel_load();
 		}
+		self.credential_retry_available = false;
 		self.credential_status = if save {
 			"Login will be saved after Discord connects"
 		} else {
@@ -946,6 +947,20 @@ impl Desktop {
 								)
 								.wrap(),
 							);
+						}
+						if self.credential_retry_available
+							&& !busy && ui::design::secondary_button(ui, "Retry saved login")
+							.clicked()
+						{
+							let started = self.store.as_mut().is_some_and(|store| {
+								store.load(self.state.generation, std::time::Instant::now())
+							});
+							self.credential_retry_available = !started;
+							self.credential_status = if started {
+								"Checking saved login…"
+							} else {
+								"Saved-login retry could not be queued; try again"
+							};
 						}
 						if self.cache_error || self.cache_pending > 0 || self.cache_clears.pending()
 						{

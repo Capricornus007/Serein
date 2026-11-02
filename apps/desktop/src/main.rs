@@ -1129,6 +1129,8 @@ struct Desktop {
 	/// Saved account awaiting the owner's confirmation before it is forgotten.
 	confirming_forget: Option<model::Id>,
 	credential_status: &'static str,
+	/// A transient keyring failure can be retried without opening a new login flow.
+	credential_retry_available: bool,
 	/// Until when the sign-in failure copy button reads "Copied".
 	sign_in_copied: Option<f64>,
 	forgetting: bool,
@@ -2486,6 +2488,7 @@ impl Desktop {
 			} else {
 				"Saved login unavailable; could not start credential lookup"
 			},
+			credential_retry_available: !demo && !loading_saved,
 			forgetting: false,
 			confirming_close: false,
 			confirming_logout: false,
@@ -4956,6 +4959,7 @@ impl Desktop {
 			match outcome {
 				credentials::Outcome::Loaded(result) => {
 					let switching = self.switching.take();
+					self.credential_retry_available = switching.is_none() && result.is_err();
 					if let Ok(Some(secret)) = result {
 						// `connect()` already sets a "Connecting to Discord…" status; avoid
 						// stacking a second, near-duplicate line under the restore screen.
@@ -5394,14 +5398,12 @@ impl Desktop {
 					pending.delivery = Delivery::Ambiguous;
 				}
 			}
-			if failure == Failure::Expired
-				&& let Some(store) = &self.store
-			{
-				let _ = store.send.try_send((
-					self.state.generation,
-					credentials::Request::NONE,
-					credentials::Operation::Forget,
-				));
+			if failure == Failure::Expired {
+				// A server-side expiry can be transient or recoverable through a fresh
+				// owner login. Keep the only saved credential until the owner explicitly
+				// logs out or forgets the account; a successful re-login replaces it.
+				self.credential_retry_available = false;
+				self.credential_status = "Saved login kept; sign in again to replace it, or explicitly forget the account.";
 			}
 		}
 		if let Some(login) = &self.login {

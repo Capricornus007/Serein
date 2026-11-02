@@ -20,10 +20,10 @@ flatpak install --user ./serein-*.flatpak           # Flatpak bundle
 
 Use a directory containing only the selected package. Local build artifacts are
 unsigned; package-manager signature policy may require an operator-signed package.
-The [signed repository setup](../repositories/README.md) prepares apt, dnf/zypper
-and pacman repositories for normal package-manager upgrades. Hosting and signing
-credentials must be configured before those repository URLs are usable. Serein is
-not listed in distribution archives or Flathub by this change. An optional
+The optional [signed repository tooling](../repositories/README.md) can prepare apt,
+dnf/zypper and pacman trees after a hosting target and dedicated signing key are explicitly
+configured. This fork does not auto-publish a Pages repository from the release workflow.
+Serein is not listed in distribution archives or Flathub by this change. An optional
 [AUR binary recipe](../aur/README.md) is prepared in this repository for maintainer
 submission; it does not configure a pacman repository or claim AUR publication.
 

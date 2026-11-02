@@ -40,13 +40,6 @@ def update(version):
                 section = section.replace(f'"{name} {previous}"', f'"{name} {version}"')
             sections[index] = section
         path.write_text('[[package]]'.join(sections))
-    plist = pathlib.Path('packaging/macos/Info.plist')
-    source, count = re.subn(
-        r'(<key>CFBundleShortVersionString</key><string>)[^<]+(</string>)',
-        lambda match: match[1] + version.split('-')[0] + match[2], plist.read_text(),
-    )
-    assert count == 1, 'Cannot locate Mac version'
-    plist.write_text(source)
 
 
 if __name__ == '__main__':

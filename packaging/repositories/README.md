@@ -1,19 +1,14 @@
 # Signed package repositories
 
-`build.py` prepares static HTTPS repository trees for apt, dnf/zypper and pacman.
-The repository is hosted on GitHub Pages at
-`https://viceverse-cz.github.io/Serein/`. Its current package-signing fingerprint is
-`CA19DA939E9BCAB500751CE480FE95CAD86141A5`; verify this through an independent
-channel before trusting the key. Configure the repository Actions secret
-`PACKAGE_SIGNING_KEY` with the ASCII-armored dedicated private signing key, and
-Actions variable `PACKAGE_SIGNING_FINGERPRINT` with its full fingerprint. Run the package-repository preparation workflow with
-`tag` (an existing Serein release), `channel` (`nightly` or `production`) and
-`base_url` (the final HTTPS root). It downloads the distribution-labelled assets,
-verifies their release `SHA256SUMS`, signs repositories and uploads the
-`signed-package-repositories` artifact. The release workflow calls the same workflow
-after publishing a release and deploys the merged tree to GitHub Pages. Manual runs
-deploy only when their `deploy` input is enabled; otherwise they leave a reviewable
-artifact without changing the site.
+`build.py` can prepare static HTTPS repository trees for apt, dnf/zypper and pacman.
+This fork does **not** configure or publish a GitHub Pages site, and the release workflow does
+not call this optional signing workflow. To operate a repository deliberately, first choose
+and configure a hosting URL, create a dedicated package-signing key, set the protected
+`PACKAGE_SIGNING_KEY` secret and `PACKAGE_SIGNING_FINGERPRINT` variable, then manually run
+the package-repository workflow with `tag`, `channel`, the exact final `base_url`, and
+`deploy` only after the Pages/hosting target has been explicitly approved. A non-deploying
+manual run leaves the signed tree as a reviewable artifact. Never reuse another signing key
+or claim the example URL/fingerprint as live configuration.
 
 Each invocation accepts native packages from **one build distribution and architecture**:
 
@@ -54,28 +49,24 @@ publishes the supplied release snapshot, not an unbounded history of packages.
 apt metadata expires after 30 days to limit stale signed-metadata replay; regenerate
 and republish before expiry even when the application version has not changed.
 
-## Automatic setup script
+## Optional setup script
 
-Run the automatic repository setup script to detect your distribution, verify the
-GPG signing key fingerprint, and configure the repository. Native setup accepts
-Ubuntu 26.04, Fedora 43/44, openSUSE Tumbleweed, Arch Linux and distributions that
-declare `ID_LIKE=arch`. Ubuntu 26.04 accepts x86_64 and ARM64 (`aarch64`/`arm64`);
-the other native repositories remain x86_64 only. ARM64 requires a new release
-containing the ARM64 build and matching signed apt repository. Other versions and derivatives must use the Flatpak bundle
-instead of incompatible native packages:
+`setup.sh` configures a repository only after an operator has published and independently
+authenticated its HTTPS base URL and signing-key fingerprint. This fork currently has no
+authorized hosted repository, so do not pipe a guessed or historical URL into a shell.
+After an operator publishes one, run the checked-out script with explicit values and review
+the package-manager prompt:
 
 ```sh
-curl -fsSL https://viceverse-cz.github.io/Serein/setup.sh | sh
-# Or run from the cloned repository:
-# sh packaging/repositories/setup.sh
+SEREIN_REPOSITORY_BASE=https://YOUR-HOST/YOUR-PATH \
+SEREIN_CHANNEL=nightly \
+EXPECTED_FINGERPRINT=YOUR_FULL_PUBLISHED_FINGERPRINT \
+sh packaging/repositories/setup.sh
 ```
 
-To configure a specific channel or base URL:
-```sh
-curl -fsSL https://viceverse-cz.github.io/Serein/setup.sh | SEREIN_CHANNEL=production sh
-```
-
-After running the script, update your package lists and install `serein` using your distribution's native package manager (`apt`, `dnf`, `zypper`, or `pacman`). Subsequent system updates will automatically update Serein.
+Native setup supports Ubuntu 26.04, Fedora 43/44, openSUSE Tumbleweed, Arch Linux and
+distributions declaring `ID_LIKE=arch`; incompatible versions should use the release
+Flatpak bundle. Publishing and trust bootstrap remain an explicit operator action.
 
 Fedora setup selects the host's exact version (43 or 44). Fedora 43 needs a new
 release containing its matching build and signed repository; older releases only
