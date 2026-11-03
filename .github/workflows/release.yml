@@ -39,7 +39,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@v2.2.0
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
       - run: bun install --cwd .github/release --frozen-lockfile --ignore-scripts
       - run: bun .github/release/check.mjs
       - name: Calculate semantic version and notes
@@ -52,7 +52,7 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: python3 .github/release/version.py "$VERSION"
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         if: steps.version.outputs.release == 'true'
         with:
           name: release-manifests
@@ -88,13 +88,13 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@v2.2.0
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
       - run: bun install --cwd .github/release --frozen-lockfile --ignore-scripts
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@v8.0.2
         with:
           name: release-manifests
           path: .
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@v8.0.2
         with:
           pattern: serein-*
           path: release-assets
